@@ -36,7 +36,8 @@ Lee el ítem correspondiente de `BACKLOG.md` y los ADRs que cite. Si el ítem es
 `REGLAS.md` y el plan de cuentas son **contexto obligatorio**: sin ellos saldrán reglas contables
 inventadas.
 
-## Idioma
+## Convenciones
 
-Documentación y ADRs en español. **Código, identificadores, comentarios y mensajes de commit en
-inglés.**
+`CONVENTIONS.md` — nombres, idioma del código y estilo. La regla que más se olvida: **el dominio
+contable se nombra en español** (`AsientoContable`, `BasePEN`, `CtaReflejaCodigo`) para que mapee
+1:1 con `REGLAS.md`; el andamiaje técnico, en inglés.
