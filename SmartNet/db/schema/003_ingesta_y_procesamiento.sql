@@ -74,8 +74,11 @@ CREATE TABLE fact.DatosExtraidos
     -- design.md item 2: serie(4) + '-' + hasta 8 dígitos; VARCHAR because issuers do not always
     -- pad the correlativo.
     Numero             VARCHAR(20)          NULL,
-    -- design.md item 1: Peruvian RUC is exactly 11 digits, an identifier (leading zeros are data).
-    RucProveedor       CHAR(11)             NULL,
+    -- design.md item 1, WIDENED: an identifier, never numeric -- leading zeros are data. Accepts 8
+    -- to 11 digits because the emitter is not always a RUC: of the 6600 suppliers, 118 carry an
+    -- 8-digit DNI and 6 a 9-10 digit carne de extranjeria. VARCHAR, not CHAR: a fixed-length type
+    -- would pad an 8-digit DNI with spaces and break every comparison against dbo.Proveedor.rucpro.
+    RucProveedor       VARCHAR(11)          NULL,
     NombreProveedor    NVARCHAR(200)        NULL,
     -- Money rule: DECIMAL(18,2), never float/real.
     Monto              DECIMAL(18,2)        NULL,
@@ -89,7 +92,8 @@ CREATE TABLE fact.DatosExtraidos
     CONSTRAINT FK_DatosExtraidos_Procesamiento
         FOREIGN KEY (ProcesamientoId) REFERENCES fact.Procesamiento (ProcesamientoId),
     CONSTRAINT CK_DatosExtraidos_RucProveedor
-        CHECK (RucProveedor IS NULL OR RucProveedor LIKE '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'),
+        CHECK (RucProveedor IS NULL
+               OR (LEN(RucProveedor) BETWEEN 8 AND 11 AND RucProveedor NOT LIKE '%[^0-9]%')),
     CONSTRAINT CK_DatosExtraidos_Moneda CHECK (Moneda IS NULL OR Moneda LIKE '[A-Z][A-Z][A-Z]')
 );
 

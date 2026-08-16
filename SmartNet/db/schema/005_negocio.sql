@@ -19,8 +19,11 @@ CREATE TABLE fact.Factura
     -- same reasoning (ADR 0003 "nadie escribe una tabla externa"; no REFERENCES grant on dbo)
     -- applies here as much as to CuentaCodigo/RucProveedor.
     ProveedorCodigo        CHAR(6)              NOT NULL CONSTRAINT DF_Factura_ProveedorCodigo DEFAULT ('P00000'),
-    -- design.md item 1: frozen copy, CHAR(11), never an FK.
-    RucProveedor           CHAR(11)             NULL,
+    -- design.md item 1: frozen copy, never an FK. WIDENED to VARCHAR(8-11): the emitter is not
+    -- always a RUC -- 124 of the 6600 suppliers carry a DNI or a carne de extranjeria instead.
+    -- VARCHAR and not CHAR because padding an 8-digit DNI to 11 would poison IX_Factura_Identidad
+    -- and every join to dbo.Proveedor.rucpro, which is itself VARCHAR.
+    RucProveedor           VARCHAR(11)          NULL,
     -- design.md item 4.
     TipoComprobante        CHAR(2)              NOT NULL,
     -- design.md item 2: nullable — "el caso del número no extraído es normativo".
@@ -65,7 +68,8 @@ CREATE TABLE fact.Factura
     CONSTRAINT FK_Factura_FacturaReferencia
         FOREIGN KEY (FacturaReferenciaId) REFERENCES fact.Factura (FacturaId),
     CONSTRAINT CK_Factura_RucProveedor
-        CHECK (RucProveedor IS NULL OR RucProveedor LIKE '[0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9][0-9]'),
+        CHECK (RucProveedor IS NULL
+               OR (LEN(RucProveedor) BETWEEN 8 AND 11 AND RucProveedor NOT LIKE '%[^0-9]%')),
     CONSTRAINT CK_Factura_Moneda CHECK (Moneda LIKE '[A-Z][A-Z][A-Z]'),
     CONSTRAINT CK_Factura_Afectacion CHECK (Afectacion IS NULL OR Afectacion IN ('GRAVADA', 'EXONERADA', 'INAFECTA')),
     CONSTRAINT CK_Factura_Estado CHECK (Estado IN ('PENDIENTE_VALIDACION', 'VALIDADA', 'DESCARTADA'))

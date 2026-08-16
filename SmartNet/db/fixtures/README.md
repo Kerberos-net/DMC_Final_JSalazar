@@ -72,9 +72,17 @@ Tres de estas cifras corrigieron o confirmaron algo que los documentos afirmaban
   y 6 un carné de extranjería de 9 o 10. Los ceros a la izquierda son significativos, así que la
   columna es texto y **nunca numérica**.
 
-## Una consecuencia abierta
+## Una consecuencia que estaba abierta, y ya no
 
-`Factura.RucProveedor` está diseñado como 11 dígitos, que es lo correcto para el emisor de un
+`Factura.RucProveedor` se diseñó como 11 dígitos, que es lo correcto para el emisor de un
 comprobante. Pero **124 proveedores del catálogo no tienen RUC de 11 dígitos**: tienen DNI o carné.
-Si alguno de ellos llegara a emitir un comprobante que este sistema deba registrar, ese campo no lo
-admitiría. Queda señalado aquí para decidirlo con criterio contable, no por omisión.
+Con el diseño original, una factura de cualquiera de ellos habría sido rechazada por la restricción.
+
+**Resuelto con criterio contable: esos emisores son legítimos.** La columna admite ahora de 8 a 11
+dígitos, en `fact.Factura` y en `fact.DatosExtraidos`.
+
+Y pasó de `CHAR(11)` a `VARCHAR(11)`, que es la mitad menos obvia de la corrección: un tipo de
+longitud fija habría rellenado con espacios un DNI de 8 dígitos, de modo que nunca habría sido igual
+al valor de `dbo.Proveedor.rucpro` —que es `VARCHAR`— y habría entrado relleno en
+`IX_Factura_Identidad`, dejando de detectar duplicados sin avisar. Es la misma clase de defecto que
+el retorno de carro invisible que arrastró una vez la carga de catálogos.

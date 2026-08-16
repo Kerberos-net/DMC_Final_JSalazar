@@ -158,13 +158,20 @@ sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ít
 
 ---
 
+## Resuelto
+
+- **`Factura.RucProveedor` admite DNI y carné de extranjería.** Decidido con criterio contable: los
+  124 proveedores sin RUC de 11 dígitos son emisores legítimos. La columna pasó a `VARCHAR(11)` con
+  restricción de 8 a 11 dígitos, en `Factura` y en `DatosExtraidos`. El cambio de `CHAR` a `VARCHAR`
+  es la mitad menos obvia: el relleno con espacios habría roto la unión con `dbo.Proveedor.rucpro` y
+  la detección de duplicados en `IX_Factura_Identidad`.
+
 ## Abierto y sin decidir
 
 No bloquea construir, pero tampoco debe cerrarse por omisión.
 
 | Tema | Dónde está anotado | Qué decide |
 |---|---|---|
-| `Factura.RucProveedor` admite 11 dígitos, pero 124 proveedores tienen DNI o carné | `SmartNet/db/fixtures/README.md` | Criterio contable. Afecta al ítem #3 y al #7 |
 | Las tres preguntas de respaldo de ADR 0014 | ADR 0014 | Condición de puesta en producción |
 | Las seis reglas sin ratificar de `REGLAS.md` §12 | `REGLAS.md` §12 | Los puntos 1 y 5 afectan a **todo asiento en moneda extranjera ya confirmado** |
 
