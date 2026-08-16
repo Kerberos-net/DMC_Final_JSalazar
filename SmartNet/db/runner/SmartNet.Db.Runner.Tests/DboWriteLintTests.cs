@@ -143,7 +143,11 @@ public sealed class DboWriteLintTests
             Path.Combine(AppContext.BaseDirectory, "..", "..", "..", "..", "..", "schema"));
         Assert.True(Directory.Exists(schemaPath), $"Expected to find SmartNet/db/schema/ at {schemaPath}.");
 
-        var scripts = Directory.GetFiles(schemaPath, "*.sql");
+        // Recursive on purpose, so `rollback/` is covered too. The down scripts are advisory and
+        // the runner never applies them, but a human may run one by hand against a real database —
+        // which makes them exactly the place where an unnoticed `dbo` write would do its damage.
+        var scripts = Directory.GetFiles(schemaPath, "*.sql", SearchOption.AllDirectories);
+        Assert.Contains(scripts, s => s.Contains("rollback", StringComparison.OrdinalIgnoreCase));
         Assert.NotEmpty(scripts);
 
         var allViolations = scripts.SelectMany(FindDboViolations).ToList();

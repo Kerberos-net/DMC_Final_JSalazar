@@ -1,0 +1,21 @@
+-- rollback/010_down.sql -- ADVISORY, never executed by the runner (design.md, Decision 4).
+-- Reverses 010_motivo_atributo_demo.sql: DELETEs exactly the 23 rows it inserted from
+-- fact.MotivoAtributo, by their Motivo number, never a blanket DELETE or a DROP TABLE.
+--
+-- Ordering: promote/apply rollback scripts in DESCENDING numeric order (010 down to 001) if
+-- reverting more than one migration -- this one runs FIRST, before 004_down.sql drops the table
+-- these rows live in.
+--
+-- Unlike every other script in this directory, promoting this one is not purely defensive: it is
+-- the exact reversal MOTIVOS-CLASIFICACION.md itself calls for before production ("debe revertirse
+-- antes de una puesta en producción"). 010 was a demo-only reclassification from `07 CAJA CHICA` to
+-- `02 COMPRAS`; this script is what makes that stop being true again.
+--
+-- CANNOT UNDO cleanly: any AsientoContable already confirmed while one of these 23 motives showed
+-- as `02` stays exactly as confirmed -- OrigenLibro is read at entry time, not re-derived later
+-- (the same freezing principle ADR 0006 applies to accounts and rates), so this DELETE does not
+-- retroactively change a single historical asiento. It only stops these motives from offering `02`
+-- going forward. That is almost certainly the desired behavior, but it is a real asymmetry worth
+-- naming: reverting the seed does not revert its consequences.
+DELETE FROM fact.MotivoAtributo
+WHERE Motivo IN (5, 13, 16, 17, 18, 19, 20, 21, 30, 38, 40, 42, 46, 48, 49, 53, 56, 59, 60, 77, 81, 88, 90);

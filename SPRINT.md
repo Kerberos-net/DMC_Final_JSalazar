@@ -13,7 +13,7 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 |---|---|
 | Ítems del backlog | 1 de 17 en curso, 0 cerrados |
 | Ciclo SDD activo | `openspec/changes/esquema-y-permisos/` |
-| Última fase cerrada | Ítem #1, fase 4 — datos base |
+| Última fase cerrada | Ítem #1, fase 4 — datos base (la 5 va 4/5: falta cablear CI) |
 
 ---
 
@@ -22,7 +22,7 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 SQL versionado, esquema `fact`, tablas, índices, restricciones y los `GRANT` de los dos usuarios
 de base de datos. Sin dependencias.
 
-**Ciclo SDD:** `openspec/changes/esquema-y-permisos/` · **29 de 36 tareas cerradas**
+**Ciclo SDD:** `openspec/changes/esquema-y-permisos/` · **33 de 36 tareas cerradas**
 
 | Fase | Unidad | Alcance | Tareas | Estado |
 |---|---|---|---|---|
@@ -30,7 +30,7 @@ de base de datos. Sin dependencias.
 | 2 | 2 | Estructura del esquema `001`–`007` + pruebas de forma | 13/13 | ✅ |
 | 3 | 3 | Matriz de permisos `008` + pruebas nivel 2 de ADR 0019 | 4/4 | ✅ |
 | 4 | 4 | Datos base `009`–`010` (`EstadoIntegracion`, `Configuracion`, 23 `MotivoAtributo`) | 7/7 | ✅ |
-| 5 | 5 | Manifiesto de *checksums* en CI + scripts de *rollback* consultivos | 0/5 | ⬜ |
+| 5 | 5 | Manifiesto de *checksums* + scripts de *rollback* consultivos | 4/5 | 🔄 |
 | 6 | 5 | Integración: suite completa end-to-end sobre base nueva | 0/2 | ⬜ |
 
 ### Lo verificado al cerrar cada fase
@@ -82,6 +82,25 @@ para SQL dinámico: no aportaba nada, porque el escaneo es textual y ya atrapa e
 dentro del literal. Queda anotado en el código qué sí evade el lint —un nombre de esquema
 concatenado— y por qué eso es residuo aceptable.
 
+
+**Fase 5 — 4 de 5.** 102/102 pruebas en verde, verificadas ejecutándolas yo. El manifiesto
+`checksums.txt` existe porque **DbUp no tiene *checksums***: anota el nombre del script en
+`fact.SchemaVersions` y nunca vuelve a mirar su contenido, así que editar un script ya aplicado no
+falla en ningún sitio y la base y el repositorio divergen en silencio. Comprobé que muerde:
+añadiendo una línea de comentario a `007_publicacion.sql`, el manifiesto se pone rojo.
+
+Diez scripts `rollback/NNN_down.sql`, uno por script directo. Son **migraciones compensatorias
+acotadas a `fact`**, nunca una restauración de instantánea: la base es compartida con el sistema
+contable de la compañía, y restaurar revertiría también ese sistema (hallazgo C7). Las pruebas
+afirman que el runner **nunca** los recoge.
+
+Al verificar encontré que el lint de `dbo` enumeraba `schema/` sin recursión, de modo que
+`rollback/` quedaba **fuera de su vigilancia**. Los down scripts son consultivos, pero alguien puede
+ejecutarlos a mano contra una base real: es justo donde una escritura a `dbo` inadvertida haría
+daño. Lo pasé a recursivo y añadí la aserción de que `rollback/` esté incluido.
+
+Queda **la tarea 5.3**: cablear la canalización de CI de dos trabajos que el usuario eligió. Las
+comprobaciones ya son un comando cada una; falta solo el envoltorio.
 ### Deuda declarada, no olvidada
 
 - ~~**Tarea 1.5** — la aserción literal de idempotencia de `008`~~ **saldada en la fase 3**, y mejor
