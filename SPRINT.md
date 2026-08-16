@@ -11,8 +11,8 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | **1 de 17 cerrado**, ninguno en curso |
-| Ciclo SDD activo | `openspec/changes/esquema-y-permisos/` |
+| Ítems del backlog | 1 de 17 cerrado, **1 en curso** (#2) |
+| Ciclo SDD activo | `openspec/changes/autenticacion-y-sesion/` — propuesta aceptada, spec y diseño en marcha |
 | Última fase cerrada | Ítem #1 COMPLETO — las seis fases cerradas |
 
 ---
@@ -132,14 +132,28 @@ construido; queda anotado así en vez de disfrazarse de RED primero.
 
 ---
 
-## ⬜ Ítems 2 a 17 — sin ciclo SDD abierto
+## 🔄 2. Autenticación y sesión
+
+Host mínimo de API, cookie `__Host-session` con `SameSite=Lax`, tabla `fact.Sesion` como almacén de
+sesión revocable en servidor, bloqueo por intentos sobre las columnas ya existentes, y el comando de
+restablecimiento de ADR 0007. Depende del ítem #1 (completo).
+
+**Ciclo SDD:** `openspec/changes/autenticacion-y-sesion/` · propuesta aceptada · spec y diseño **en
+curso**. Las fases se definen cuando exista `tasks.md` — no antes, para no inventarlas.
+
+**Tres decisiones ya tomadas, no reabrir:** Argon2id como algoritmo de *hash*; `fact.Sesion` como
+tabla versionada con sus propios `GRANT`/`DENY`, no caché distribuida; el ítem #2 levanta también el
+host mínimo de API en `SmartNet/api/` (`net10.0`), ya que ningún otro ítem del backlog lo hace.
+
+---
+
+## ⬜ Ítems 3 a 17 — sin ciclo SDD abierto
 
 Las fases de cada ítem **se definen cuando arranca su ciclo SDD**, no antes. Ponerlas aquí ahora
 sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ítem, y ninguno existe.
 
 | # | Ítem | Depende de | Contexto obligatorio | Estado |
 |---|---|---|---|---|
-| 2 | Autenticación y sesión | #1 | — | ⬜ |
 | 3 | Catálogos y satélites | #1 | ⚠ `Cuentas.xlsx` | ⬜ |
 | 4 | Tipos de cambio | #1 | — | ⬜ |
 | 5 | Ingesta Gmail | #1 | — | ⬜ |
