@@ -5,3 +5,8 @@
 
 # Temporales de Office al abrir los datos maestros
 ~$*.xlsx
+
+# .NET build output
+bin/
+obj/
+*.user
