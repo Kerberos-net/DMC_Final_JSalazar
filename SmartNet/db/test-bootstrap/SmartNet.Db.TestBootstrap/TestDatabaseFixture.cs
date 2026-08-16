@@ -19,6 +19,13 @@ public sealed class TestDatabaseFixture : IAsyncDisposable
     public string DatabaseName { get; }
     public string ConnectionString { get; }
 
+    // Runs exactly once per test process (Lazy<Task> with the default LazyThreadSafetyMode.
+    // ExecutionAndPublication guarantees single execution even under xUnit's cross-class
+    // parallelism): drops any `fact_test_%` database left behind by a prior run whose disposal did
+    // not complete. See design.md/apply-progress "Coordinator-directed follow-up, item 3" for the
+    // diagnosed root cause — this sweep is the safety net, not the fix for that root cause.
+    private static readonly Lazy<Task> OrphanSweep = new(SweepOrphanedTestDatabasesAsync);
+
     private TestDatabaseFixture(string databaseName, string connectionString, string masterConnectionString)
     {
         DatabaseName = databaseName;
@@ -36,8 +43,59 @@ public sealed class TestDatabaseFixture : IAsyncDisposable
         Environment.GetEnvironmentVariable("SMARTNET_TEST_MASTER_CONNECTION")
         ?? "Server=localhost;Database=master;Integrated Security=True;TrustServerCertificate=True;Encrypt=False";
 
+    /// <summary>
+    /// Drops every database whose name matches exactly `fact_test_%` (the literal underscore is
+    /// escaped so it is not treated as a SQL `LIKE` single-character wildcard) — never anything
+    /// else. `master` and `BDSmartNet` are structurally unreachable: neither name matches this
+    /// pattern, and the query never enumerates by anything other than name. Best-effort: a database
+    /// still legitimately in use by a concurrently running test (unlikely — `fact_test_<guid>`
+    /// names never collide) would simply fail this DROP and be left for a later sweep or manual
+    /// cleanup, never treated as fatal to the current test run.
+    /// </summary>
+    private static async Task SweepOrphanedTestDatabasesAsync()
+    {
+        var masterConnectionString = ResolveMasterConnectionString();
+
+        List<string> orphaned;
+        await using (var connection = new SqlConnection(masterConnectionString))
+        {
+            await connection.OpenAsync();
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT name FROM sys.databases WHERE name LIKE 'fact\\_test\\_%' ESCAPE '\\';";
+            await using var reader = await command.ExecuteReaderAsync();
+            orphaned = new List<string>();
+            while (await reader.ReadAsync())
+            {
+                orphaned.Add(reader.GetString(0));
+            }
+        }
+
+        foreach (var name in orphaned)
+        {
+            try
+            {
+                await using var connection = new SqlConnection(masterConnectionString);
+                await connection.OpenAsync();
+                await using var command = connection.CreateCommand();
+                command.CommandText =
+                    $"""
+                     ALTER DATABASE [{name}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+                     DROP DATABASE [{name}];
+                     """;
+                await command.ExecuteNonQueryAsync();
+            }
+            catch (SqlException)
+            {
+                // Best-effort cleanup of a PRIOR run's leak; never block the current test run over
+                // a database this sweep could not remove (e.g. genuinely still in use).
+            }
+        }
+    }
+
     public static async Task<TestDatabaseFixture> CreateAsync(CancellationToken ct = default)
     {
+        await OrphanSweep.Value;
+
         var masterConnectionString = ResolveMasterConnectionString();
         var databaseName = $"fact_test_{Guid.NewGuid():N}";
 
@@ -84,6 +142,39 @@ public sealed class TestDatabaseFixture : IAsyncDisposable
              IF DATABASE_PRINCIPAL_ID('{userName}') IS NULL
                  CREATE USER [{userName}] WITHOUT LOGIN;
              """,
+            ct);
+
+    /// <summary>
+    /// Creates the four `dbo.*` external catalogs named by ADR 0003's "externa" class
+    /// (`Proveedor`, `CuentaContable`, `Motivo`, `Origen`), as bare structure only — no data, no
+    /// `DocumentoIdentidad`, no FK to it. `008_usuarios_y_permisos.sql`'s
+    /// `GRANT SELECT ON OBJECT::dbo.<table>` statements need these objects to exist to succeed;
+    /// this is test-only infrastructure, never applied to the shared database (that is
+    /// `SmartNet/db/fixtures/010_dbo_catalogos_ddl.sql`'s job, run once by hand against a real
+    /// environment, README.md). Idempotent (`IF OBJECT_ID(...) IS NULL`), consistent with the rest
+    /// of this harness.
+    /// </summary>
+    public Task CreateExternalDboCatalogsAsync(CancellationToken ct = default) =>
+        ExecuteNonQueryAsync(
+            """
+            IF OBJECT_ID('dbo.DocumentoIdentidad', 'U') IS NULL
+                CREATE TABLE dbo.DocumentoIdentidad (coddocide CHAR(2) NOT NULL, nomdocide NVARCHAR(60) NOT NULL,
+                    CONSTRAINT PK_DocumentoIdentidad PRIMARY KEY CLUSTERED (coddocide));
+            IF OBJECT_ID('dbo.Origen', 'U') IS NULL
+                CREATE TABLE dbo.Origen (codigo CHAR(2) NOT NULL, origen NVARCHAR(40) NOT NULL,
+                    CONSTRAINT PK_Origen PRIMARY KEY CLUSTERED (codigo));
+            IF OBJECT_ID('dbo.Motivo', 'U') IS NULL
+                CREATE TABLE dbo.Motivo (codigo INT NOT NULL, motivo NVARCHAR(60) NOT NULL,
+                    cuenta VARCHAR(120) NULL, CONSTRAINT PK_Motivo PRIMARY KEY CLUSTERED (codigo));
+            IF OBJECT_ID('dbo.CuentaContable', 'U') IS NULL
+                CREATE TABLE dbo.CuentaContable (cuenta VARCHAR(10) NOT NULL,
+                    descripcion NVARCHAR(60) NOT NULL, nivel TINYINT NULL, ctarefleja VARCHAR(10) NULL,
+                    ctapuente VARCHAR(10) NULL, CONSTRAINT PK_CuentaContable PRIMARY KEY CLUSTERED (cuenta));
+            IF OBJECT_ID('dbo.Proveedor', 'U') IS NULL
+                CREATE TABLE dbo.Proveedor (codpro CHAR(6) NOT NULL, proveedor NVARCHAR(80) NOT NULL,
+                    coddocide CHAR(2) NULL, rucpro VARCHAR(11) NULL,
+                    CONSTRAINT PK_Proveedor PRIMARY KEY CLUSTERED (codpro));
+            """,
             ct);
 
     /// <summary>
@@ -137,16 +228,37 @@ public sealed class TestDatabaseFixture : IAsyncDisposable
         return result is null or DBNull ? default : (T)result;
     }
 
+    /// <summary>
+    /// Retries a few times with backoff: under xUnit's cross-class parallelism, many
+    /// `fact_test_&lt;id&gt;` databases are created/dropped concurrently against the same instance,
+    /// and `DROP DATABASE`/`ALTER DATABASE` can hit transient lock contention. This is defense in
+    /// depth, not the fix for the confirmed root cause of the disposal leak (see apply-progress,
+    /// "Coordinator-directed follow-up, item 3": callers whose own setup helper throws BEFORE
+    /// returning the fixture never reach this method at all — that is a caller-side bug, fixed at
+    /// the call sites, not here).
+    /// </summary>
     public async ValueTask DisposeAsync()
     {
-        await using var connection = new SqlConnection(_masterConnectionString);
-        await connection.OpenAsync();
-        await using var command = connection.CreateCommand();
-        command.CommandText =
-            $"""
-             ALTER DATABASE [{DatabaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
-             DROP DATABASE [{DatabaseName}];
-             """;
-        await command.ExecuteNonQueryAsync();
+        const int maxAttempts = 3;
+        for (var attempt = 1; attempt <= maxAttempts; attempt++)
+        {
+            try
+            {
+                await using var connection = new SqlConnection(_masterConnectionString);
+                await connection.OpenAsync();
+                await using var command = connection.CreateCommand();
+                command.CommandText =
+                    $"""
+                     ALTER DATABASE [{DatabaseName}] SET SINGLE_USER WITH ROLLBACK IMMEDIATE;
+                     DROP DATABASE [{DatabaseName}];
+                     """;
+                await command.ExecuteNonQueryAsync();
+                return;
+            }
+            catch (SqlException) when (attempt < maxAttempts)
+            {
+                await Task.Delay(TimeSpan.FromMilliseconds(250 * attempt));
+            }
+        }
     }
 }

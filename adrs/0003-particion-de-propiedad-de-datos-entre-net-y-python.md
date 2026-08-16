@@ -2,7 +2,11 @@
 
 ## Estado
 
-Aceptado. Revisión 4. Convierte la partición en **permisos reales del motor** —esquema propio y dos
+Aceptado. Revisión 5. Añade `DocumentoIdentidad` como quinta tabla externa: el catálogo se
+incorporó después de escribir este ADR y `Proveedor` tiene clave foránea hacia él, de modo que
+omitirlo dejaba sin lectura al tipo de documento del proveedor.
+
+La revisión 4 convierte la partición en **permisos reales del motor** —esquema propio y dos
 usuarios de base de datos— que hasta ahora se reivindicaban sin decidirse, y declara como premisa
 verificable el supuesto sobre el alta de proveedores (revisión adversarial v2, A12, A15).
 
@@ -97,6 +101,7 @@ Escritas por un **sistema ajeno al proyecto**, en la misma base. Esta aplicació
 | `CuentaContable` | Plan contable de la compañía, con `ctarefleja` y `ctapuente` |
 | `Motivo` | Motivos de compra con sus prefijos de cuenta |
 | `Origen` | Orígenes de libro |
+| `DocumentoIdentidad` | Tipos de documento de identidad de SUNAT; `Proveedor` tiene clave foránea hacia él |
 
 ### Tablas satélite
 

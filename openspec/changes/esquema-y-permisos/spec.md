@@ -6,8 +6,9 @@ implementation detail — verifiable, observable database properties only.
 ## Non-Goals (explicit scope boundaries)
 
 - **`dbo.*` tables are never created or written by this change.** `dbo.Proveedor`,
-  `dbo.CuentaContable`, `dbo.Motivo`, `dbo.Origen` are referenced read-only. No DDL, no `INSERT`,
-  `UPDATE`, or `DELETE` against `dbo` exists anywhere in the versioned SQL.
+  `dbo.CuentaContable`, `dbo.Motivo`, `dbo.Origen`, `dbo.DocumentoIdentidad` are referenced
+  read-only. No DDL, no `INSERT`, `UPDATE`, or `DELETE` against `dbo` exists anywhere in the
+  versioned SQL.
 - **No row in `Usuario` and no credential of any kind appears in the versioned SQL.** The table is
   created empty. The first user is created later by the application's administration command
   (ADR 0007), never by migration.
@@ -296,20 +297,20 @@ either success or a permission-denied error — never by inspecting a document.
 - **When** that user executes `INSERT`, `UPDATE`, and `SELECT` against `fact.EstadoIntegracion`
 - **Then** every operation succeeds for both users
 
-#### Scenario: Both users can SELECT the four external dbo tables and neither can write them
+#### Scenario: Both users can SELECT the five external dbo tables and neither can write them
 - **Given** `usr_api` and `usr_worker` connected to the database with grants applied
 - **When** each user executes `SELECT` against `dbo.Proveedor`, `dbo.CuentaContable`, `dbo.Motivo`,
-  and `dbo.Origen`
+  `dbo.Origen`, and `dbo.DocumentoIdentidad`
 - **Then** every `SELECT` succeeds for both users
-- **When** each user executes `INSERT`, `UPDATE`, or `DELETE` against any of those four tables
+- **When** each user executes `INSERT`, `UPDATE`, or `DELETE` against any of those five tables
 - **Then** the engine denies every one of those operations, for both users, with a permission error
 
-#### Scenario: Neither user has any grant on any dbo table other than the four named
+#### Scenario: Neither user has any grant on any dbo table other than the five named
 - **Given** `usr_api` and `usr_worker` connected to the database with grants applied
 - **When** enumerating effective permissions for both users via the engine's permission-metadata
   views (e.g. `sys.database_permissions` / `fn_my_permissions`), scoped to schema `dbo`
 - **Then** the only objects listed are `dbo.Proveedor`, `dbo.CuentaContable`, `dbo.Motivo`,
-  `dbo.Origen`, all with `SELECT` only
+  `dbo.Origen`, `dbo.DocumentoIdentidad`, all with `SELECT` only
 
 ### Requirement: The permission matrix is expressed exclusively as versioned SQL
 

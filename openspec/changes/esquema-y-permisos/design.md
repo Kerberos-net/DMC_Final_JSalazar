@@ -10,7 +10,11 @@
 Nine numbered plain-SQL scripts under `SmartNet/db/schema/`, applied in lexical order by a **DbUp**
 runner hosted in a standalone .NET console project, before the API and before the worker (ADR 0012).
 Structure, permissions and base data are separate scripts. Nothing outside schema `fact` is created;
-the four `dbo.*` catalogs are referenced by object-level `GRANT SELECT` only.
+the five `dbo.*` catalogs (`Proveedor`, `CuentaContable`, `Motivo`, `Origen`, `DocumentoIdentidad`)
+are referenced by object-level `GRANT SELECT` only. `DocumentoIdentidad` was added after this
+document's first draft — a real external catalog the user loaded, and the FK target of
+`dbo.Proveedor.coddocide` — via Work Unit 3's coordinator-directed follow-up; not otherwise part of
+this Decision's own reasoning, so it is noted here only for count accuracy, not re-argued.
 
 The SQL is the authoritative type definition both runtimes derive from (ADR 0016). Therefore every
 type left unstated by the documents is decided **here**, in writing, with its cost — not at authoring
@@ -248,10 +252,18 @@ grant script; and the ADR 0019 level-2 test can add a throwaway principal to a r
 is that `usr_api` **cannot** read `fact.Procesamiento`. Absence of a grant delivers that only until
 someone writes `GRANT SELECT ON SCHEMA::fact` — an easy and plausible mistake. `DENY` beats `GRANT`, so
 `DENY SELECT, INSERT, UPDATE, DELETE ON OBJECT::fact.Procesamiento TO fact_api` (and the symmetric
-denies for the Python-private set, and for `fact.Factura`/`fact.AsientoContable*`/`fact.AdjuntoManual`/
-`fact.Usuario` to `fact_worker`) makes the claim hold under a future mistake. **Cost:** `DENY` is
-sticky — a later legitimate need requires remembering to `REVOKE` the deny first, and the error message
-does not say so.
+denies for the Python-private set, and for the full .NET-private bucket ADR 0003 names —
+"negocio" + "satélites de datos maestros" + "seguridad" — to `fact_worker`: `fact.Factura`,
+`fact.AsientoContable`, `fact.AsientoContableDetalle`, `fact.AdjuntoManual`,
+`fact.AuditoriaCorreccion`, `fact.FacturaExtraccion`, `fact.CorrelativoAsiento`,
+`fact.ProveedorAtributo`, `fact.MotivoAtributo`, `fact.SugerenciaCuenta`, `fact.Usuario`) makes the
+claim hold under a future mistake. **Widened from the first draft**, which named only four of these
+eleven tables (`Factura`/`AsientoContable*`/`AdjuntoManual`/`Usuario`); the other six relied on
+absence-of-`GRANT` alone. Independent verification (Work Unit 3) found the gap between this
+paragraph and the full "Privadas propias de .NET" bucket the same Decision already grants
+SELECT/INSERT/UPDATE to `fact_api`, and the user decided to close it — this paragraph and `008` now
+agree on the complete eleven-table set. **Cost:** `DENY` is sticky — a later legitimate need
+requires remembering to `REVOKE` the deny first, and the error message does not say so.
 
 **`dbo` is granted at object level only** — `GRANT SELECT ON OBJECT::dbo.Proveedor`, and the same for
 `CuentaContable`, `Motivo`, `Origen`. Never `GRANT SELECT ON SCHEMA::dbo`, which would expose every

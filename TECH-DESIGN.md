@@ -161,8 +161,9 @@ aplicación tiene **`SELECT` únicamente**.
 | `CuentaContable` | Plan contable: 1650 cuentas, 907 imputables de 6 dígitos, con `ctarefleja` y `ctapuente` | **Código de cuenta, texto de longitud variable** |
 | `Motivo` | 90 motivos de compra con sus prefijos de cuenta | **Entero** |
 | `Origen` | 13 orígenes de libro | **Código de 2 caracteres** |
+| `DocumentoIdentidad` | 6 tipos de documento de SUNAT; `Proveedor` tiene clave foránea hacia él | **Código de 2 caracteres** |
 
-Las cuatro claves son **códigos de negocio, no identificadores subrogados**. `P00000` es literalmente
+Las cinco claves son **códigos de negocio, no identificadores subrogados**. `P00000` es literalmente
 la clave del proveedor genérico, no una etiqueta sobre un `BIGINT`. Toda tabla satélite y toda
 referencia desde el dominio se une por esos códigos.
 

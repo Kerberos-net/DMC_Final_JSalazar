@@ -64,4 +64,36 @@ public sealed class TestBootstrapHarnessTests
 
         Assert.Equal("usr_api", currentUser);
     }
+
+    /// <summary>
+    /// Task 1.5's owed assertion, settled here now that `008_usuarios_y_permisos.sql` exists
+    /// (Phase 3 / Unit 3): applying `008` against a database where `usr_api`/`usr_worker` already
+    /// exist as WITHOUT LOGIN users (the harness's own setup order — see design.md, "How the ADR
+    /// 0019 level-2 tests reach a database") must succeed, and applying it a second time — this
+    /// time with the roles, membership and grants of the first application already in place — must
+    /// also succeed without error.
+    /// </summary>
+    [Fact]
+    public async Task Script008_IsCreateIfAbsent_ReapplyingAgainstAlreadyMigratedDatabaseSucceeds()
+    {
+        await using var db = await TestDatabaseFixture.CreateAsync();
+        await db.CreateWithoutLoginUserAsync("usr_api");
+        await db.CreateWithoutLoginUserAsync("usr_worker");
+        await db.CreateExternalDboCatalogsAsync();
+
+        var firstRun = db.RunMigrations();
+        Assert.Equal(0, firstRun);
+
+        // DbUp's own journal (fact.SchemaVersions) would otherwise skip 008 on a second call,
+        // because it already recorded 008 as applied — proving nothing about 008's own idempotency.
+        // Deleting only 008's journal row forces DbUp to re-execute 008's actual SQL text against a
+        // database where usr_api/usr_worker are already real users, already members of
+        // fact_api/fact_worker, with every GRANT/DENY already in place — exactly the re-apply
+        // scenario task 1.5/3.4 require.
+        await db.ExecuteNonQueryAsync(
+            "DELETE FROM fact.SchemaVersions WHERE ScriptName LIKE '%008_usuarios_y_permisos%';");
+
+        var secondRun = db.RunMigrations();
+        Assert.Equal(0, secondRun);
+    }
 }

@@ -54,13 +54,19 @@ public sealed class SchemaShapeTests
     {
         await using var db = await MigratedDatabase();
 
-        // Only fact and the built-in schemas should own tables after migration; the journal itself
-        // lives in fact too (RunnerJournalTests already covers that specifically).
+        // Only fact and the built-in schemas should own tables created BY THIS PROJECT after
+        // migration; the journal itself lives in fact too (RunnerJournalTests already covers that
+        // specifically). `dbo` is excluded here, not because a versioned script could ever write
+        // there (spec.md's Non-Goals forbid it outright, and 008's own GRANT-only statements are
+        // the only mention of `dbo` in any script) but because MigratedDatabase() now creates the
+        // four external dbo.* catalogs as test-only fixtures — 008's GRANT SELECT ON OBJECT::dbo.*
+        // needs an object to grant on. Those tables exist in every real deployment already (the
+        // accounting system owns them); they are not evidence of this project writing outside fact.
         var stray = await db.ExecuteScalarAsync<int>(
             """
             SELECT COUNT(*) FROM sys.tables t
             JOIN sys.schemas s ON t.schema_id = s.schema_id
-            WHERE s.name NOT IN ('fact');
+            WHERE s.name NOT IN ('fact', 'dbo');
             """);
         Assert.Equal(0, stray);
     }
@@ -369,9 +375,32 @@ public sealed class SchemaShapeTests
     private static async Task<TestDatabaseFixture> MigratedDatabase()
     {
         var db = await TestDatabaseFixture.CreateAsync();
-        var exitCode = db.RunMigrations();
-        Assert.Equal(0, exitCode);
-        return db;
+        // The `db` fixture is intentionally wrapped in its own try/catch here, not left as a bare
+        // local: if anything below throws before `return db;`, the caller's own
+        // `await using var db = await MigratedDatabase();` never runs, because the assignment
+        // itself never completes — the already-created database would leak with nothing left to
+        // dispose it (the confirmed root cause of the Work Unit 3 test-database leak; see
+        // apply-progress "Coordinator-directed follow-up, item 3").
+        try
+        {
+            // Phase 3 (Unit 3) added 008_usuarios_y_permisos.sql to SmartNet/db/schema/, which the
+            // runner now applies as part of every migration; 008 THROWs 50001 unless
+            // usr_api/usr_worker and the five external dbo.* catalogs already exist (design.md,
+            // Decision 3 and the ADR 0019 section). Schema-shape tests do not exercise permissions,
+            // but they share the runner and must satisfy 008's premise to reach 001-007's own
+            // assertions.
+            await db.CreateWithoutLoginUserAsync("usr_api");
+            await db.CreateWithoutLoginUserAsync("usr_worker");
+            await db.CreateExternalDboCatalogsAsync();
+            var exitCode = db.RunMigrations();
+            Assert.Equal(0, exitCode);
+            return db;
+        }
+        catch
+        {
+            await db.DisposeAsync();
+            throw;
+        }
     }
 
     private static async Task<long> CreateProcesamiento(TestDatabaseFixture db)

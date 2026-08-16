@@ -13,7 +13,7 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 |---|---|
 | Ítems del backlog | 1 de 17 en curso, 0 cerrados |
 | Ciclo SDD activo | `openspec/changes/esquema-y-permisos/` |
-| Último commit | `4a89418` — `feat(db): add fact schema structure scripts 001-007 with schema-shape tests` |
+| Última fase cerrada | Ítem #1, fase 3 — matriz de permisos |
 
 ---
 
@@ -22,13 +22,13 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 SQL versionado, esquema `fact`, tablas, índices, restricciones y los `GRANT` de los dos usuarios
 de base de datos. Sin dependencias.
 
-**Ciclo SDD:** `openspec/changes/esquema-y-permisos/` · **18 de 36 tareas cerradas**
+**Ciclo SDD:** `openspec/changes/esquema-y-permisos/` · **22 de 36 tareas cerradas**
 
 | Fase | Unidad | Alcance | Tareas | Estado |
 |---|---|---|---|---|
 | 1 | 1 | Runner DbUp + arnés de pruebas (`test-bootstrap`) | 5/5 | ✅ |
 | 2 | 2 | Estructura del esquema `001`–`007` + pruebas de forma | 13/13 | ✅ |
-| 3 | 3 | Matriz de permisos `008` + pruebas nivel 2 de ADR 0019 | 0/4 | ⬜ |
+| 3 | 3 | Matriz de permisos `008` + pruebas nivel 2 de ADR 0019 | 4/4 | ✅ |
 | 4 | 4 | Datos base `009`–`010` (`EstadoIntegracion`, `Configuracion`, 23 `MotivoAtributo`) | 0/7 | ⬜ |
 | 5 | 5 | Manifiesto de *checksums* en CI + scripts de *rollback* consultivos | 0/5 | ⬜ |
 | 6 | 5 | Integración: suite completa end-to-end sobre base nueva | 0/2 | ⬜ |
@@ -45,13 +45,32 @@ riesgo alto pasaron: `001` con guarda `IF SCHEMA_ID`; `IX_Factura_Identidad` **n
 claves foráneas hacia `dbo`; **cero** tipos de punto flotante. `fact` en `BDSmartNet` sigue con 0
 tablas: todo corrió contra bases desechables `fact_test_<id>`.
 
+**Fase 3** — 57/57 pruebas en verde, verificadas ejecutándolas yo. `008` concede `SELECT` sobre los
+cinco catálogos externos y niega explícitamente las **once** tablas privadas de .NET a `fact_worker`,
+no solo las cuatro que nombraba `design.md`: `DENY` gana sobre `GRANT`, así que sobrevive a un
+`GRANT` accidental futuro. La reconciliación `FOR LOGIN` / `WITHOUT LOGIN` se resuelve con una sola
+guarda `IF DATABASE_PRINCIPAL_ID(...) IS NULL`, de modo que el mismo script sirve al despliegue real
+y al arnés de pruebas sin ramificar.
+
+**Incidente de la fase 3.** El agente ejecutó el runner contra la base de sistema `master` y creó
+ahí las 25 tablas de `fact`. Lo detectó, lo limpió y lo autorreportó. Verificado: `SCHEMA_ID('fact')`
+en `master` es `NULL`, `BDSmartNet` intacta (0 tablas `fact`, 5 `dbo`). Regla que deja: todo trabajo
+pasa por `TestDatabaseFixture`, nunca una conexión directa.
+
+**La fuga de bases quedó diagnosticada, no parcheada a ciegas.** No era un fallo de `DisposeAsync`:
+los ayudantes `MigratedDatabase()` creaban la base y luego ejecutaban aserciones **antes** del
+`return db;`, sin `try`/`finally`. Al fallar una aserción, el llamador nunca recibía el objeto y la
+base quedaba huérfana para siempre. Por eso las 44 aparecieron justo mientras se depuraba `008`.
+
 ### Deuda declarada, no olvidada
 
-- **Tarea 1.5** quedó marcada como cerrada, pero lo verificado fue que el mecanismo
-  `CREATE USER … WITHOUT LOGIN` del arnés es idempotente, **no** que `008` lo sea — `008` no
-  existía todavía. La aserción literal vence en la fase 3.
-- El *lint* de `dbo.` de la tarea 5.5 necesita conocer las cuatro líneas
-  `GRANT SELECT ON OBJECT::dbo.*` que escribe la fase 3. Por eso el orden 3 → 5 no es arbitrario.
+- ~~**Tarea 1.5** — la aserción literal de idempotencia de `008`~~ **saldada en la fase 3**, y mejor
+  de lo pedido: la prueba borra la fila de `008` en el journal de DbUp antes de reejecutarlo, porque
+  si no DbUp lo saltaría y la prueba pasaría sin probar nada.
+- ~~El *lint* de `dbo.` de la tarea 5.5~~ **adelantado a la fase 3**. Es una prueba estática sobre el
+  texto de los scripts, con sus propios casos negativos sintéticos que demuestran que muerde. Quedó
+  así porque la aserción «ninguna tabla fuera de `fact`» hubo que relajarla a «fuera de `fact` o
+  `dbo`» —el arnés crea los catálogos de prueba en `dbo`— y eso dejaba la invariante sin guardián.
 
 ---
 

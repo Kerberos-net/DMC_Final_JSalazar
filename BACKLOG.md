@@ -14,7 +14,7 @@ cinco premisas externas verificadas y ningún ADR queda condicionado.
 |---|---|---|---|---|
 | 1 | **Esquema y permisos** | SQL versionado, esquema `fact`, tablas, índices, restricciones y los `GRANT` de los dos usuarios de base de datos | — | — |
 | 2 | **Autenticación y sesión** | Login, cookie `__Host-` con `SameSite=Lax`, bloqueo por intentos, comando de restablecimiento | #1 | — |
-| 3 | **Catálogos y satélites** | Lectura de los cuatro catálogos externos, satélites propios, resolución de prefijos contra las 907 hojas | #1 | ⚠ Plan de cuentas (`Cuentas.xlsx`) |
+| 3 | **Catálogos y satélites** | Lectura de los cinco catálogos externos, satélites propios, resolución de prefijos contra las 907 hojas | #1 | ⚠ Plan de cuentas (`Cuentas.xlsx`) |
 | 4 | **Tipos de cambio** | Tabla, carga manual con `Origen='MANUAL'`, *scraping* SBS, bloqueo si no hay dato para la fecha | #1 | — |
 | 5 | **Ingesta Gmail** | Candidatura por etiqueta y extensión, descarga de adjuntos, hash, etiquetado, consulta de sondeo acotada | #1 | — |
 | 6 | **Extracción y asociación** | XML como fuente prioritaria, OCR del PDF, asociación por los cuatro componentes normalizados, `AfectacionMixta` | #5 | — |
