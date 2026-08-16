@@ -354,9 +354,17 @@ schema break), so repairing one should not touch the other; and the `MotivoAtrib
 insert that can fail for reasons **outside this schema**, which deserves to fail in its own file.
 
 `009_datos_base.sql`:
-- **`EstadoIntegracion` — seven rows**: `GMAIL`, `DRIVE`, `SHEETS`, `SBS`, `WORKER`, `TELEGRAM`,
-  `CORREO`. TECH-DESIGN lists five and ADR 0003 revision 4 adds `TELEGRAM` and `CORREO`; the later
-  document wins. Flagged in Open Questions.
+- **`EstadoIntegracion` — five rows**: `GMAIL`, `DRIVE`, `SHEETS`, `SBS`, `WORKER`. **Corrected
+  (Work Unit 4).** This paragraph originally said seven, adding `TELEGRAM` and `CORREO` on the
+  reasoning that ADR 0003 revision 4 — the later document at the time — should win over TECH-DESIGN's
+  five. `spec.md` was written after this paragraph and settled the question explicitly and literally
+  ("EstadoIntegracion is seeded with exactly the five known integration names... five rows, no more,
+  no fewer") without this paragraph or the Open Question below being updated to match — a real
+  document/document conflict, found and reported rather than silently resolved, then fixed here in
+  the direction `spec.md` already committed to. The `007` schema's own `CK_EstadoIntegracion_Nombre`
+  still allows all seven values; only the *seed* is five. `TELEGRAM`/`CORREO` rows, if ever needed,
+  are for whoever writes the API to insert when it starts executing those integrations, not this
+  migration's job.
 - **`Configuracion` defaults**: seed every key named in TECH-DESIGN with its `Seccion`, `Tipo` and
   `Descripcion`. `ValorPorDefecto` is filled **only where a document states one**; where no document
   states a value (Gmail label, Telegram destination, allowed attachment types and max size — ADR 0013
@@ -464,5 +472,7 @@ worker. This change delivers only step 1; steps 2 and 3 have no artifact yet.
 - [ ] **The internal/external comprobante reference is asymmetric** — internal is one `Numero`,
       external is `Serie` + `Numero`. Honoured as documented; confirm it is intentional before item
       #10 builds credit notes on it.
-- [ ] `EstadoIntegracion`'s row set: five names in TECH-DESIGN, seven in ADR 0003 rev 4. Seeding
-      seven; confirm.
+- [x] **RESOLVED (Work Unit 4).** `EstadoIntegracion`'s row set: five names in TECH-DESIGN, seven in
+      ADR 0003 rev 4. `spec.md`'s own Scenario already settled this explicitly, in favor of five —
+      "no more, no fewer" — before Work Unit 4 began; this Open Question and the 009 planning note
+      above simply hadn't been updated to match. `009_datos_base.sql` seeds five.

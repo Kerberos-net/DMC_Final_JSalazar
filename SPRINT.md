@@ -13,7 +13,7 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 |---|---|
 | Ítems del backlog | 1 de 17 en curso, 0 cerrados |
 | Ciclo SDD activo | `openspec/changes/esquema-y-permisos/` |
-| Última fase cerrada | Ítem #1, fase 3 — matriz de permisos |
+| Última fase cerrada | Ítem #1, fase 4 — datos base |
 
 ---
 
@@ -22,14 +22,14 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 SQL versionado, esquema `fact`, tablas, índices, restricciones y los `GRANT` de los dos usuarios
 de base de datos. Sin dependencias.
 
-**Ciclo SDD:** `openspec/changes/esquema-y-permisos/` · **22 de 36 tareas cerradas**
+**Ciclo SDD:** `openspec/changes/esquema-y-permisos/` · **29 de 36 tareas cerradas**
 
 | Fase | Unidad | Alcance | Tareas | Estado |
 |---|---|---|---|---|
 | 1 | 1 | Runner DbUp + arnés de pruebas (`test-bootstrap`) | 5/5 | ✅ |
 | 2 | 2 | Estructura del esquema `001`–`007` + pruebas de forma | 13/13 | ✅ |
 | 3 | 3 | Matriz de permisos `008` + pruebas nivel 2 de ADR 0019 | 4/4 | ✅ |
-| 4 | 4 | Datos base `009`–`010` (`EstadoIntegracion`, `Configuracion`, 23 `MotivoAtributo`) | 0/7 | ⬜ |
+| 4 | 4 | Datos base `009`–`010` (`EstadoIntegracion`, `Configuracion`, 23 `MotivoAtributo`) | 7/7 | ✅ |
 | 5 | 5 | Manifiesto de *checksums* en CI + scripts de *rollback* consultivos | 0/5 | ⬜ |
 | 6 | 5 | Integración: suite completa end-to-end sobre base nueva | 0/2 | ⬜ |
 
@@ -61,6 +61,26 @@ pasa por `TestDatabaseFixture`, nunca una conexión directa.
 los ayudantes `MigratedDatabase()` creaban la base y luego ejecutaban aserciones **antes** del
 `return db;`, sin `try`/`finally`. Al fallar una aserción, el llamador nunca recibía el objeto y la
 base quedaba huérfana para siempre. Por eso las 44 aparecieron justo mientras se depuraba `008`.
+
+
+**Fase 4** — 93/93 pruebas en verde, verificadas ejecutándolas yo. Los **23** motivos reclasificados
+los conté yo mismo sobre `MOTIVOS-CLASIFICACION.md`: 23 filas marcadas con `†`, lista idéntica a la
+que siembra `010`, con el motivo **88** incluido — el que se perdió la vez anterior. `fact.Usuario`
+queda vacía y ningún `INSERT` del SQL versionado la apunta. `Configuracion` siembra 2 claves con
+valor documentado y 13 marcadas `pendiente` con `Valor` y `ValorPorDefecto` en `NULL`.
+
+**El lint de `dbo` se reescribió en esta fase, y con razón.** La regla original de la fase 3 —«toda
+mención de `dbo` fuera de un `GRANT` permitido es violación»— habría rechazado el
+`INSERT INTO fact.MotivoAtributo … SELECT … FROM dbo.Motivo` de `010`, que es una **lectura**
+legítima: ADR 0003 dice que nadie *escribe* una tabla externa, no que nadie la lea. Pasó a comprobar
+verbo y destino por sentencia.
+
+Al verificar esa reescritura encontré un hueco real: `SELECT … INTO dbo.X` **crea y puebla** una
+tabla en `dbo` sin nombrar ninguno de los verbos vigilados. Añadí el patrón y su prueba, y comprobé
+por sonda que la prueba falla sin él. La sonda descartó además un segundo patrón que había añadido
+para SQL dinámico: no aportaba nada, porque el escaneo es textual y ya atrapa el `CREATE TABLE dbo.`
+dentro del literal. Queda anotado en el código qué sí evade el lint —un nombre de esquema
+concatenado— y por qué eso es residuo aceptable.
 
 ### Deuda declarada, no olvidada
 

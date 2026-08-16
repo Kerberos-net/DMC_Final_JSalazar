@@ -410,9 +410,12 @@ public sealed class PermissionMatrixTests
     {
         await using var db = await MigratedDatabaseWithUsers();
 
-        await AssertSucceedsWrite(db, UsrWorker, "INSERT INTO fact.EstadoIntegracion (Nombre) VALUES ('GMAIL');");
+        // 'GMAIL' is no longer a free value: 009_datos_base.sql (Phase 4) now seeds it as base
+        // data. 'CORREO' is CHECK-permitted (007) and not one of the five names 009 seeds, so the
+        // INSERT below tests the same permission property without colliding with real base data.
+        await AssertSucceedsWrite(db, UsrWorker, "INSERT INTO fact.EstadoIntegracion (Nombre) VALUES ('CORREO');");
         await AssertSucceedsRead(db, UsrWorker, "SELECT COUNT(*) FROM fact.EstadoIntegracion;");
-        await AssertSucceedsWrite(db, UsrWorker, "UPDATE fact.EstadoIntegracion SET FallosSeguidos = 1 WHERE Nombre = 'GMAIL';");
+        await AssertSucceedsWrite(db, UsrWorker, "UPDATE fact.EstadoIntegracion SET FallosSeguidos = 1 WHERE Nombre = 'CORREO';");
 
         await AssertSucceedsWrite(db, UsrApi, "INSERT INTO fact.EstadoIntegracion (Nombre) VALUES ('TELEGRAM');");
         await AssertSucceedsRead(db, UsrApi, "SELECT COUNT(*) FROM fact.EstadoIntegracion;");
@@ -486,6 +489,7 @@ public sealed class PermissionMatrixTests
             await db.CreateWithoutLoginUserAsync(UsrApi);
             await db.CreateWithoutLoginUserAsync(UsrWorker);
             await db.CreateExternalDboCatalogsAsync();
+            await db.SeedDboMotivoFixtureRowsAsync();
             var exitCode = db.RunMigrations();
             Assert.Equal(0, exitCode);
             return db;

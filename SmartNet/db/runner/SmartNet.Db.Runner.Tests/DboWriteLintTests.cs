@@ -5,25 +5,48 @@ namespace SmartNet.Db.Runner.Tests;
 /// <summary>
 /// Coordinator-directed follow-up (item 4) — brings the static `dbo`-write lint forward from
 /// task 5.5. A pure text scan over the versioned scripts in `SmartNet/db/schema/`: no `CREATE`,
-/// `ALTER`, `DROP`, `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`, `MERGE`, or `REFERENCES` may target a
-/// `dbo` object. The only permitted mention of `dbo` anywhere in the versioned SQL is a
-/// `GRANT SELECT ON OBJECT::dbo.&lt;table&gt; TO fact_api|fact_worker;` line, or a SQL comment. No
+/// `ALTER`, `DROP`, `INSERT`, `UPDATE`, `DELETE`, `TRUNCATE`, or `MERGE` statement may TARGET a
+/// `dbo` object, and no `REFERENCES` may point at one. Reading `dbo` — a bare `SELECT ... FROM
+/// dbo.X`/`JOIN dbo.X`, or the `GRANT SELECT ON OBJECT::dbo.&lt;table&gt;` lines in `008` — is
+/// always allowed; ADR 0003's rule is "nadie escribe una tabla externa", not "nadie la lee". No
 /// database needed — this is what the relaxed `NoTableCreatedByThisProject_ExistsOutsideSchemaFact`
 /// assertion (SchemaShapeTests.cs) no longer guarantees on its own, restored here properly.
 ///
-/// Task 5.5 also asks for a CI lint step wired into the build; that packaging (and the broader
-/// "unqualified dbo. outside the four/five permitted lines" framing task 5.5 describes) remains
-/// open in Phase 5. This test is the detection logic task 5.5 can wrap in a CI step later.
+/// **Corrected during Work Unit 4** (Phase 4, base-data): the first draft of this lint (Work Unit 3)
+/// flagged *any* line mentioning `dbo` outside an allowed `GRANT` line — which would have wrongly
+/// rejected `010_motivo_atributo_demo.sql`'s legitimate `INSERT INTO fact.MotivoAtributo ... SELECT
+/// ... FROM dbo.Motivo`, a read, the moment that script was written. Verified before fixing: the old
+/// blanket rule really did flag that exact statement (a throwaway reflection probe against the old
+/// implementation, discarded once confirmed — not kept as a permanent test since the fixed
+/// implementation below is what ships). Rewritten to check each SQL *statement* for a forbidden verb
+/// (`CREATE`/`ALTER`/`DROP`/`INSERT`/`UPDATE`/`DELETE`/`TRUNCATE`/`MERGE`) whose own target is
+/// `dbo.*`, or a `REFERENCES dbo.*` clause — never a bare mention of the word `dbo`.
+///
+/// Task 5.5 also asks for a CI lint step wired into the build; that packaging remains open in
+/// Phase 5. This test is the detection logic task 5.5 can wrap in a CI step later.
 /// </summary>
 public sealed class DboWriteLintTests
 {
-    private static readonly Regex AllowedGrantLine = new(
-        @"^\s*GRANT\s+SELECT\s+ON\s+OBJECT::dbo\.\w+\s+TO\s+fact_(api|worker)\s*;\s*$",
-        RegexOptions.IgnoreCase);
-
     private static readonly Regex BlockComment = new(@"/\*.*?\*/", RegexOptions.Singleline);
     private static readonly Regex LineComment = new(@"--[^\r\n]*");
-    private static readonly Regex DboMention = new(@"\bdbo\b", RegexOptions.IgnoreCase);
+
+    // Each targets the verb immediately followed (optionally through INTO/TABLE/FROM) by a dbo.*
+    // identifier — the verb's own object, not an unrelated dbo mention elsewhere in the statement.
+    private static readonly Regex[] ForbiddenTargets =
+    [
+        new(@"\bINSERT\s+(INTO\s+)?dbo\.", RegexOptions.IgnoreCase),
+        new(@"\bUPDATE\s+dbo\.", RegexOptions.IgnoreCase),
+        new(@"\bDELETE\s+(FROM\s+)?dbo\.", RegexOptions.IgnoreCase),
+        new(@"\bCREATE\s+(TABLE|VIEW|INDEX|SCHEMA|PROCEDURE|FUNCTION|SEQUENCE)\s+dbo\.", RegexOptions.IgnoreCase),
+        new(@"\bALTER\s+(TABLE|VIEW|SCHEMA|INDEX|DATABASE)\s+dbo\.", RegexOptions.IgnoreCase),
+        new(@"\bDROP\s+(TABLE|VIEW|INDEX|SCHEMA|PROCEDURE|FUNCTION|SEQUENCE)\s+dbo\.", RegexOptions.IgnoreCase),
+        new(@"\bTRUNCATE\s+TABLE\s+dbo\.", RegexOptions.IgnoreCase),
+        new(@"\bMERGE\s+(INTO\s+)?dbo\.", RegexOptions.IgnoreCase),
+        new(@"\bREFERENCES\s+dbo\.", RegexOptions.IgnoreCase),
+        // `SELECT ... INTO dbo.X` both creates and populates a dbo table without naming any verb
+        // matched above. Verified as a real blind spot of the Work Unit 4 rewrite before adding it.
+        new(@"\bINTO\s+dbo\.", RegexOptions.IgnoreCase),
+    ];
 
     // RED-first: the detection logic itself did not exist before this test. A throwaway script
     // with a real dbo write proves the lint actually catches the violation it claims to catch —
@@ -32,53 +55,58 @@ public sealed class DboWriteLintTests
     [Fact]
     public void Lint_DetectsViolation_WhenScriptWritesToDbo()
     {
-        var path = CreateScriptFile("UPDATE dbo.Proveedor SET proveedor = 'x' WHERE codpro = 'P00000';");
-        try
-        {
-            var violations = FindDboViolations(path);
-            Assert.NotEmpty(violations);
-        }
-        finally
-        {
-            Directory.Delete(Path.GetDirectoryName(path)!, recursive: true);
-        }
+        AssertViolation("UPDATE dbo.Proveedor SET proveedor = 'x' WHERE codpro = 'P00000';");
+    }
+
+    [Fact]
+    public void Lint_DetectsViolation_WhenScriptInsertsIntoDbo()
+    {
+        AssertViolation("INSERT INTO dbo.Motivo (codigo, motivo) VALUES (999, 'Intruso');");
+    }
+
+    [Fact]
+    public void Lint_DetectsViolation_WhenScriptDeletesFromDbo()
+    {
+        AssertViolation("DELETE FROM dbo.Proveedor WHERE codpro = 'P00000';");
     }
 
     [Fact]
     public void Lint_DetectsViolation_WhenScriptDeclaresReferencesToDbo()
     {
-        var path = CreateScriptFile(
+        AssertViolation(
             "CREATE TABLE fact.X (Y INT NOT NULL, CONSTRAINT FK_X_Y FOREIGN KEY (Y) REFERENCES dbo.CuentaContable (cuenta));");
-        try
-        {
-            var violations = FindDboViolations(path);
-            Assert.NotEmpty(violations);
-        }
-        finally
-        {
-            Directory.Delete(Path.GetDirectoryName(path)!, recursive: true);
-        }
     }
 
     [Fact]
     public void Lint_DetectsViolation_WhenScriptCreatesADboObject()
     {
-        var path = CreateScriptFile("CREATE TABLE dbo.Intruso (Id INT NOT NULL);");
-        try
-        {
-            var violations = FindDboViolations(path);
-            Assert.NotEmpty(violations);
-        }
-        finally
-        {
-            Directory.Delete(Path.GetDirectoryName(path)!, recursive: true);
-        }
+        AssertViolation("CREATE TABLE dbo.Intruso (Id INT NOT NULL);");
+    }
+
+    // Found while verifying Work Unit 4's rewrite of this lint. The SELECT INTO hole was real and
+    // reachable; it does not exist in the real scripts today. A guardian that misses a construct is
+    // worse than none, because it is trusted.
+    [Fact]
+    public void Lint_DetectsViolation_WhenScriptCreatesADboTableWithSelectInto()
+    {
+        AssertViolation("SELECT codigo, motivo INTO dbo.MotivoCopia FROM fact.MotivoAtributo;");
+    }
+
+    // Dynamic SQL does not evade the patterns above: the scan is textual and does not respect
+    // string literals, so `EXEC('CREATE TABLE dbo.X ...')` is matched by the plain CREATE rule.
+    // Verified by probe — a dedicated EXEC pattern added nothing and was removed. What DOES evade
+    // it is a concatenated schema name (`EXEC('CREATE TABLE ' + @s + '.X')`), which no text scan
+    // can catch; that residue belongs to review, and to 008 granting no DDL right on dbo.
+    [Fact]
+    public void Lint_DetectsViolation_WhenScriptHidesADboWriteInDynamicSql()
+    {
+        AssertViolation("EXEC('CREATE TABLE dbo.Intruso (Id INT NOT NULL)');");
     }
 
     [Fact]
     public void Lint_AllowsGrantSelectLines_AndComments()
     {
-        var path = CreateScriptFile(
+        AssertNoViolation(
             """
             -- A comment mentioning dbo.Proveedor is fine, it is not executable.
             GRANT SELECT ON OBJECT::dbo.Proveedor TO fact_api;
@@ -86,18 +114,28 @@ public sealed class DboWriteLintTests
             /* another comment about dbo.CuentaContable, also fine */
             GRANT SELECT ON OBJECT::dbo.DocumentoIdentidad TO fact_api;
             """);
-        try
-        {
-            var violations = FindDboViolations(path);
-            Assert.Empty(violations);
-        }
-        finally
-        {
-            Directory.Delete(Path.GetDirectoryName(path)!, recursive: true);
-        }
     }
 
-    // The actual guardian: the real versioned scripts, 001-008, have no disallowed dbo mention.
+    // Regression for the bug found and fixed during Work Unit 4: a bare read of dbo must be
+    // allowed, including as the SELECT source of an INSERT into fact. This is exactly
+    // 010_motivo_atributo_demo.sql's own shape.
+    [Fact]
+    public void Lint_AllowsSelectReadsFromDbo_IncludingAsAnInsertSelectSource()
+    {
+        AssertNoViolation(
+            """
+            INSERT INTO fact.MotivoAtributo (Motivo, OrigenLibro, Activo)
+            SELECT codigo, '02', 1
+            FROM dbo.Motivo
+            WHERE codigo IN (5, 13, 16);
+            """);
+        AssertNoViolation("SELECT COUNT(*) FROM dbo.Motivo WHERE codigo = 5;");
+        AssertNoViolation(
+            "SELECT m.codigo FROM dbo.Motivo m JOIN fact.MotivoAtributo a ON a.Motivo = m.codigo;");
+    }
+
+    // The actual guardian: the real versioned scripts, 001-010 (whatever exists today), have no
+    // disallowed dbo mention.
     [Fact]
     public void RealSchemaScripts_HaveNoDisallowedDboMentions()
     {
@@ -113,11 +151,38 @@ public sealed class DboWriteLintTests
             "Disallowed dbo mention(s) found:\n" + string.Join('\n', allViolations));
     }
 
+    private static void AssertViolation(string sql)
+    {
+        var path = CreateScriptFile(sql);
+        try
+        {
+            Assert.NotEmpty(FindDboViolations(path));
+        }
+        finally
+        {
+            Directory.Delete(Path.GetDirectoryName(path)!, recursive: true);
+        }
+    }
+
+    private static void AssertNoViolation(string sql)
+    {
+        var path = CreateScriptFile(sql);
+        try
+        {
+            Assert.Empty(FindDboViolations(path));
+        }
+        finally
+        {
+            Directory.Delete(Path.GetDirectoryName(path)!, recursive: true);
+        }
+    }
+
     /// <summary>
-    /// Strips SQL comments, then flags any remaining line that mentions `dbo` unless the line is
-    /// exactly an allowed `GRANT SELECT ON OBJECT::dbo.&lt;table&gt; TO fact_api|fact_worker;`
-    /// statement. Comment stripping is regex-based, adequate for this project's own scripts (none
-    /// of which embed `--` or `/*`/`*/` inside a string literal); not a general-purpose SQL parser.
+    /// Strips SQL comments, then flags any remaining SQL *statement* whose own verb targets a
+    /// `dbo.*` object, or that declares `REFERENCES dbo.*`. A bare read of `dbo` (`SELECT`, `JOIN`)
+    /// is never flagged. Statements are split on `;`; comment stripping and statement splitting are
+    /// regex-based, adequate for this project's own scripts (none of which embed `--`, `/*`/`*/`, or
+    /// `;` inside a string literal); not a general-purpose SQL parser.
     /// </summary>
     private static List<string> FindDboViolations(string path)
     {
@@ -126,21 +191,22 @@ public sealed class DboWriteLintTests
         var withoutComments = LineComment.Replace(withoutBlockComments, string.Empty);
 
         var violations = new List<string>();
-        var lines = withoutComments.Split('\n');
-        for (var i = 0; i < lines.Length; i++)
+        var statements = withoutComments.Split(';');
+        foreach (var statement in statements)
         {
-            var line = lines[i];
-            if (!DboMention.IsMatch(line))
+            if (string.IsNullOrWhiteSpace(statement))
             {
                 continue;
             }
 
-            if (AllowedGrantLine.IsMatch(line))
+            foreach (var forbidden in ForbiddenTargets)
             {
-                continue;
+                if (forbidden.IsMatch(statement))
+                {
+                    violations.Add($"{Path.GetFileName(path)}: {statement.Trim()}");
+                    break;
+                }
             }
-
-            violations.Add($"{Path.GetFileName(path)}:{i + 1}: {line.Trim()}");
         }
 
         return violations;

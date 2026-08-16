@@ -80,6 +80,7 @@ public sealed class TestBootstrapHarnessTests
         await db.CreateWithoutLoginUserAsync("usr_api");
         await db.CreateWithoutLoginUserAsync("usr_worker");
         await db.CreateExternalDboCatalogsAsync();
+        await db.SeedDboMotivoFixtureRowsAsync();
 
         var firstRun = db.RunMigrations();
         Assert.Equal(0, firstRun);

@@ -178,6 +178,55 @@ public sealed class TestDatabaseFixture : IAsyncDisposable
             ct);
 
     /// <summary>
+    /// TEST FIXTURE — NOT data this project owns. `dbo.Motivo` belongs entirely to the accounting
+    /// system (ADR 0003, clase "externa"); this seeds a small, representative subset into the
+    /// empty test-fixture table `CreateExternalDboCatalogsAsync()` created, so that
+    /// `010_motivo_atributo_demo.sql`'s `INSERT ... SELECT ... FROM dbo.Motivo` has rows to select
+    /// when it runs against a throwaway `fact_test_&lt;id&gt;` database. The names, prefixes and
+    /// origin markers below are copied verbatim from `MOTIVOS-CLASIFICACION.md`'s own table for
+    /// traceability, not invented — but the SET is deliberately partial (the real catalog has 90
+    /// rows; this seeds 28): the 23 `†`-marked motives the reclassification touches (5, 13, 16, 17,
+    /// 18, 19, 20, 21, 30, 38, 40, 42, 46, 48, 49, 53, 56, 59, 60, 77, 81, 88, 90 — every one of
+    /// them, at minimum, per the coordinator's instruction), plus five more (11, 12, 22 — plain `02`
+    /// motives never reclassified; 1, 28 — `BAJA` motives) so the "no other motive is reclassified"
+    /// scenario has something real to check against.
+    /// </summary>
+    public Task SeedDboMotivoFixtureRowsAsync(CancellationToken ct = default) =>
+        ExecuteNonQueryAsync(
+            """
+            INSERT INTO dbo.Motivo (codigo, motivo, cuenta) VALUES
+                (5, 'Transferencia a Caja chica', '1013,1021,1022'),
+                (13, 'Movilidad', '631123'),
+                (16, 'Parqueo o cochera', '6393'),
+                (17, 'Tasas de contratos', '644311'),
+                (18, 'Peaje', '639915'),
+                (19, 'Utiles de escritorio menores', '656111'),
+                (20, 'Utiles de Limpieza menores', '656211'),
+                (21, 'Botiquin menores', '656212'),
+                (30, 'Mantenimiento local menores', '634311'),
+                (38, 'Copia Literal o vigencia poder', '636913'),
+                (40, 'Legalizaciones', '632211'),
+                (42, 'Recarga de nextel menor a 100', '636412'),
+                (46, 'Repuesto soporte tecnico menor a 50', '656511'),
+                (48, N'Gastos de representación menor a 100', '6373'),
+                (49, N'Servicio Reparación equipo menor a 50', '634314'),
+                (53, 'Recarga de tarjetas peruanas', '169901'),
+                (56, 'Reniec', '636912'),
+                (59, 'Tasas Judiciales y Policiales', '644311'),
+                (60, 'Arreglo Floral', '659913'),
+                (77, N'Periódico', '659914'),
+                (81, 'Movilidad-Taxi por viaje', '631124'),
+                (88, N'Devolución Comprobante CChica', '169105'),
+                (90, 'Mantenimiento rep muebles y eq', '634313'),
+                (11, 'Servicio custodia mercaderia SS', '639922'),
+                (12, N'Fotocopia-Impresión', '639914'),
+                (22, 'Fletes traslado de mercaderia', '631111'),
+                (1, 'Pago a Cuenta de Proveedores', '656412'),
+                (28, 'NO USAR', '1424');
+            """,
+            ct);
+
+    /// <summary>
     /// Runs <paramref name="action"/> impersonating <paramref name="userName"/> for the lifetime
     /// of one connection, via `EXECUTE AS USER` / `REVERT` — the documented way to evaluate
     /// database-level permissions without a real login (design.md).

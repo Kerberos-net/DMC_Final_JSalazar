@@ -35,6 +35,7 @@ public sealed class PermissionReproducibilityTests
             await db.CreateWithoutLoginUserAsync("usr_api");
             await db.CreateWithoutLoginUserAsync("usr_worker");
             await db.CreateExternalDboCatalogsAsync();
+            await db.SeedDboMotivoFixtureRowsAsync();
             var exitCode = db.RunMigrations();
             Assert.Equal(0, exitCode);
             return db;

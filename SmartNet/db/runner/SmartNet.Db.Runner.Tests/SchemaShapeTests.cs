@@ -388,10 +388,13 @@ public sealed class SchemaShapeTests
             // usr_api/usr_worker and the five external dbo.* catalogs already exist (design.md,
             // Decision 3 and the ADR 0019 section). Schema-shape tests do not exercise permissions,
             // but they share the runner and must satisfy 008's premise to reach 001-007's own
-            // assertions.
+            // assertions. Phase 4 (Unit 4) added 010_motivo_atributo_demo.sql, which THROWs 50002
+            // if dbo.Motivo does not contain the 23 reclassified motive numbers — the fixture rows
+            // must exist even for tests that only care about 001-007's own shape.
             await db.CreateWithoutLoginUserAsync("usr_api");
             await db.CreateWithoutLoginUserAsync("usr_worker");
             await db.CreateExternalDboCatalogsAsync();
+            await db.SeedDboMotivoFixtureRowsAsync();
             var exitCode = db.RunMigrations();
             Assert.Equal(0, exitCode);
             return db;

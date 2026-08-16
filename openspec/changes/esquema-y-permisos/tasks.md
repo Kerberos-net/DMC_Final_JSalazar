@@ -201,13 +201,72 @@ attach to.
 
 ## Phase 4: Base Data
 
-- [ ] 4.1 RED: `EstadoIntegracion` test — exactly the seeded name set, `WORKER.FallosSeguidos = 0`.
-- [ ] 4.2 RED: `Configuracion` test — every TECH-DESIGN section returns ≥1 row; `pendiente` keys have `Valor`/`ValorPorDefecto` both `NULL`.
-- [ ] 4.3 RED: `MotivoAtributo` test — exactly 23 rows for motives 5,13,16,17,18,19,20,21,30,38,40,42,46,48,49,53,56,59,60,77,81,88,90, all `OrigenLibro='02'`, `Activo=1`.
-- [ ] 4.4 RED: `Usuario` empty test — `COUNT(*) = 0`; no `INSERT` targeting `fact.Usuario` anywhere in versioned SQL.
-- [ ] 4.5 GREEN: `009_datos_base.sql` — `EstadoIntegracion` rows, `Configuracion` defaults, all `NOT EXISTS`-guarded.
-- [ ] 4.6 GREEN: `010_motivo_atributo_demo.sql` — `INSERT … SELECT` from `dbo.Motivo` matched by motive number; `IF @@ROWCOUNT <> 23 THROW`.
-- [ ] 4.7 RED: dbo-write-safety test — every `INSERT` in 4.5/4.6 targets a `fact.`-qualified table.
+- [x] 4.1 RED: `EstadoIntegracion` test — exactly the seeded name set, `WORKER.FallosSeguidos = 0`.
+  - `BaseDataTests.cs`. The seeded set is the **five** names `spec.md` states literally
+    ("GMAIL, DRIVE, SHEETS, SBS, WORKER — five rows, no more, no fewer"), not the seven design.md's
+    still-open Open Question speculated (`TELEGRAM`/`CORREO` added on the theory that ADR 0003 rev 4
+    should win over TECH-DESIGN). **Discovery, not invention:** `spec.md` had already settled this
+    explicitly and was never inconsistent; `design.md`'s own planning paragraph and Open Question
+    simply hadn't been updated to match once `spec.md` did. Found and fixed in `design.md` this
+    session (both marked resolved, in the five-row direction `spec.md` already committed to) — not
+    silently picked a side of a live disagreement.
+- [x] 4.2 RED: `Configuracion` test — every TECH-DESIGN section returns ≥1 row; `pendiente` keys have `Valor`/`ValorPorDefecto` both `NULL`.
+  - Six sections, not the five TECH-DESIGN's prose lists verbatim: `INGESTA`, `ADJUNTOS`,
+    `TELEGRAM`, `NOTIFICACIONES`, `INTEGRACIONES` cover TECH-DESIGN's eight named topics; a sixth,
+    `CONTABILIDAD` (key `FECHA_CORTE_CONTABLE`), was added because `REGLAS.md` §7 invariant 3 and
+    TECH-DESIGN's own Flujo-3 acceptance criteria reference `Configuracion.FechaCorteContable`
+    literally, and without a row there is nowhere for that invariant to read its own value. Not one
+    of `REGLAS.md` §12's six "pendiente de ratificación" points (those are accounting-criterion
+    disputes; this is an undecided operational value), so it is seeded `pendiente` under the same
+    rule ADR 0013 already established for attachment types/size, not treated as a special case.
+    Exactly two keys carry a real (non-`pendiente`) `ValorPorDefecto`, each traced to one document:
+    `NOTIFICACIONES.CANAL_ALERTA_FALLBACK = 'CORREO'` (TECH-DESIGN.md + ADR 0015: "fallos por
+    Telegram con respaldo por correo") and `INTEGRACIONES.INTERVALO_ESPERADO_WORKER = '30'` (ADR
+    0015: "30 minutos como punto de partida"). Every other key — Gmail label, allowed extensions,
+    poll frequency, start date, manual-attachment types/max size, Telegram chat id, display
+    preference, the four non-`WORKER` expected intervals, and `FECHA_CORTE_CONTABLE` — is seeded
+    `pendiente` (`Valor`/`ValorPorDefecto` both `NULL`) because no document states a concrete value,
+    following design.md's own stated policy literally rather than inventing one to make a test pass.
+- [x] 4.3 RED: `MotivoAtributo` test — exactly 23 rows for motives 5,13,16,17,18,19,20,21,30,38,40,42,46,48,49,53,56,59,60,77,81,88,90, all `OrigenLibro='02'`, `Activo=1`.
+  - **Recounted independently against `MOTIVOS-CLASIFICACION.md` itself** (not trusted from this
+    file, per the coordinator's explicit instruction): `grep`-counted every row carrying `†` in the
+    document's "Tabla completa" — **23**, exactly the list already written above, and exactly
+    matching `spec.md`. Cross-checked: 27 plain `02` rows + 23 `†` rows = 50, matching the "Reparto
+    final" table's stated `50`. No discrepancy found; nothing needed to stop for. Also asserts the
+    negative: five motives from the `dbo.Motivo` test fixture that are **not** `†`-marked (11, 12,
+    22 — plain `02`; 1, 28 — `BAJA`) do not appear in `fact.MotivoAtributo` at all.
+- [x] 4.4 RED: `Usuario` empty test — `COUNT(*) = 0`; no `INSERT` targeting `fact.Usuario` anywhere in versioned SQL.
+- [x] 4.5 GREEN: `009_datos_base.sql` — `EstadoIntegracion` rows, `Configuracion` defaults, all `NOT EXISTS`-guarded.
+- [x] 4.6 GREEN: `010_motivo_atributo_demo.sql` — `INSERT … SELECT` from `dbo.Motivo` matched by motive number; `IF @@ROWCOUNT <> 23 THROW`.
+  - **Dependency surfaced and closed:** `010` needs `dbo.Motivo` rows to select from, but
+    `CreateExternalDboCatalogsAsync()` (Work Unit 3) creates the external catalogs empty. Added
+    `TestDatabaseFixture.SeedDboMotivoFixtureRowsAsync()` — 28 rows (the 23 reclassified + 5 more
+    for the negative check above), copied verbatim from `MOTIVOS-CLASIFICACION.md` for
+    traceability, explicitly documented as a TEST FIXTURE this project does not own, never applied
+    outside `TestDatabaseFixture`. Every test helper that runs the full migration set now calls it
+    (`SchemaShapeTests`, `TestBootstrapHarnessTests`, `PermissionMatrixTests`,
+    `PermissionReproducibilityTests`, `BaseDataTests`) — 010 THROWs 50002 without it, which is how
+    the gap was found (a real RED, not a hypothetical one: the first full-suite run after 010 was
+    added failed exactly this way).
+  - **Bug found and fixed in the Phase 3 lint, before it could ship broken:** `DboWriteLintTests`'s
+    first draft flagged *any* mention of `dbo` outside an allowed `GRANT` line — which would have
+    wrongly rejected `010`'s own `INSERT INTO fact.MotivoAtributo ... SELECT ... FROM dbo.Motivo`,
+    a read, the moment this script was written. Verified before fixing (a throwaway reflection probe
+    against the old implementation confirmed it really did flag that exact statement), then rewrote
+    the lint to check each SQL statement for a forbidden verb whose own target is `dbo.*`, never a
+    bare mention of the word — reads were always meant to be allowed (ADR 0003: "nadie escribe una
+    tabla externa", not "nadie la lee"). A new regression test
+    (`Lint_AllowsSelectReadsFromDbo_IncludingAsAnInsertSelectSource`) proves the fixed lint accepts
+    exactly this shape; the original violation-detection tests were re-run to confirm they still
+    catch real violations after the rewrite.
+- [x] 4.7 RED: dbo-write-safety test — every `INSERT` in 4.5/4.6 targets a `fact.`-qualified table.
+  - **Not duplicated.** The (corrected, see 4.6's note) Phase 3 lint,
+    `DboWriteLintTests.RealSchemaScripts_HaveNoDisallowedDboMentions`, already re-scans every script
+    under `SmartNet/db/schema/` on every test run — 009 and 010 included automatically, no wiring
+    needed — for exactly this property: no `INSERT`/`UPDATE`/`DELETE`/`CREATE`/`ALTER`/`DROP`/
+    `TRUNCATE`/`MERGE` whose own target is `dbo.*`, and no `REFERENCES dbo.*`. A second test
+    asserting the identical fact from the identical files would be redundant coverage, not defense
+    in depth, so none was written; `BaseDataTests.cs` says so explicitly in its own class comment.
 
 ## Phase 5: CI Hash Manifest and Advisory Rollback
 
