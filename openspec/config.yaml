@@ -1,0 +1,82 @@
+schema: spec-driven
+
+project: dmc_final_jsalazar
+strict_tdd: true
+
+context: |
+  Gestor de Facturas de Compra. Greenfield, zero application code as of init.
+  Stack: .NET (domain + transactional API, SmartNet/api/), Python (ingestion/
+  publication worker, SmartNet/worker/), Angular w/ signals no state lib
+  (SPA, SmartNet/web/), SQL Server own schema `fact` in shared DB
+  (SmartNet/db/schema/). Schema is plain versioned SQL (DbUp/Flyway-class
+  tool), explicitly not EF Core Migrations, not Alembic (ADR 0016).
+  Domain naming in Spanish (REGLAS.md-aligned), technical scaffolding in
+  English (CONVENTIONS.md). Money = decimal only, never float/double.
+
+testing:
+  strategy_source: adrs/0019-estrategia-de-verificacion.md
+  levels:
+    - name: nucleo-contable
+      description: >
+        Pure accounting core — no DB, no HTTP, no clock. Generates the
+        asiento and evaluates invariants. Reference cases: REGLAS.md §10
+        (five/seven worked numeric examples) and §7 invariants (each on
+        both accept/reject paths), plus §8 rejection rules.
+      status: not-yet-established
+      expected_command: "dotnet test (SmartNet/api core project)"
+    - name: contrato-de-frontera
+      description: >
+        Boundary contract tests over frontier tables (OutboxEvent,
+        CommandQueue, InboxEvent, Procesamiento, extraction evidence)
+        run against the versioned schema (ADR 0016), from both runtimes
+        (.NET writes/Python reads and vice versa). Also verifies the
+        ADR 0003 database permission matrix (usr_api / usr_worker).
+      status: not-yet-established
+      expected_command: "dotnet test + pytest (contract suites, both sides)"
+    - name: extremo-a-extremo
+      description: >
+        Exactly ONE end-to-end test over fixed data (email with
+        attachments -> ingestion -> processing -> promotion ->
+        validation -> outbox event). Deliberately singular, not a suite.
+      status: not-yet-established
+      expected_command: "TBD once SmartNet/ projects are scaffolded"
+  per_runtime_commands_expected:
+    dotnet: "dotnet test"
+    python: "pytest"
+    angular: "ng test"
+  note: >
+    No code exists yet in SmartNet/. These commands are expected-but-
+    unverified, not discovered fact — recorded per ADR 0019 for when
+    projects are scaffolded per BACKLOG.md item order.
+
+rules:
+  proposal:
+    - Cite the BACKLOG.md item number and its "Depende de" / "Contexto extra requerido" columns
+    - Items marked ⚠ require REGLAS.md and/or Cuentas.xlsx as mandatory context — do not invent accounting rules
+    - Include rollback plan for risky changes
+  specs:
+    - Use Given/When/Then for scenarios
+    - Use RFC 2119 keywords (MUST, SHALL, SHOULD, MAY)
+    - Domain-facing requirements use Spanish domain terms consistent with REGLAS.md/CONVENTIONS.md
+  design:
+    - Respect ADR 0002 (stack per component) and ADR 0003 (data ownership partition — Python never touches .NET domain tables, no writes to dbo.*)
+    - Schema changes go through SmartNet/db/schema/ plain versioned SQL only — never EF Core Migrations, never Alembic (ADR 0016)
+    - Document architecture decisions with rationale; reference existing ADRs by number
+  tasks:
+    - Group by phase, use hierarchical numbering
+    - Keep tasks completable in one session
+    - Accounting core (nucleo-contable) tasks must stay free of DB/HTTP/clock dependencies (ADR 0019)
+  apply:
+    guidelines:
+      - Follow CONVENTIONS.md naming: accounting domain in Spanish, technical scaffolding in English
+      - Money fields: decimal/DECIMAL(18,2) only, never float/double; exchange rate DECIMAL(12,6)
+      - No accents/ñ in identifiers; accents allowed in strings/comments/docs
+    tdd: true
+    test_command: "not yet established — see testing.per_runtime_commands_expected"
+  verify:
+    test_command: "not yet established — see testing.per_runtime_commands_expected"
+    build_command: "not yet established"
+    coverage_threshold: 0
+  archive:
+    - Warn before merging destructive deltas
+    - REGLAS.md §10 worked examples and §7 invariants are normative — code/example discrepancies are resolved deliberately, never silently
