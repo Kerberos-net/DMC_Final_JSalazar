@@ -1,0 +1,1999 @@
+<!DOCTYPE html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<script src="./support.js"></script>
+</head>
+<body>
+<x-dc>
+<helmet>
+<style>
+  *{box-sizing:border-box;}
+  body{margin:0;}
+  ::placeholder{opacity:0.6;}
+  input,select{font-family:inherit;}
+  input:focus,select:focus{outline:none;}
+</style>
+</helmet>
+
+<div style="height:100vh;width:100%;font-family:-apple-system,BlinkMacSystemFont,'SF Pro Text',Helvetica,Arial,sans-serif;background:{{c.bg}};color:{{c.text}};overflow:hidden;">
+
+<sc-if value="{{cuentaPickerActive}}" hint-placeholder-val="{{false}}">
+  <div onClick="{{closeCuentaPicker}}" style="position:fixed;inset:0;z-index:50;"></div>
+</sc-if>
+
+<sc-if value="{{attachModalOpen}}" hint-placeholder-val="{{false}}">
+  <div style="position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:100;">
+    <div style="width:400px;max-height:70vh;overflow-y:auto;background:{{c.cardBg}};border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,0.35);padding:20px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:14px;">
+        <div style="font-size:14px;font-weight:700;color:{{c.text}};">{{attachModalTitle}}</div>
+        <div onClick="{{closeAttachModal}}" style="width:22px;height:22px;border-radius:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:{{c.cardBg2}};">
+          <div style="width:8px;height:8px;position:relative;">
+            <div style="position:absolute;width:10px;height:1.3px;background:{{c.textSecondary}};top:3.5px;left:-1px;transform:rotate(45deg);"></div>
+            <div style="position:absolute;width:10px;height:1.3px;background:{{c.textSecondary}};top:3.5px;left:-1px;transform:rotate(-45deg);"></div>
+          </div>
+        </div>
+      </div>
+
+      <label style="display:flex;align-items:center;justify-content:center;gap:8px;border:1.5px dashed {{c.border}};border-radius:10px;padding:16px;cursor:pointer;margin-bottom:14px;color:{{c.accent}};font-size:12.5px;font-weight:600;">
+        + Adjuntar archivo(s)
+        <input type="file" multiple="{{true}}" onChange="{{addAttachFiles}}" style="display:none;" />
+      </label>
+
+      <sc-if value="{{attachModalItems}}" hint-placeholder-val="{{false}}">
+        <div style="display:flex;flex-direction:column;gap:6px;">
+          <sc-for list="{{attachModalItems}}" as="f" hint-placeholder-count="0">
+            <div style="display:flex;align-items:center;justify-content:space-between;gap:10px;padding:8px 10px;background:{{c.cardBg2}};border-radius:8px;">
+              <div style="font-size:12.5px;color:{{c.text}};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{f.name}}</div>
+              <div onClick="{{f.onRemove}}" title="Quitar" style="width:18px;height:18px;border-radius:5px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">
+                <div style="width:9px;height:1.4px;background:#d70015;"></div>
+              </div>
+            </div>
+          </sc-for>
+        </div>
+      </sc-if>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{proveedorPickerOpen}}" hint-placeholder-val="{{false}}">
+  <div style="position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:flex-start;justify-content:center;padding-top:12vh;z-index:100;">
+    <div style="width:440px;max-height:65vh;overflow-y:auto;background:{{c.cardBg}};border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,0.35);padding:18px;">
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+        <div style="font-size:14px;font-weight:700;color:{{c.text}};">Buscar proveedor</div>
+        <div onClick="{{closeProveedorPicker}}" style="width:22px;height:22px;border-radius:11px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:{{c.cardBg2}};">
+          <div style="width:8px;height:8px;position:relative;">
+            <div style="position:absolute;width:10px;height:1.3px;background:{{c.textSecondary}};top:3.5px;left:-1px;transform:rotate(45deg);"></div>
+            <div style="position:absolute;width:10px;height:1.3px;background:{{c.textSecondary}};top:3.5px;left:-1px;transform:rotate(-45deg);"></div>
+          </div>
+        </div>
+      </div>
+      <input type="text" autofocus="{{true}}" placeholder="Buscar por nombre, código o RUC…" value="{{proveedorQuery}}" onChange="{{setProveedorQuery}}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;margin-bottom:10px;" />
+      <div style="display:flex;flex-direction:column;gap:2px;">
+        <sc-for list="{{filteredProveedores}}" as="p" hint-placeholder-count="5">
+          <div onClick="{{p.onSelect}}" style="padding:9px 10px;border-radius:8px;cursor:pointer;display:flex;align-items:center;justify-content:space-between;gap:10px;" style-hover="background:{{c.accentSoft}};">
+            <div style="overflow:hidden;">
+              <div style="font-size:13px;color:{{c.text}};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{p.nombre}}</div>
+              <div style="font-size:11px;color:{{c.textSecondary}};">RUC {{p.ruc}}</div>
+            </div>
+            <div style="font-size:11px;padding:3px 9px;border-radius:20px;background:{{c.cardBg2}};color:{{c.textSecondary}};font-weight:600;flex-shrink:0;">{{p.cod}}</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+  </div>
+</sc-if>
+
+<sc-if value="{{isLogin}}" hint-placeholder-val="{{true}}">
+<div style="height:100vh;display:flex;align-items:center;justify-content:center;background:{{c.bg}};">
+  <div style="width:360px;padding:36px 32px;background:{{c.cardBg}};border-radius:16px;box-shadow:0 20px 60px rgba(0,0,0,0.18);border:1px solid {{c.border}};display:flex;flex-direction:column;align-items:center;gap:6px;">
+    <div style="width:56px;height:56px;border-radius:13px;background:{{c.accent}};display:flex;align-items:center;justify-content:center;color:#fff;font-size:22px;font-weight:700;margin-bottom:6px;">GF</div>
+    <div style="font-size:17px;font-weight:600;color:{{c.text}};">Gestor de Facturas de Compra</div>
+    <div style="font-size:12.5px;color:{{c.textSecondary}};margin-bottom:18px;text-align:center;">Inicia sesión para revisar y validar facturas</div>
+    <input type="text" placeholder="Usuario" value="{{loginUser}}" onChange="{{setLoginUser}}" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13.5px;margin-bottom:9px;" />
+    <input type="password" placeholder="Contraseña" value="{{loginPass}}" onChange="{{setLoginPass}}" style="width:100%;padding:9px 12px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13.5px;margin-bottom:4px;" />
+    <sc-if value="{{loginError}}" hint-placeholder-val="{{false}}">
+      <div style="width:100%;font-size:12px;color:#d70015;padding:4px 2px 0;">{{loginError}}</div>
+    </sc-if>
+    <button onClick="{{submitLogin}}" style="width:100%;margin-top:14px;padding:9px 0;border-radius:8px;border:none;background:{{c.accent}};color:#fff;font-size:13.5px;font-weight:600;cursor:pointer;">Ingresar</button>
+    <div style="font-size:11px;color:{{c.textTertiary}};margin-top:14px;">Credenciales verificadas contra SQL Server</div>
+  </div>
+</div>
+</sc-if>
+
+<sc-if value="{{isApp}}" hint-placeholder-val="{{false}}">
+<div style="height:100vh;display:flex;">
+
+  <div style="width:{{sidebarWidthPx}};flex-shrink:0;background:{{c.sidebarBg}};border-right:1px solid {{c.border}};display:flex;flex-direction:column;padding:16px 12px;position:relative;transition:width 0.15s ease;overflow:visible;">
+    <div style="display:flex;align-items:center;gap:6px;padding:2px 2px 20px;">
+      <div onClick="{{toggleSidebar}}" title="Contraer/expandir panel" style="width:28px;height:28px;border-radius:7px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">
+        <div style="width:16px;height:11px;display:flex;flex-direction:column;justify-content:space-between;">
+          <div style="height:1.6px;border-radius:1px;background:{{c.textSecondary}};width:{{barW1}};transition:width 0.2s ease;"></div>
+          <div style="height:1.6px;border-radius:1px;background:{{c.textSecondary}};width:{{barW2}};transition:width 0.2s ease;"></div>
+          <div style="height:1.6px;border-radius:1px;background:{{c.textSecondary}};width:{{barW3}};transition:width 0.2s ease;"></div>
+        </div>
+      </div>
+      <div style="display:flex;align-items:center;gap:8px;overflow:hidden;">
+        <div style="width:22px;height:22px;border-radius:6px;background:{{c.accent}};flex-shrink:0;display:flex;align-items:center;justify-content:center;">
+          <div style="width:11px;height:9px;position:relative;">
+            <div style="position:absolute;inset:0;border:1.3px solid #fff;border-radius:1.5px;"></div>
+            <div style="position:absolute;left:1.5px;right:1.5px;top:2.3px;height:1.1px;background:#fff;"></div>
+            <div style="position:absolute;left:1.5px;right:1.5px;top:4.6px;height:1.1px;background:#fff;"></div>
+          </div>
+        </div>
+        <sc-if value="{{showLabels}}" hint-placeholder-val="{{true}}">
+          <div style="font-size:13px;font-weight:600;color:{{c.text}};white-space:nowrap;">Facturas de Compra</div>
+        </sc-if>
+      </div>
+    </div>
+
+    <div style="display:flex;flex-direction:column;gap:2px;">
+      <div style="{{navDashStyle}}" onClick="{{goDashboard}}" title="Bandeja principal">
+        <div style="width:14px;height:14px;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:2px;flex-shrink:0;">
+          <div style="background:currentColor;border-radius:1.5px;"></div><div style="background:currentColor;border-radius:1.5px;opacity:0.55;"></div>
+          <div style="background:currentColor;border-radius:1.5px;opacity:0.55;"></div><div style="background:currentColor;border-radius:1.5px;"></div>
+        </div>
+        <sc-if value="{{showLabels}}" hint-placeholder-val="{{true}}"><div style="white-space:nowrap;">Bandeja principal</div></sc-if>
+      </div>
+      <div style="{{navBitStyle}}" onClick="{{goBitacora}}" title="Registro de compra">
+        <div style="width:14px;height:14px;display:flex;flex-direction:column;gap:2.5px;justify-content:center;flex-shrink:0;">
+          <div style="height:2px;border-radius:1px;background:currentColor;width:100%;"></div>
+          <div style="height:2px;border-radius:1px;background:currentColor;width:80%;"></div>
+          <div style="height:2px;border-radius:1px;background:currentColor;width:60%;"></div>
+        </div>
+        <sc-if value="{{showLabels}}" hint-placeholder-val="{{true}}"><div style="white-space:nowrap;">Registro de compra</div></sc-if>
+      </div>
+      <div style="{{navProvStyle}}" onClick="{{goProveedores}}" title="Proveedores">
+        <div style="width:14px;height:14px;border-radius:7px;border:1.4px solid currentColor;position:relative;flex-shrink:0;">
+          <div style="position:absolute;left:3px;top:3px;width:6px;height:6px;border-radius:3px;border:1.2px solid currentColor;"></div>
+        </div>
+        <sc-if value="{{showLabels}}" hint-placeholder-val="{{true}}"><div style="white-space:nowrap;">Proveedores</div></sc-if>
+      </div>
+      <div style="{{navPlanStyle}}" onClick="{{goPlanContable}}" title="Plan contable">
+        <div style="width:14px;height:14px;display:flex;flex-direction:column;gap:2px;justify-content:center;flex-shrink:0;">
+          <div style="height:2px;width:100%;background:currentColor;opacity:0.9;border-radius:1px;"></div>
+          <div style="height:2px;width:70%;background:currentColor;opacity:0.9;border-radius:1px;margin-left:20%;"></div>
+          <div style="height:2px;width:100%;background:currentColor;opacity:0.9;border-radius:1px;"></div>
+        </div>
+        <sc-if value="{{showLabels}}" hint-placeholder-val="{{true}}"><div style="white-space:nowrap;">Plan contable</div></sc-if>
+      </div>
+
+      <div style="height:1px;background:{{c.border}};margin:8px 4px;"></div>
+
+      <div style="{{navErrStyle}}" onClick="{{goErrores}}" title="Errores y notificaciones">
+        <div style="width:14px;height:14px;border-radius:7px;border:1.4px solid currentColor;position:relative;flex-shrink:0;">
+          <div style="position:absolute;left:50%;top:2.5px;width:1.4px;height:5px;background:currentColor;transform:translateX(-50%);"></div>
+          <div style="position:absolute;left:50%;bottom:2.2px;width:1.6px;height:1.6px;border-radius:1px;background:currentColor;transform:translateX(-50%);"></div>
+        </div>
+        <sc-if value="{{showLabels}}" hint-placeholder-val="{{true}}"><div style="white-space:nowrap;">Errores y notificaciones</div></sc-if>
+      </div>
+      <div style="{{navCfgStyle}}" onClick="{{goConfig}}" title="Sincronización">
+        <div style="width:14px;height:14px;position:relative;flex-shrink:0;">
+          <div style="position:absolute;inset:1.5px;border-radius:7px;border:1.4px solid currentColor;border-right-color:transparent;transform:rotate(45deg);"></div>
+          <div style="position:absolute;inset:1.5px;border-radius:7px;border:1.4px solid currentColor;border-left-color:transparent;transform:rotate(225deg);"></div>
+          <div style="position:absolute;top:0;right:2px;width:0;height:0;border-left:2.5px solid transparent;border-right:2.5px solid transparent;border-bottom:3px solid currentColor;transform:rotate(45deg);"></div>
+          <div style="position:absolute;bottom:0;left:2px;width:0;height:0;border-left:2.5px solid transparent;border-right:2.5px solid transparent;border-top:3px solid currentColor;transform:rotate(45deg);"></div>
+        </div>
+        <sc-if value="{{showLabels}}" hint-placeholder-val="{{true}}"><div style="white-space:nowrap;">Sincronización</div></sc-if>
+      </div>
+      <div style="{{navAjustesStyle}}" onClick="{{goAjustes}}" title="Configuración">
+        <div style="width:14px;height:14px;position:relative;flex-shrink:0;">
+          <div style="position:absolute;inset:2px;border-radius:5px;border:1.4px solid currentColor;"></div>
+          <div style="position:absolute;top:-1px;left:5px;width:2px;height:3px;background:currentColor;"></div>
+          <div style="position:absolute;bottom:-1px;left:5px;width:2px;height:3px;background:currentColor;"></div>
+          <div style="position:absolute;left:-1px;top:5px;width:3px;height:2px;background:currentColor;"></div>
+          <div style="position:absolute;right:-1px;top:5px;width:3px;height:2px;background:currentColor;"></div>
+        </div>
+        <sc-if value="{{showLabels}}" hint-placeholder-val="{{true}}"><div style="white-space:nowrap;">Configuración</div></sc-if>
+      </div>
+    </div>
+
+    <div style="flex:1;"></div>
+
+    <div style="display:flex;align-items:center;justify-content:space-between;padding:8px;border-radius:8px;background:{{c.cardBg2}};margin-bottom:8px;">
+      <sc-if value="{{showLabels}}" hint-placeholder-val="{{true}}"><div style="font-size:12px;color:{{c.textSecondary}};white-space:nowrap;">Apariencia</div></sc-if>
+      <div onClick="{{toggleDark}}" style="width:30px;height:30px;border-radius:15px;border:1px solid {{c.border}};background:{{c.cardBg}};display:flex;align-items:center;justify-content:center;cursor:pointer;position:relative;flex-shrink:0;">
+        <sc-if value="{{dark}}" hint-placeholder-val="{{false}}">
+          <div style="width:13px;height:13px;border-radius:7px;background:#e8e8ed;position:relative;overflow:hidden;">
+            <div style="width:11px;height:11px;border-radius:6px;background:{{c.cardBg}};position:absolute;top:-3px;right:-3px;"></div>
+          </div>
+        </sc-if>
+        <sc-if value="{{lightMode}}" hint-placeholder-val="{{true}}">
+          <div style="width:11px;height:11px;border-radius:6px;background:#ff9f0a;position:relative;">
+            <div style="position:absolute;top:-5px;left:4.5px;width:2px;height:4px;background:#ff9f0a;"></div>
+            <div style="position:absolute;bottom:-5px;left:4.5px;width:2px;height:4px;background:#ff9f0a;"></div>
+            <div style="position:absolute;left:-5px;top:4.5px;width:4px;height:2px;background:#ff9f0a;"></div>
+            <div style="position:absolute;right:-5px;top:4.5px;width:4px;height:2px;background:#ff9f0a;"></div>
+          </div>
+        </sc-if>
+      </div>
+    </div>
+    <div onClick="{{toggleProfile}}" style="display:flex;align-items:center;gap:8px;padding:6px 8px;cursor:pointer;border-radius:8px;">
+      <div style="width:24px;height:24px;border-radius:12px;background:{{c.textTertiary}};flex-shrink:0;"></div>
+      <sc-if value="{{showLabels}}" hint-placeholder-val="{{true}}"><div style="font-size:12px;color:{{c.textSecondary}};white-space:nowrap;">Asistente contable</div></sc-if>
+    </div>
+
+    <sc-if value="{{profileOpen}}" hint-placeholder-val="{{false}}">
+      <div style="position:absolute;left:12px;bottom:66px;width:200px;background:{{c.cardBg}};border:1px solid {{c.border}};border-radius:10px;box-shadow:0 10px 30px rgba(0,0,0,0.22);padding:14px;z-index:30;">
+        <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+          <div style="width:32px;height:32px;border-radius:16px;background:{{c.textTertiary}};flex-shrink:0;"></div>
+          <div style="overflow:hidden;">
+            <div style="font-size:13px;font-weight:600;color:{{c.text}};white-space:nowrap;">Asistente contable</div>
+            <div style="font-size:11px;color:{{c.textSecondary}};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">asistente@empresa.com</div>
+          </div>
+        </div>
+        <button onClick="{{openProfileModal}}" style="width:100%;padding:7px 0;border-radius:7px;border:1px solid {{c.border}};background:{{c.accent}};color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;margin-bottom:6px;">Ver perfil</button>
+        <button onClick="{{logout}}" style="width:100%;padding:7px 0;border-radius:7px;border:1px solid {{c.border}};background:{{c.cardBg2}};color:{{c.text}};font-size:12.5px;cursor:pointer;">Cerrar sesión</button>
+      </div>
+    </sc-if>
+  </div>
+
+  <sc-if value="{{profileModalOpen}}" hint-placeholder-val="{{false}}">
+    <div style="position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:100;">
+      <div style="width:420px;max-height:88vh;overflow-y:auto;background:{{c.cardBg}};border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,0.35);padding:26px;">
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:18px;">
+          <div style="font-size:16px;font-weight:700;color:{{c.text}};">Perfil de usuario</div>
+          <div onClick="{{closeProfileModal}}" style="width:24px;height:24px;border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:{{c.cardBg2}};">
+            <div style="width:9px;height:9px;position:relative;">
+              <div style="position:absolute;width:11px;height:1.4px;background:{{c.textSecondary}};top:4px;left:-1px;transform:rotate(45deg);"></div>
+              <div style="position:absolute;width:11px;height:1.4px;background:{{c.textSecondary}};top:4px;left:-1px;transform:rotate(-45deg);"></div>
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;align-items:center;gap:14px;margin-bottom:22px;">
+          <div style="width:56px;height:56px;border-radius:28px;background:{{c.textTertiary}};flex-shrink:0;"></div>
+          <div>
+            <div style="font-size:15px;font-weight:600;color:{{c.text}};">{{profileName}}</div>
+            <div style="font-size:11.5px;padding:3px 10px;border-radius:20px;background:{{c.accentSoft}};color:{{c.accent}};font-weight:600;width:fit-content;margin-top:4px;">Asistente contable</div>
+          </div>
+        </div>
+
+        <div style="display:flex;flex-direction:column;gap:12px;margin-bottom:18px;">
+          <div>
+            <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Nombre completo</div>
+            <input value="{{profileName}}" onChange="{{setProfileName}}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;" />
+          </div>
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+            <div>
+              <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Usuario</div>
+              <input value="{{profileUsuario}}" disabled="{{true}}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.cardBg2}};color:{{c.textSecondary}};font-size:13px;" />
+            </div>
+            <div>
+              <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Correo</div>
+              <input value="{{profileEmail}}" onChange="{{setProfileEmail}}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;" />
+            </div>
+          </div>
+          <div style="font-size:11.5px;color:{{c.textTertiary}};">Cuenta creada: 03/03/2026 · Último acceso: hoy, 09:12</div>
+        </div>
+
+        <div style="border-top:1px solid {{c.border}};padding-top:16px;margin-bottom:18px;">
+          <div style="font-size:12.5px;font-weight:600;color:{{c.text}};margin-bottom:10px;">Cambiar contraseña</div>
+          <div style="display:flex;flex-direction:column;gap:10px;">
+            <input type="password" placeholder="Contraseña actual" value="{{profilePassActual}}" onChange="{{setProfilePassActual}}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;" />
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:10px;">
+              <input type="password" placeholder="Nueva contraseña" value="{{profilePassNueva}}" onChange="{{setProfilePassNueva}}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;" />
+              <input type="password" placeholder="Confirmar" value="{{profilePassConfirmar}}" onChange="{{setProfilePassConfirmar}}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;" />
+            </div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;">
+          <button onClick="{{closeProfileModal}}" style="flex:1;padding:9px 0;border-radius:8px;border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};font-size:13px;cursor:pointer;">Cancelar</button>
+          <button onClick="{{closeProfileModal}}" style="flex:1;padding:9px 0;border-radius:8px;border:none;background:{{c.accent}};color:#fff;font-size:13px;font-weight:600;cursor:pointer;">Guardar cambios</button>
+        </div>
+      </div>
+    </div>
+  </sc-if>
+
+  <div style="flex:1;overflow-y:auto;padding:24px 20px;">
+
+    <sc-if value="{{isDashboard}}" hint-placeholder-val="{{false}}">
+    <div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:22px;">
+        <div>
+          <div style="font-size:28px;font-weight:800;color:{{c.text}};letter-spacing:-0.02em;margin-bottom:3px;">Bandeja principal</div>
+          <div style="font-size:13px;color:{{c.textSecondary}};">{{todayLabel}} · ¿Qué necesito atender hoy?</div>
+        </div>
+        <div style="display:flex;gap:8px;">
+          <button onClick="{{syncDrive}}" style="display:flex;align-items:center;gap:6px;border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};padding:7px 12px;border-radius:8px;font-size:12.5px;cursor:pointer;white-space:nowrap;" title="Descarga las facturas nuevas desde el correo · Última sincronización: {{driveLastSync}}">
+            <div style="width:12px;height:12px;border-radius:6px;border:1.5px solid {{c.accent}};border-left-color:transparent;position:relative;flex-shrink:0;">
+              <div style="position:absolute;top:-2.5px;right:-1px;width:4px;height:4px;background:{{c.accent}};transform:rotate(45deg);"></div>
+            </div>
+            {{syncLabel}}
+          </button>
+          <button onClick="{{exportExcel}}" style="display:flex;align-items:center;gap:6px;border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};padding:7px 12px;border-radius:8px;font-size:12.5px;cursor:pointer;">
+            <div style="width:11px;height:11px;border:1.3px solid #1f8a3d;border-radius:2px;position:relative;flex-shrink:0;">
+              <div style="position:absolute;left:1.5px;right:1.5px;top:2px;height:1.1px;background:#1f8a3d;"></div>
+              <div style="position:absolute;left:1.5px;right:1.5px;top:5px;height:1.1px;background:#1f8a3d;"></div>
+            </div>
+            Exportar a Excel
+          </button>
+          <button onClick="{{printList}}" style="display:flex;align-items:center;gap:6px;border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};padding:7px 12px;border-radius:8px;font-size:12.5px;cursor:pointer;">
+            <div style="width:11px;height:9px;border:1.3px solid {{c.textSecondary}};border-radius:1.5px;position:relative;flex-shrink:0;">
+              <div style="position:absolute;left:-1.5px;right:-1.5px;top:2px;height:3px;border-top:1.3px solid {{c.textSecondary}};border-bottom:1.3px solid {{c.textSecondary}};"></div>
+            </div>
+            Imprimir listado
+          </button>
+        </div>
+      </div>
+
+      <div style="display:flex;gap:12px;margin-bottom:22px;">
+        <div style="flex:1;background:{{c.cardBg}};border:1px solid {{c.border}};border-radius:12px;padding:16px;">
+          <div style="font-size:10.5px;font-weight:700;color:{{c.textSecondary}};text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Pendientes de validación</div>
+          <div style="font-size:26px;font-weight:800;color:{{c.text}};letter-spacing:-0.02em;margin-bottom:6px;">{{countPendientes}}</div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:{{c.textSecondary}};">
+            <div style="width:6px;height:6px;border-radius:3px;background:{{c.accent}};flex-shrink:0;"></div>Requieren revisión
+          </div>
+        </div>
+        <div style="flex:1;background:{{c.cardBg}};border:1px solid {{c.border}};border-radius:12px;padding:16px;">
+          <div style="font-size:10.5px;font-weight:700;color:{{c.textSecondary}};text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Validadas</div>
+          <div style="font-size:26px;font-weight:800;color:#1f8a3d;letter-spacing:-0.02em;margin-bottom:6px;">{{countValidadas}}</div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:{{c.textSecondary}};">
+            <div style="width:6px;height:6px;border-radius:3px;background:#1f8a3d;flex-shrink:0;"></div>Registradas en el sistema
+          </div>
+        </div>
+        <div style="flex:1;background:{{c.cardBg}};border:1px solid {{c.border}};border-radius:12px;padding:16px;">
+          <div style="font-size:10.5px;font-weight:700;color:{{c.textSecondary}};text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Con error</div>
+          <div style="font-size:26px;font-weight:800;color:#d70015;letter-spacing:-0.02em;margin-bottom:6px;">{{countErrores}}</div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:{{c.textSecondary}};">
+            <div style="width:6px;height:6px;border-radius:3px;background:#d70015;flex-shrink:0;"></div>Acción requerida
+          </div>
+        </div>
+        <div style="flex:1;background:{{c.cardBg}};border:1px solid {{c.border}};border-radius:12px;padding:16px;">
+          <div style="font-size:10.5px;font-weight:700;color:{{c.textSecondary}};text-transform:uppercase;letter-spacing:0.05em;margin-bottom:8px;">Alertas</div>
+          <div style="font-size:26px;font-weight:800;color:#c93400;letter-spacing:-0.02em;margin-bottom:6px;">{{countAlertas}}</div>
+          <div style="display:flex;align-items:center;gap:6px;font-size:11.5px;color:{{c.textSecondary}};">
+            <div style="width:6px;height:6px;border-radius:3px;background:#ff9f0a;flex-shrink:0;"></div>Duplicados o datos faltantes
+          </div>
+        </div>
+      </div>
+
+      <div style="background:{{c.cardBg}};border:1px solid {{c.border}};border-radius:12px;padding:18px 18px 6px;margin-bottom:0;">
+        <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:16px;">
+          <div style="display:flex;align-items:center;gap:10px;">
+            <div style="font-size:15px;font-weight:700;color:{{c.text}};">Bandeja de facturas</div>
+            <div style="font-size:11.5px;color:{{c.textSecondary}};background:{{c.cardBg2}};padding:3px 9px;border-radius:20px;">{{totalInvoicesLabel}}</div>
+          </div>
+          <div style="display:flex;gap:6px;flex-wrap:wrap;">
+            <div onClick="{{setEstTodos}}" style="{{estChipTodosStyle}}">Todos <span style="opacity:0.7;">{{cntTodos}}</span></div>
+            <div onClick="{{setEstPendiente}}" style="{{estChipPendienteStyle}}">Pendiente <span style="opacity:0.7;">{{countPendientes}}</span></div>
+            <div onClick="{{setEstValidada}}" style="{{estChipValidadaStyle}}">Validada <span style="opacity:0.7;">{{countValidadas}}</span></div>
+            <div onClick="{{setEstError}}" style="{{estChipErrorStyle}}">Error <span style="opacity:0.7;">{{countErrores}}</span></div>
+            <div onClick="{{setEstAlerta}}" style="{{estChipAlertaStyle}}">Alerta <span style="opacity:0.7;">{{countAlertas}}</span></div>
+          </div>
+        </div>
+
+        <div style="display:flex;gap:10px;margin-bottom:14px;align-items:center;">
+          <input type="text" placeholder="Buscar por proveedor o documento…" value="{{filterProveedor}}" onChange="{{setFilterProveedor}}" style="padding:7px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.bg}};color:{{c.text}};font-size:12.5px;width:220px;" />
+          <input type="date" value="{{filterDesde}}" onChange="{{setFilterDesde}}" style="padding:6px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.bg}};color:{{c.text}};font-size:12.5px;color-scheme:{{c.colorScheme}};" />
+          <div style="color:{{c.textSecondary}};font-size:12px;">—</div>
+          <input type="date" value="{{filterHasta}}" onChange="{{setFilterHasta}}" style="padding:6px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.bg}};color:{{c.text}};font-size:12.5px;color-scheme:{{c.colorScheme}};" />
+        </div>
+      <div style="background:transparent;border-top:1px solid {{c.border}};margin:0 -18px;overflow-x:auto;">
+<div style="display:grid;grid-template-columns:22px 78px 40px 34px 34px 80px 48px 92px minmax(110px,1.1fr) minmax(120px,1.1fr) 44px 74px 74px 76px 84px 46px;column-gap:6px;padding:10px 18px;font-size:11px;font-weight:600;color:{{c.textSecondary}};border-bottom:1px solid {{c.border}};text-transform:uppercase;letter-spacing:0.03em;white-space:nowrap;">
+          <div>Adj.</div><div>Origen</div><div>Año</div><div>Mes</div><div>Día</div><div>Compro</div><div onClick="{{onSortTipo}}" style="cursor:pointer;">{{lblTipo}}</div><div onClick="{{onSortNumero}}" style="cursor:pointer;">{{lblNumero}}</div><div onClick="{{onSortProveedor}}" style="cursor:pointer;">{{lblProveedor}}</div><div>Glosa</div><div onClick="{{onSortTC}}" style="cursor:pointer;">{{lblTC}}</div><div onClick="{{onSortBase}}" style="text-align:right;cursor:pointer;">{{lblBase}}</div><div onClick="{{onSortIgv}}" style="text-align:right;cursor:pointer;">{{lblIgv}}</div><div onClick="{{onSortMonto}}" style="text-align:right;cursor:pointer;">{{lblMonto}}</div><div onClick="{{onSortEstado}}" style="cursor:pointer;">{{lblEstado}}</div><div></div>
+        </div>
+        <sc-for list="{{dashboardRows}}" as="row" hint-placeholder-count="6">
+          <div onClick="{{row.openFn}}" style="display:grid;grid-template-columns:22px 78px 40px 34px 34px 80px 48px 92px minmax(110px,1.1fr) minmax(120px,1.1fr) 44px 74px 74px 76px 84px 46px;column-gap:6px;padding:11px 18px;font-size:13px;color:{{c.text}};border-bottom:1px solid {{c.border}};cursor:pointer;align-items:center;">
+            <div style="text-align:center;">
+              <sc-if value="{{row.adjuntos}}" hint-placeholder-val="{{true}}">
+                <div title="Adjuntos encontrados" style="width:11px;height:11px;position:relative;transform:rotate(45deg);display:inline-block;">
+                  <div style="position:absolute;width:4px;height:10px;left:1.5px;top:0;border:1.4px solid #ff9f0a;border-radius:2px;"></div>
+                  <div style="position:absolute;width:4px;height:5.5px;left:1.5px;top:0;border:1.4px solid #ff9f0a;border-radius:2px 2px 0 0;border-bottom:none;background:{{c.cardBg}};"></div>
+                </div>
+              </sc-if>
+            </div>
+            <div style="font-size:12px;color:{{c.textSecondary}};white-space:nowrap;">{{row.origenLibro}}</div>
+            <div style="font-size:12.5px;color:{{c.textSecondary}};white-space:nowrap;font-variant-numeric:tabular-nums;">{{row.anio}}</div>
+            <div style="font-size:12.5px;color:{{c.textSecondary}};white-space:nowrap;font-variant-numeric:tabular-nums;">{{row.mes}}</div>
+            <div style="font-size:12.5px;color:{{c.textSecondary}};white-space:nowrap;font-variant-numeric:tabular-nums;">{{row.dia}}</div>
+            <div style="font-size:12.5px;font-weight:600;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{c.textSecondary}};">{{row.compro}}</div>
+            <div style="color:{{c.textSecondary}};font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{row.tipoLabel}}">{{row.tipoCode}}</div>
+            <div style="font-variant-numeric:tabular-nums;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{row.numero}}</div>
+            <div style="display:flex;align-items:center;gap:7px;overflow:hidden;">
+              <div style="width:20px;height:20px;border-radius:10px;background:{{row.avatarColor}};color:#fff;font-size:9.5px;font-weight:700;display:flex;align-items:center;justify-content:center;flex-shrink:0;">{{row.avatarInit}}</div>
+              <sc-if value="{{row.rowAlert}}" hint-placeholder-val="{{false}}">
+                <div style="width:6px;height:6px;border-radius:3px;background:#ff9f0a;flex-shrink:0;"></div>
+              </sc-if>
+              <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;" title="{{row.ruc}}">{{row.proveedor}}</div>
+            </div>
+            <div style="font-size:12.5px;color:{{c.textSecondary}};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{row.glosa}}">{{row.glosa}}</div>
+            <div style="font-variant-numeric:tabular-nums;font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;color:{{c.textSecondary}};">{{row.tcFmt}}</div>
+            <div style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-size:12.5px;color:{{c.textSecondary}};">{{row.baseFmt}}</div>
+            <div style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-size:12.5px;color:{{c.textSecondary}};">{{row.igvFmt}}</div>
+            <div style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{row.montoFmt}}</div>
+            <div style="overflow:hidden;">
+              <div style="display:inline-block;padding:3px 9px;border-radius:20px;font-size:11px;font-weight:600;background:{{row.estadoBg}};color:{{row.estadoFg}};white-space:nowrap;">{{row.estadoLabel}}</div>
+            </div>
+            <div style="display:flex;gap:3px;">
+              <div onClick="{{row.editFn}}" title="Editar" style="width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">
+                <div style="width:12px;height:12px;position:relative;">
+                  <div style="position:absolute;left:1px;top:0px;width:8px;height:2.4px;background:{{c.textSecondary}};transform:rotate(45deg);transform-origin:left center;"></div>
+                  <div style="position:absolute;left:1px;top:5.5px;width:2.4px;height:2.4px;background:{{c.textSecondary}};transform:rotate(45deg);"></div>
+                  <div style="position:absolute;left:-1.5px;top:8px;width:0;height:0;border-left:2.5px solid transparent;border-right:2.5px solid transparent;border-top:4px solid {{c.textSecondary}};transform:rotate(45deg);"></div>
+                </div>
+              </div>
+              <div onClick="{{row.deleteFn}}" title="Eliminar" style="width:20px;height:20px;border-radius:5px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">
+                <div style="width:8px;height:8px;border:1.3px solid #d70015;border-top:none;border-radius:0 0 2px 2px;position:relative;">
+                  <div style="position:absolute;top:-3px;left:-2px;width:12px;height:1.3px;background:#d70015;"></div>
+                </div>
+              </div>
+            </div>
+          </div>
+        </sc-for>
+        <sc-if value="{{hasRows}}" hint-placeholder-val="{{true}}"><div></div></sc-if>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin:12px -18px 0;padding:12px 18px 0;">
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div style="font-size:12px;color:{{c.textSecondary}};">{{dashPageInfo}}</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div style="font-size:12px;color:{{c.textSecondary}};">Filas por página</div>
+            <select value="{{dashboardPageSize}}" onChange="{{setDashboardPageSize}}" style="padding:5px 8px;border-radius:7px;border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};font-size:12.5px;">
+              <option value="6">6</option>
+              <option value="10">10</option>
+              <option value="20">20</option>
+              <option value="50">50</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;padding-bottom:14px;">
+          <button onClick="{{onDashPrev}}" style="border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};padding:5px 12px;border-radius:7px;font-size:12.5px;cursor:pointer;opacity:{{dashPrevOpacity}};">← Anterior</button>
+          <div style="font-size:12.5px;color:{{c.textSecondary}};">Página {{dashPage}} de {{dashTotalPages}}</div>
+          <button onClick="{{onDashNext}}" style="border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};padding:5px 12px;border-radius:7px;font-size:12.5px;cursor:pointer;opacity:{{dashNextOpacity}};">Siguiente →</button>
+        </div>
+      </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{isDetail}}" hint-placeholder-val="{{false}}">
+    <div>
+      <div style="display:flex;align-items:center;gap:14px;margin-bottom:18px;">
+        <button onClick="{{backToDashboard}}" style="border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};padding:6px 12px;border-radius:8px;font-size:12.5px;cursor:pointer;">← Volver</button>
+        <div style="flex:1;">
+          <div style="font-size:19px;font-weight:700;">{{detCompro}} · {{detNumero}} · {{detProveedor}}</div>
+        </div>
+        <div style="padding:4px 12px;border-radius:20px;font-size:12px;font-weight:600;background:{{detEstadoBg}};color:{{detEstadoFg}};">{{detEstadoLabel}}</div>
+        <button onClick="{{guardarAvance}}" style="border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};padding:8px 16px;border-radius:8px;font-size:13px;cursor:pointer;">Guardar avance</button>
+        <button onClick="{{validar}}" disabled="{{false}}" style="border:none;background:{{c.accent}};color:#fff;padding:8px 18px;border-radius:8px;font-size:13px;font-weight:600;cursor:pointer;">Validar</button>
+      </div>
+
+      <sc-if value="{{detDuplicado}}" hint-placeholder-val="{{false}}">
+        <div style="display:flex;align-items:center;gap:10px;background:rgba(255,149,0,0.12);border:1px solid rgba(255,149,0,0.35);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:12.5px;color:#c93400;">
+          <div style="flex:1;">Posible duplicado: existe otra factura con el mismo RUC, tipo de comprobante y número.</div>
+          <label style="display:flex;align-items:center;gap:6px;cursor:pointer;color:{{c.text}};">
+            <input type="checkbox" checked="{{dupAck}}" onChange="{{toggleDupAck}}" />
+            Revisé el duplicado
+          </label>
+        </div>
+      </sc-if>
+      <sc-if value="{{detProveedorMissing}}" hint-placeholder-val="{{false}}">
+        <div style="background:rgba(0,113,227,0.08);border:1px solid rgba(0,113,227,0.3);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:12.5px;color:{{c.accent}};">Proveedor no encontrado: se asignó <b>P0000 (Varios)</b>. Falta registrar al proveedor real.</div>
+      </sc-if>
+      <sc-if value="{{detTCMissing}}" hint-placeholder-val="{{false}}">
+        <div style="background:rgba(255,59,48,0.08);border:1px solid rgba(255,59,48,0.3);border-radius:10px;padding:10px 14px;margin-bottom:10px;font-size:12.5px;color:#d70015;">Falta el registro del tipo de cambio para la fecha de emisión. Se muestra 0.00.</div>
+      </sc-if>
+
+      <div style="display:flex;gap:20px;align-items:flex-start;">
+        <div style="width:42%;flex-shrink:0;">
+          <div style="display:flex;gap:8px;margin-bottom:10px;">
+            <div onClick="{{openOrdenModal}}" style="flex:1;background:{{c.cardBg}};border:1px solid {{c.border}};border-radius:10px;padding:10px;font-size:12px;color:{{c.textSecondary}};text-align:center;cursor:pointer;">Orden de compra <span style="color:{{c.accent}};font-weight:600;">({{ordenesCount}})</span></div>
+            <div onClick="{{openMediosModal}}" style="flex:1;background:{{c.cardBg}};border:1px solid {{c.border}};border-radius:10px;padding:10px;font-size:12px;color:{{c.textSecondary}};text-align:center;cursor:pointer;">Medios probatorios <span style="color:{{c.accent}};font-weight:600;">({{mediosCount}})</span></div>
+          </div>
+          <div style="background:{{c.cardBg}};border:1px solid {{c.border}};border-radius:12px;padding:16px;aspect-ratio:0.75;display:flex;flex-direction:column;gap:8px;">
+            <div style="font-size:11px;color:{{c.textSecondary}};margin-bottom:6px;">Factura escaneada</div>
+            <div style="flex:1;border-radius:6px;background:repeating-linear-gradient(135deg,{{c.cardBg2}} 0 10px,{{c.bg}} 10px 20px);display:flex;align-items:center;justify-content:center;">
+              <div style="font-size:11px;font-family:monospace;color:{{c.textTertiary}};background:{{c.cardBg}};padding:6px 10px;border-radius:6px;">PDF de la factura</div>
+            </div>
+          </div>
+        </div>
+
+        <div style="flex:1;background:{{c.cardBg}};border:1px solid {{c.border}};border-radius:12px;padding:20px;">
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;">
+            <div>
+              <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Tipo de comprobante</div>
+              <select value="{{detTipo}}" onChange="{{onTipo}}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;">
+                <option value="01">01 Factura</option>
+                <option value="03">03 Boleta</option>
+                <option value="07">07 Nota de Crédito</option>
+              </select>
+            </div>
+            <div>
+              <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Número de comprobante</div>
+              <input value="{{detNumero}}" onChange="{{onNumero}}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;" />
+            </div>
+            <div>
+              <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Proveedor</div>
+              <div style="display:flex;gap:8px;">
+                <input value="{{detProveedor}}" onChange="{{onProveedor}}" style="flex:1;min-width:0;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;" />
+                <div onClick="{{openProveedorPicker}}" title="Buscar proveedor" style="width:34px;height:34px;border-radius:8px;border:1px solid {{c.border}};background:{{c.cardBg}};display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">
+                  <div style="width:10px;height:10px;border:1.5px solid {{c.textSecondary}};border-radius:5px;position:relative;">
+                    <div style="position:absolute;width:5px;height:1.5px;background:{{c.textSecondary}};right:-4.5px;bottom:-1px;transform:rotate(45deg);"></div>
+                  </div>
+                </div>
+              </div>
+            </div>
+            <div>
+              <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Código de proveedor</div>
+              <div style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.cardBg2}};color:{{c.textSecondary}};font-size:13px;">{{detProveedorCodLabel}}</div>
+            </div>
+            <div style="grid-column:1 / span 2;">
+              <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Glosa</div>
+              <input value="{{detGlosa}}" onChange="{{onGlosa}}" placeholder="Ej. Materiales de construcción, impresoras…" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;" />
+            </div>
+            <div>
+              <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Base imponible</div>
+              <input value="{{detBaseVal}}" onChange="{{onDetBase}}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;font-variant-numeric:tabular-nums;" />
+            </div>
+            <div>
+              <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">IGV (18%)</div>
+              <input value="{{detIgvVal}}" onChange="{{onDetIgv}}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;font-variant-numeric:tabular-nums;" />
+            </div>
+            <div>
+              <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Monto</div>
+              <input value="{{detMonto}}" onChange="{{onMonto}}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;font-variant-numeric:tabular-nums;" />
+            </div>
+            <div>
+              <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Moneda</div>
+              <select value="{{detMoneda}}" onChange="{{onMoneda}}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;">
+                <option value="PEN">PEN — Sol</option>
+                <option value="USD">USD — Dólar</option>
+              </select>
+            </div>
+            <div>
+              <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Fecha de emisión</div>
+              <input type="date" value="{{detFecha}}" onChange="{{onFecha}}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;color-scheme:{{c.colorScheme}};" />
+            </div>
+            <div>
+              <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Tipo de cambio compra</div>
+              <input value="{{detTC}}" onChange="{{onTC}}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;font-variant-numeric:tabular-nums;" />
+              <div style="font-size:11px;color:{{c.textTertiary}};margin-top:4px;">Fuente: SBS · fecha {{detTCFecha}}</div>
+            </div>
+            <div>
+              <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Mes contable</div>
+              <input type="number" min="1" max="12" value="{{detMesContable}}" onChange="{{onMesContable}}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;font-variant-numeric:tabular-nums;" />
+            </div>
+            <div>
+              <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Día contable</div>
+              <input type="number" min="1" max="31" value="{{detDiaContable}}" onChange="{{onDiaContable}}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;font-variant-numeric:tabular-nums;" />
+            </div>
+          </div>
+
+          <div style="margin-top:20px;padding-top:16px;border-top:1px solid {{c.border}};">
+            <div style="font-size:12px;font-weight:600;color:{{c.textSecondary}};margin-bottom:8px;">Asiento contable sugerido · Origen 02 Compras</div>
+            <div style="background:{{c.cardBg2}};border-radius:8px;overflow:visible;">
+              <div style="display:grid;grid-template-columns:1.6fr 1fr 1fr;padding:7px 12px;font-size:10.5px;font-weight:600;color:{{c.textSecondary}};text-transform:uppercase;letter-spacing:0.03em;border-bottom:1px solid {{c.border}};border-radius:8px 8px 0 0;">
+                <div>Cuenta contable</div><div style="text-align:right;">Debe</div><div style="text-align:right;">Haber</div>
+              </div>
+              <sc-for list="{{detAsientoLineas}}" as="l" hint-placeholder-count="3">
+                <div style="display:grid;grid-template-columns:1.5fr 0.85fr 0.85fr 20px;column-gap:6px;padding:6px 12px;font-size:12px;border-bottom:1px solid {{c.border}};align-items:center;position:relative;">
+                  <div>
+                    <div onClick="{{l.onOpen}}" style="cursor:pointer;padding:5px 8px;border-radius:6px;border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};font-size:12px;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{l.cuenta}}</div>
+                    <sc-if value="{{l.pickerOpen}}" hint-placeholder-val="{{false}}">
+                      <div style="position:absolute;top:100%;left:0;width:320px;background:{{c.cardBg}};border:1px solid {{c.border}};border-radius:8px;box-shadow:0 12px 30px rgba(0,0,0,0.25);z-index:60;padding:8px;">
+                        <input type="text" autofocus="{{true}}" placeholder="Buscar cuenta contable…" value="{{cuentaQuery}}" onChange="{{setCuentaQuery}}" style="width:100%;padding:7px 9px;border-radius:6px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:12.5px;margin-bottom:6px;" />
+                        <div style="max-height:180px;overflow-y:auto;display:flex;flex-direction:column;gap:1px;">
+                          <sc-for list="{{filteredCuentaItems}}" as="opt" hint-placeholder-count="4">
+                            <div onClick="{{opt.onSelect}}" style="padding:7px 8px;border-radius:5px;font-size:12.5px;color:{{c.text}};cursor:pointer;" style-hover="background:{{c.accentSoft}};">{{opt.label}}</div>
+                          </sc-for>
+                        </div>
+                      </div>
+                    </sc-if>
+                  </div>
+                  <input value="{{l.debe}}" onChange="{{l.onDebe}}" style="width:100%;padding:5px 7px;border-radius:6px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:12px;text-align:right;font-variant-numeric:tabular-nums;" />
+                  <input value="{{l.haber}}" onChange="{{l.onHaber}}" style="width:100%;padding:5px 7px;border-radius:6px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:12px;text-align:right;font-variant-numeric:tabular-nums;" />
+                  <div onClick="{{l.onRemove}}" title="Eliminar línea" style="width:18px;height:18px;border-radius:5px;display:flex;align-items:center;justify-content:center;cursor:pointer;flex-shrink:0;">
+                    <div style="width:9px;height:1.4px;background:#d70015;"></div>
+                  </div>
+                </div>
+              </sc-for>
+              <div style="display:grid;grid-template-columns:1.5fr 0.85fr 0.85fr 20px;column-gap:6px;padding:7px 12px;font-size:12px;font-weight:600;background:{{c.cardBg}};">
+                <div style="color:{{c.textSecondary}};">Total</div>
+                <div style="text-align:right;font-variant-numeric:tabular-nums;">{{detLineasSumDebeFmt}}</div>
+                <div style="text-align:right;font-variant-numeric:tabular-nums;">{{detLineasSumHaberFmt}}</div>
+                <div></div>
+              </div>
+            </div>
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-top:8px;">
+              <div onClick="{{detAddLinea}}" style="font-size:12px;color:{{c.accent}};cursor:pointer;font-weight:600;">+ Agregar línea</div>
+              <div style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:{{detLineasCuadraBg}};color:{{detLineasCuadraFg}};">{{detLineasCuadraLabel}}</div>
+            </div>
+            <div style="font-size:11px;color:{{c.textTertiary}};margin-top:6px;">Toca una cuenta para corregirla. Se confirma al validar; sigue editable luego en Registro de compra.</div>
+          </div>
+
+          <div onClick="{{toggleHistory}}" style="margin-top:16px;padding-top:14px;border-top:1px solid {{c.border}};font-size:12px;color:{{c.textSecondary}};cursor:pointer;display:flex;align-items:center;gap:6px;">
+            <div>▾ Historial de corrección</div>
+          </div>
+          <sc-if value="{{historyOpen}}" hint-placeholder-val="{{false}}">
+            <div style="margin-top:8px;padding:10px 12px;background:{{c.cardBg2}};border-radius:8px;font-size:12px;color:{{c.textSecondary}};line-height:1.6;">
+              <div>28/07/2026 09:41 — Campo <b>monto</b>: 1,200.00 → 1,250.00</div>
+              <div>28/07/2026 09:40 — Campo <b>proveedor</b>: (vacío) → Ferretería San Martín S.A.C.</div>
+            </div>
+          </sc-if>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{isBitacora}}" hint-placeholder-val="{{false}}">
+    <div>
+      <div style="margin-bottom:16px;">
+        <div style="font-size:22px;font-weight:700;margin-bottom:2px;">Registro de compra</div>
+        <div style="font-size:13px;color:{{c.textSecondary}};">Generados automáticamente al validar cada factura · cabecera y detalle almacenados en el software</div>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;flex-wrap:wrap;">
+        <input type="text" placeholder="Buscar por proveedor o documento…" value="{{bitacoraSearch}}" onChange="{{setBitacoraSearch}}" style="padding:7px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};font-size:12.5px;width:230px;" />
+        <input type="date" value="{{bitacoraDesde}}" onChange="{{setBitacoraDesde}}" style="padding:6px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};font-size:12.5px;color-scheme:{{c.colorScheme}};" />
+        <div style="color:{{c.textSecondary}};font-size:12px;">—</div>
+        <input type="date" value="{{bitacoraHasta}}" onChange="{{setBitacoraHasta}}" style="padding:6px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};font-size:12.5px;color-scheme:{{c.colorScheme}};" />
+        <select value="{{regAnio}}" onChange="{{setRegAnio}}" style="padding:6px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};font-size:12.5px;">
+          <option value="">Año</option>
+          <sc-for list="{{regAnioOptions}}" as="a" hint-placeholder-count="2">
+            <option value="{{a}}">{{a}}</option>
+          </sc-for>
+        </select>
+        <select value="{{regMes}}" onChange="{{setRegMes}}" style="padding:6px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};font-size:12.5px;">
+          <option value="">Mes</option>
+          <option value="01">01</option><option value="02">02</option><option value="03">03</option>
+          <option value="04">04</option><option value="05">05</option><option value="06">06</option>
+          <option value="07">07</option><option value="08">08</option><option value="09">09</option>
+          <option value="10">10</option><option value="11">11</option><option value="12">12</option>
+        </select>
+        <select value="{{regDia}}" onChange="{{setRegDia}}" style="padding:6px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};font-size:12.5px;">
+          <option value="">Día</option>
+          <sc-for list="{{regDiaOptions}}" as="d" hint-placeholder-count="0">
+            <option value="{{d}}">{{d}}</option>
+          </sc-for>
+        </select>
+      </div>
+
+      <div style="background:{{c.cardBg}};border:1px solid {{c.border}};border-radius:12px;overflow-x:auto;">
+        <div style="display:grid;grid-template-columns:78px 44px 34px 34px 80px 96px minmax(120px,1.1fr) minmax(120px,1.1fr) 48px 58px 74px 74px 78px 100px 130px;column-gap:8px;padding:10px 16px;font-size:11px;font-weight:600;color:{{c.textSecondary}};border-bottom:1px solid {{c.border}};text-transform:uppercase;letter-spacing:0.03em;white-space:nowrap;">
+          <div>Origen</div><div>Año</div><div>Mes</div><div>Día</div><div>Compro</div><div>Comprobante</div><div>Proveedor</div><div>Glosa</div><div>Mon.</div><div>T.C.</div><div style="text-align:right;">Base imp.</div><div style="text-align:right;">IGV</div><div style="text-align:right;">Neto</div><div>Estado</div><div></div>
+        </div>
+        <sc-for list="{{bitacoraRows}}" as="row" hint-placeholder-count="4">
+          <div style="display:grid;grid-template-columns:78px 44px 34px 34px 80px 96px minmax(120px,1.1fr) minmax(120px,1.1fr) 48px 58px 74px 74px 78px 100px 130px;column-gap:8px;padding:11px 16px;font-size:13px;border-bottom:1px solid {{c.border}};align-items:center;opacity:{{row.rowOpacity}};">
+            <div style="font-size:12px;color:{{c.textSecondary}};white-space:nowrap;">{{row.origenLibro}}</div>
+            <div style="font-size:12.5px;color:{{c.textSecondary}};white-space:nowrap;font-variant-numeric:tabular-nums;">{{row.anio}}</div>
+            <div style="font-size:12.5px;color:{{c.textSecondary}};white-space:nowrap;font-variant-numeric:tabular-nums;">{{row.mes}}</div>
+            <div style="font-size:12.5px;color:{{c.textSecondary}};white-space:nowrap;font-variant-numeric:tabular-nums;">{{row.dia}}</div>
+            <div style="font-size:12.5px;font-weight:600;color:{{c.textSecondary}};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{row.compro}}</div>
+            <div style="font-size:12.5px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;">{{row.numero}}</div>
+            <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{row.proveedor}}</div>
+            <div style="font-size:12px;color:{{c.textSecondary}};white-space:nowrap;overflow:hidden;text-overflow:ellipsis;" title="{{row.glosa}}">{{row.glosa}}</div>
+            <div style="font-size:12.5px;color:{{c.textSecondary}};white-space:nowrap;">{{row.moneda}}</div>
+            <div style="font-size:12.5px;color:{{c.textSecondary}};white-space:nowrap;font-variant-numeric:tabular-nums;">{{row.tcFmt}}</div>
+            <div style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-size:12.5px;color:{{c.textSecondary}};">{{row.baseFmt}}</div>
+            <div style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;font-size:12.5px;color:{{c.textSecondary}};">{{row.igvFmt}}</div>
+            <div style="text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;">{{row.montoFmt}}</div>
+            <div style="display:inline-block;padding:3px 10px;border-radius:20px;font-size:11px;font-weight:600;background:{{row.estadoBg}};color:{{row.estadoFg}};white-space:nowrap;width:fit-content;">{{row.estadoLabel}}</div>
+            <div style="display:flex;gap:6px;">
+              <button onClick="{{row.onVerDetalle}}" style="border:1px solid {{c.border}};background:{{c.cardBg2}};color:{{c.text}};padding:5px 10px;border-radius:6px;font-size:11.5px;cursor:pointer;white-space:nowrap;">Ver detalle</button>
+            </div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;">
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div style="font-size:12px;color:{{c.textSecondary}};">{{regPageInfo}}</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div style="font-size:12px;color:{{c.textSecondary}};">Filas por página</div>
+            <select value="{{regPageSize}}" onChange="{{setRegPageSize}}" style="padding:5px 8px;border-radius:7px;border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};font-size:12.5px;">
+              <option value="6">6</option>
+              <option value="10">10</option>
+              <option value="20">20</option>
+              <option value="50">50</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <button onClick="{{onRegPrev}}" style="border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};padding:5px 12px;border-radius:7px;font-size:12.5px;cursor:pointer;opacity:{{regPrevOpacity}};">← Anterior</button>
+          <div style="font-size:12.5px;color:{{c.textSecondary}};">Página {{regPage}} de {{regTotalPages}}</div>
+          <button onClick="{{onRegNext}}" style="border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};padding:5px 12px;border-radius:7px;font-size:12.5px;cursor:pointer;opacity:{{regNextOpacity}};">Siguiente →</button>
+        </div>
+      </div>
+    </div>
+
+    <sc-if value="{{asientoDetailOpen}}" hint-placeholder-val="{{false}}">
+      <div style="position:fixed;inset:0;background:rgba(0,0,0,0.4);display:flex;align-items:center;justify-content:center;z-index:100;">
+        <div style="width:600px;max-height:86vh;overflow-y:auto;background:{{c.cardBg}};border-radius:14px;box-shadow:0 24px 70px rgba(0,0,0,0.35);padding:26px;">
+          <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;">
+            <div style="font-size:16px;font-weight:700;color:{{c.text}};">Registro de compra · {{asientoDetailCompro}} · {{asientoDetailNumero}}</div>
+            <div onClick="{{closeAsientoDetail}}" style="width:24px;height:24px;border-radius:12px;display:flex;align-items:center;justify-content:center;cursor:pointer;background:{{c.cardBg2}};flex-shrink:0;">
+              <div style="width:9px;height:9px;position:relative;">
+                <div style="position:absolute;width:11px;height:1.4px;background:{{c.textSecondary}};top:4px;left:-1px;transform:rotate(45deg);"></div>
+                <div style="position:absolute;width:11px;height:1.4px;background:{{c.textSecondary}};top:4px;left:-1px;transform:rotate(-45deg);"></div>
+              </div>
+            </div>
+          </div>
+
+          <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;background:{{c.cardBg2}};border-radius:10px;padding:14px 16px;margin-bottom:14px;">
+            <div>
+              <div style="font-size:10.5px;color:{{c.textSecondary}};text-transform:uppercase;letter-spacing:0.03em;margin-bottom:3px;">Proveedor</div>
+              <div style="font-size:13px;color:{{c.text}};">{{asientoDetailProveedor}}</div>
+            </div>
+            <div>
+              <div style="font-size:10.5px;color:{{c.textSecondary}};text-transform:uppercase;letter-spacing:0.03em;margin-bottom:3px;">Origen del libro</div>
+              <div style="font-size:13px;color:{{c.text}};">{{asientoDetailOrigen}}</div>
+            </div>
+            <div>
+              <div style="font-size:10.5px;color:{{c.textSecondary}};text-transform:uppercase;letter-spacing:0.03em;margin-bottom:3px;">Fecha contable</div>
+              <div style="font-size:13px;color:{{c.text}};">{{asientoDetailFechaContable}}</div>
+            </div>
+            <div style="grid-column:1 / span 2;">
+              <div style="font-size:10.5px;color:{{c.textSecondary}};text-transform:uppercase;letter-spacing:0.03em;margin-bottom:3px;">Glosa</div>
+              <div style="font-size:13px;color:{{c.text}};">{{asientoDetailGlosa}}</div>
+            </div>
+          </div>
+
+          <sc-if value="{{asientoDetailAnulado}}" hint-placeholder-val="{{false}}">
+            <div style="background:rgba(255,59,48,0.1);border:1px solid rgba(255,59,48,0.3);border-radius:8px;padding:8px 12px;font-size:12px;color:#d70015;margin-bottom:14px;">Este asiento está anulado.</div>
+          </sc-if>
+          <sc-if value="{{asientoNoCuadra}}" hint-placeholder-val="{{false}}">
+            <div style="background:rgba(255,59,48,0.1);border:1px solid rgba(255,59,48,0.3);border-radius:8px;padding:8px 12px;font-size:12px;color:#d70015;margin-bottom:14px;">Inconsistencia: el debe ({{asientoSumDebe}}) no cuadra con el haber ({{asientoSumHaber}}).</div>
+          </sc-if>
+
+          <div style="font-size:12px;font-weight:600;color:{{c.textSecondary}};margin-bottom:8px;">Asiento contable · validado, no editable</div>
+          <div style="background:{{c.cardBg2}};border-radius:10px;overflow:hidden;">
+            <div style="display:grid;grid-template-columns:1.6fr 1fr 1fr;column-gap:8px;padding:8px 14px;font-size:10.5px;font-weight:600;color:{{c.textSecondary}};text-transform:uppercase;letter-spacing:0.03em;border-bottom:1px solid {{c.border}};">
+              <div>Cuenta contable</div><div style="text-align:right;">Debe</div><div style="text-align:right;">Haber</div>
+            </div>
+            <sc-for list="{{asientoLineasRows}}" as="l" hint-placeholder-count="3">
+              <div style="display:grid;grid-template-columns:1.6fr 1fr 1fr;column-gap:8px;padding:9px 14px;font-size:12.5px;align-items:center;border-bottom:1px solid {{c.border}};">
+                <div style="color:{{c.text}};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{l.cuenta}}</div>
+                <div style="text-align:right;font-variant-numeric:tabular-nums;color:{{c.textSecondary}};">{{l.debeFmt}}</div>
+                <div style="text-align:right;font-variant-numeric:tabular-nums;color:{{c.textSecondary}};">{{l.haberFmt}}</div>
+              </div>
+            </sc-for>
+            <div style="display:grid;grid-template-columns:1.6fr 1fr 1fr;column-gap:8px;padding:9px 14px;font-size:12.5px;font-weight:600;background:{{c.cardBg}};">
+              <div style="color:{{c.textSecondary}};">Total</div>
+              <div style="text-align:right;font-variant-numeric:tabular-nums;">{{asientoSumDebe}}</div>
+              <div style="text-align:right;font-variant-numeric:tabular-nums;">{{asientoSumHaber}}</div>
+            </div>
+          </div>
+
+          <sc-if value="{{asientoHistRows}}" hint-placeholder-val="{{true}}">
+            <div style="margin-top:16px;">
+              <div style="font-size:12px;font-weight:600;color:{{c.textSecondary}};margin-bottom:6px;">Historial de correcciones</div>
+              <div style="background:{{c.cardBg2}};border-radius:8px;padding:10px 12px;font-size:12px;color:{{c.textSecondary}};line-height:1.7;">
+                <sc-for list="{{asientoHistRows}}" as="h" hint-placeholder-count="0">
+                  <div>{{h.ts}} — Campo <b>{{h.campo}}</b>: {{h.de}} → {{h.a}}</div>
+                </sc-for>
+              </div>
+            </div>
+          </sc-if>
+
+          <div style="display:flex;gap:10px;margin-top:20px;">
+            <button onClick="{{closeAsientoDetail}}" style="flex:1;padding:9px 0;border-radius:8px;border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};font-size:13px;cursor:pointer;">Cerrar</button>
+            <sc-if value="{{asientoDetailAnulado}}" hint-placeholder-val="{{false}}">
+              <button onClick="{{onReactivar}}" style="flex:1;padding:9px 0;border-radius:8px;border:none;background:{{c.accent}};color:#fff;font-size:13px;font-weight:600;cursor:pointer;">Reactivar asiento</button>
+            </sc-if>
+            <sc-if value="{{asientoDetailAnulado}}" hint-placeholder-val="{{true}}">
+              <button onClick="{{onAnular}}" style="flex:1;padding:9px 0;border-radius:8px;border:1px solid #d70015;background:transparent;color:#d70015;font-size:13px;font-weight:600;cursor:pointer;">Anular asiento</button>
+            </sc-if>
+          </div>
+        </div>
+      </div>
+    </sc-if>
+    </sc-if>
+
+    <sc-if value="{{isErrores}}" hint-placeholder-val="{{false}}">
+    <div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;">
+        <div>
+          <div style="font-size:22px;font-weight:700;margin-bottom:2px;">Errores y notificaciones</div>
+          <div style="font-size:13px;color:{{c.textSecondary}};">Incidencias de conexión y envío de alertas</div>
+        </div>
+        <button onClick="{{exportErrores}}" style="display:flex;align-items:center;gap:6px;border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};padding:7px 12px;border-radius:8px;font-size:12.5px;cursor:pointer;">
+          <div style="width:11px;height:11px;border:1.3px solid #1f8a3d;border-radius:2px;position:relative;flex-shrink:0;">
+            <div style="position:absolute;left:1.5px;right:1.5px;top:2px;height:1.1px;background:#1f8a3d;"></div>
+            <div style="position:absolute;left:1.5px;right:1.5px;top:5px;height:1.1px;background:#1f8a3d;"></div>
+          </div>
+          Exportar a Excel
+        </button>
+      </div>
+
+      <div style="display:flex;gap:8px;margin-bottom:10px;align-items:center;flex-wrap:wrap;">
+        <div onClick="{{setErrorFilterTodos}}" style="{{chipTodosStyle}}">Todos</div>
+        <div onClick="{{setErrorFilterError}}" style="{{chipErrorStyle}}">Errores de conexión ({{countErrorCat}})</div>
+        <div onClick="{{setErrorFilterNotif}}" style="{{chipNotifStyle}}">Notificaciones ({{countNotifCat}})</div>
+      </div>
+      <div style="display:flex;gap:8px;margin-bottom:16px;align-items:center;">
+        <input type="date" value="{{errorFechaDesde}}" onChange="{{setErrorFechaDesde}}" style="padding:6px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};font-size:12.5px;color-scheme:{{c.colorScheme}};" />
+        <div style="color:{{c.textSecondary}};font-size:12px;">—</div>
+        <input type="date" value="{{errorFechaHasta}}" onChange="{{setErrorFechaHasta}}" style="padding:6px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};font-size:12.5px;color-scheme:{{c.colorScheme}};" />
+      </div>
+
+      <div style="display:flex;flex-direction:column;gap:10px;">
+        <sc-for list="{{erroresRows}}" as="e" hint-placeholder-count="3">
+          <div style="background:{{c.cardBg}};border:1px solid {{c.border}};border-radius:10px;padding:14px 16px;display:flex;gap:14px;align-items:center;">
+            <sc-if value="{{e.isError}}" hint-placeholder-val="{{true}}">
+              <div style="width:26px;height:26px;border-radius:13px;background:{{e.categoriaBg}};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <div style="width:14px;height:14px;border-radius:7px;border:1.4px solid {{e.categoriaFg}};position:relative;">
+                  <div style="position:absolute;left:50%;top:2.5px;width:1.4px;height:5px;background:{{e.categoriaFg}};transform:translateX(-50%);"></div>
+                  <div style="position:absolute;left:50%;bottom:2.2px;width:1.6px;height:1.6px;border-radius:1px;background:{{e.categoriaFg}};transform:translateX(-50%);"></div>
+                </div>
+              </div>
+            </sc-if>
+            <sc-if value="{{e.isNotif}}" hint-placeholder-val="{{false}}">
+              <div style="width:26px;height:26px;border-radius:13px;background:{{e.categoriaBg}};display:flex;align-items:center;justify-content:center;flex-shrink:0;">
+                <div style="width:12px;height:10px;position:relative;">
+                  <div style="position:absolute;top:0;left:1px;width:10px;height:8px;border-radius:5px 5px 2px 2px;border:1.4px solid {{e.categoriaFg}};"></div>
+                  <div style="position:absolute;bottom:-2px;left:4px;width:4px;height:4px;border-radius:2px;background:{{e.categoriaFg}};"></div>
+                </div>
+              </div>
+            </sc-if>
+            <div style="flex:1;">
+              <div style="display:flex;align-items:center;gap:8px;margin-bottom:3px;">
+                <div style="font-size:13px;font-weight:600;">{{e.sistema}} · {{e.detalle}}</div>
+              </div>
+              <div style="font-size:12px;color:{{c.textSecondary}};">{{e.fecha}} · {{e.reintentos}} reintentos</div>
+            </div>
+            <div style="font-size:11px;padding:3px 9px;border-radius:20px;background:{{e.categoriaBg}};color:{{e.categoriaFg}};font-weight:600;white-space:nowrap;">{{e.categoriaLabel}}</div>
+            <div style="font-size:11.5px;padding:4px 10px;border-radius:20px;background:rgba(52,199,89,0.12);color:#1f8a3d;font-weight:600;white-space:nowrap;">Respaldo enviado</div>
+          </div>
+        </sc-for>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{isConfig}}" hint-placeholder-val="{{false}}">
+    <div>
+      <div style="font-size:22px;font-weight:700;margin-bottom:2px;">Sincronización</div>
+      <div style="font-size:13px;color:{{c.textSecondary}};margin-bottom:16px;">Conecta y configura las fuentes que alimentan el registro de facturas</div>
+
+      <div style="display:flex;gap:8px;margin-bottom:18px;flex-wrap:wrap;">
+        <div onClick="{{setSyncTabCorreo}}" style="{{syncTabCorreoStyle}}">Correo electrónico</div>
+        <div onClick="{{setSyncTabDrive}}" style="{{syncTabDriveStyle}}">Google Drive</div>
+        <div onClick="{{setSyncTabSheets}}" style="{{syncTabSheetsStyle}}">Google Sheets</div>
+        <div onClick="{{setSyncTabTelegram}}" style="{{syncTabTelegramStyle}}">Bot de Telegram</div>
+      </div>
+
+      <div style="display:flex;gap:16px;align-items:flex-start;margin-bottom:20px;">
+        <div style="flex:1;min-width:0;display:flex;flex-direction:column;gap:14px;">
+
+          <div style="background:{{c.cardBg}};border:1px solid {{c.border}};border-radius:12px;padding:18px;">
+            <div style="display:flex;align-items:flex-start;gap:14px;margin-bottom:14px;">
+              <div style="width:38px;height:38px;border-radius:10px;background:{{connColor}};color:#fff;display:flex;align-items:center;justify-content:center;font-size:15px;font-weight:700;flex-shrink:0;">{{connLetra}}</div>
+              <div style="flex:1;">
+                <div style="display:flex;align-items:center;gap:10px;margin-bottom:4px;">
+                  <div style="font-size:14px;font-weight:600;">{{connNombre}}</div>
+                  <div style="font-size:11px;padding:3px 10px;border-radius:20px;background:{{connEstadoBg}};color:{{connEstadoFg}};font-weight:600;">{{connEstadoLabel}}</div>
+                </div>
+                <div style="font-size:12.5px;color:{{c.textSecondary}};line-height:1.5;">{{connDetalle}}</div>
+              </div>
+              <div style="display:flex;gap:8px;flex-shrink:0;">
+                <sc-if value="{{isNotTelegram}}" hint-placeholder-val="{{true}}">
+                  <button onClick="{{onReconnect}}" style="border:1px solid {{c.border}};background:{{c.cardBg2}};color:{{c.text}};padding:7px 14px;border-radius:8px;font-size:12.5px;cursor:pointer;white-space:nowrap;">Reconectar</button>
+                  <button onClick="{{onDisconnect}}" style="border:1px solid {{c.border}};background:transparent;color:#d70015;padding:7px 14px;border-radius:8px;font-size:12.5px;cursor:pointer;white-space:nowrap;">Desconectar</button>
+                </sc-if>
+                <sc-if value="{{isTelegram}}" hint-placeholder-val="{{false}}">
+                  <button onClick="{{onReconnect}}" style="border:none;background:{{c.accent}};color:#fff;padding:7px 14px;border-radius:8px;font-size:12.5px;font-weight:600;cursor:pointer;white-space:nowrap;">Conectar</button>
+                </sc-if>
+              </div>
+            </div>
+            <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;padding-top:14px;border-top:1px solid {{c.border}};">
+              <div>
+                <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Proveedor</div>
+                <div style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.cardBg2}};color:{{c.textSecondary}};font-size:13px;">{{connProveedor}}</div>
+              </div>
+              <div>
+                <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Cuenta conectada</div>
+                <input value="{{connCuenta}}" onChange="{{onCuenta}}" placeholder="Sin conectar" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;" />
+              </div>
+            </div>
+          </div>
+
+          <sc-if value="{{isTelegram}}" hint-placeholder-val="{{false}}">
+            <div style="background:{{c.cardBg}};border:1px solid {{c.border}};border-radius:12px;padding:18px;">
+              <div style="font-size:13px;font-weight:600;margin-bottom:4px;">Configuración del bot</div>
+              <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:14px;">Crea un bot con @BotFather y agrega su token y el chat/canal destino.</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div>
+                  <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Token del bot</div>
+                  <input value="{{tokenBot}}" onChange="{{onTokenBot}}" placeholder="123456:ABC-DEF…" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;" />
+                </div>
+                <div>
+                  <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Chat / canal destino</div>
+                  <input value="{{chatId}}" onChange="{{onChatId}}" placeholder="@mi_canal o ID de chat" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;" />
+                </div>
+              </div>
+            </div>
+          </sc-if>
+
+          <sc-if value="{{isNotTelegram}}" hint-placeholder-val="{{true}}">
+          <div style="background:{{c.cardBg}};border:1px solid {{c.border}};border-radius:12px;padding:18px;">
+            <div style="font-size:13px;font-weight:600;margin-bottom:14px;">Opciones de sincronización</div>
+            <div style="display:grid;grid-template-columns:1fr 1fr 1fr;gap:12px;margin-bottom:14px;">
+              <div>
+                <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Frecuencia (minutos)</div>
+                <select value="{{connFrecuencia}}" onChange="{{onFrecuencia}}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;">
+                  <option value="5">Cada 5 minutos</option>
+                  <option value="15">Cada 15 minutos</option>
+                  <option value="30">Cada 30 minutos</option>
+                  <option value="60">Cada hora</option>
+                </select>
+              </div>
+              <div>
+                <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Procesar desde</div>
+                <select value="{{connDiasAtras}}" onChange="{{onDiasAtras}}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;">
+                  <option value="7">Últimos 7 días</option>
+                  <option value="30">Últimos 30 días</option>
+                  <option value="90">Últimos 90 días</option>
+                  <option value="—">No aplica</option>
+                </select>
+              </div>
+              <div>
+                <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Carpeta / etiqueta</div>
+                <input value="{{connCarpeta}}" onChange="{{onCarpeta}}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;" />
+              </div>
+            </div>
+
+            <sc-if value="{{isCorreo}}" hint-placeholder-val="{{true}}">
+              <div style="display:flex;flex-direction:column;gap:10px;padding-top:6px;border-top:1px solid {{c.border}};">
+                <div onClick="{{toggleMarcarLeidos}}" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding-top:10px;">
+                  <div>
+                    <div style="font-size:12.5px;color:{{c.text}};">Marcar correos como leídos</div>
+                    <div style="font-size:11px;color:{{c.textSecondary}};">Los correos procesados se marcarán como leídos.</div>
+                  </div>
+                  <div style="width:34px;height:20px;border-radius:10px;background:{{marcarLeidos ? c.accent : c.border}};flex-shrink:0;"></div>
+                </div>
+                <div onClick="{{toggleDescargarAdjuntos}}" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+                  <div>
+                    <div style="font-size:12.5px;color:{{c.text}};">Descargar adjuntos</div>
+                    <div style="font-size:11px;color:{{c.textSecondary}};">Se descargarán los adjuntos de los correos.</div>
+                  </div>
+                  <div style="width:34px;height:20px;border-radius:10px;background:{{descargarAdjuntos ? c.accent : c.border}};flex-shrink:0;"></div>
+                </div>
+                <div onClick="{{toggleEliminarProcesados}}" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+                  <div>
+                    <div style="font-size:12.5px;color:{{c.text}};">Eliminar correos procesados</div>
+                    <div style="font-size:11px;color:{{c.textSecondary}};">Los correos procesados se moverán a la papelera.</div>
+                  </div>
+                  <div style="width:34px;height:20px;border-radius:10px;background:{{eliminarProcesados ? c.accent : c.border}};flex-shrink:0;"></div>
+                </div>
+              </div>
+            </sc-if>
+          </div>
+          </sc-if>
+
+          <sc-if value="{{isCorreo}}" hint-placeholder-val="{{true}}">
+            <div style="background:{{c.cardBg}};border:1px solid {{c.border}};border-radius:12px;padding:18px;">
+              <div style="font-size:13px;font-weight:600;margin-bottom:4px;">Filtros de correos</div>
+              <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:14px;">Define los criterios para identificar correos con facturas de compra.</div>
+              <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px;">
+                <div>
+                  <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Remitentes permitidos (opcional)</div>
+                  <input value="{{filtroRemitentes}}" onChange="{{onFiltroRemitentes}}" placeholder="ej. proveedor@empresa.com" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;" />
+                </div>
+                <div>
+                  <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Asunto debe contener</div>
+                  <input value="{{filtroAsunto}}" onChange="{{onFiltroAsunto}}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;" />
+                </div>
+                <div>
+                  <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Palabras clave en el cuerpo</div>
+                  <input value="{{filtroPalabras}}" onChange="{{onFiltroPalabras}}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;" />
+                </div>
+                <div>
+                  <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Adjuntos permitidos</div>
+                  <input value="{{filtroExts}}" onChange="{{onFiltroExts}}" style="width:100%;padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;" />
+                </div>
+              </div>
+            </div>
+          </sc-if>
+        </div>
+
+        <sc-if value="{{isNotTelegram}}" hint-placeholder-val="{{true}}">
+        <div style="width:280px;flex-shrink:0;display:flex;flex-direction:column;gap:14px;">
+          <div style="background:{{c.cardBg}};border:1px solid {{c.border}};border-radius:12px;padding:16px;">
+            <div style="display:flex;align-items:center;justify-content:space-between;margin-bottom:12px;">
+              <div style="font-size:13px;font-weight:600;">Estado de sincronización</div>
+              <div style="font-size:11px;padding:3px 9px;border-radius:20px;background:{{connEstadoBg}};color:{{connEstadoFg}};font-weight:600;">{{connEstadoLabel}}</div>
+            </div>
+            <div style="font-size:11px;color:{{c.textSecondary}};margin-bottom:2px;">Última sincronización</div>
+            <div style="font-size:12.5px;color:{{c.text}};margin-bottom:10px;">{{connUltima}}</div>
+            <div style="font-size:11px;color:{{c.textSecondary}};margin-bottom:2px;">Próxima sincronización</div>
+            <div style="font-size:12.5px;color:{{c.text}};margin-bottom:14px;">{{connProxima}}</div>
+            <button onClick="{{onSyncNow}}" style="width:100%;padding:9px 0;border-radius:8px;border:none;background:{{c.accent}};color:#fff;font-size:12.5px;font-weight:600;cursor:pointer;">Sincronizar ahora</button>
+          </div>
+
+          <div style="background:{{c.cardBg}};border:1px solid {{c.border}};border-radius:12px;padding:16px;">
+            <div style="font-size:13px;font-weight:600;margin-bottom:12px;">Resumen de la conexión</div>
+            <div style="display:flex;flex-direction:column;gap:10px;">
+              <sc-for list="{{connStats}}" as="st" hint-placeholder-count="4">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <div style="font-size:12px;color:{{c.textSecondary}};">{{st.label}}</div>
+                  <div style="font-size:13px;font-weight:600;color:{{c.text}};">{{st.value}}</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+
+          <div style="background:{{c.cardBg}};border:1px solid {{c.border}};border-radius:12px;padding:16px;">
+            <div style="font-size:13px;font-weight:600;margin-bottom:10px;">Carpetas monitoreadas</div>
+            <div style="display:flex;flex-direction:column;gap:8px;">
+              <sc-for list="{{connCarpetasList}}" as="f" hint-placeholder-count="2">
+                <div style="display:flex;align-items:center;justify-content:space-between;">
+                  <div style="font-size:12.5px;color:{{c.text}};overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{f.nombre}}</div>
+                  <div style="font-size:10.5px;padding:2px 8px;border-radius:20px;background:{{c.accentSoft}};color:{{c.accent}};font-weight:600;flex-shrink:0;">Activa</div>
+                </div>
+              </sc-for>
+            </div>
+          </div>
+        </div>
+        </sc-if>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{isProveedores}}" hint-placeholder-val="{{false}}">
+    <div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;">
+        <div>
+          <div style="font-size:22px;font-weight:700;margin-bottom:2px;">Proveedores</div>
+          <div style="font-size:13px;color:{{c.textSecondary}};">Catálogo de proveedores registrados · solo lectura</div>
+        </div>
+        <button onClick="{{exportProveedores}}" style="display:flex;align-items:center;gap:6px;border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};padding:7px 12px;border-radius:8px;font-size:12.5px;cursor:pointer;white-space:nowrap;">
+          <div style="width:11px;height:11px;border:1.3px solid #1f8a3d;border-radius:2px;position:relative;flex-shrink:0;">
+            <div style="position:absolute;left:1.5px;right:1.5px;top:2px;height:1.1px;background:#1f8a3d;"></div>
+            <div style="position:absolute;left:1.5px;right:1.5px;top:5px;height:1.1px;background:#1f8a3d;"></div>
+          </div>
+          Exportar a Excel
+        </button>
+      </div>
+
+      <input type="text" placeholder="Buscar por nombre, código o RUC…" value="{{provSearch}}" onChange="{{setProvSearch}}" style="padding:7px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};font-size:12.5px;width:260px;margin-bottom:16px;" />
+
+      <div style="background:{{c.cardBg}};border:1px solid {{c.border}};border-radius:12px;overflow:hidden;">
+        <div style="display:grid;grid-template-columns:100px 1.6fr 1fr;padding:10px 16px;font-size:11px;font-weight:600;color:{{c.textSecondary}};border-bottom:1px solid {{c.border}};text-transform:uppercase;letter-spacing:0.03em;">
+          <div onClick="{{onProvSortCod}}" style="cursor:pointer;">{{provLblCod}}</div><div onClick="{{onProvSortNombre}}" style="cursor:pointer;">{{provLblNombre}}</div><div onClick="{{onProvSortRuc}}" style="cursor:pointer;">{{provLblRuc}}</div>
+        </div>
+        <sc-for list="{{proveedoresListRows}}" as="p" hint-placeholder-count="6">
+          <div style="display:grid;grid-template-columns:100px 1.6fr 1fr;padding:11px 16px;font-size:13px;border-bottom:1px solid {{c.border}};align-items:center;">
+            <div style="font-size:12.5px;font-weight:600;color:{{c.textSecondary}};">{{p.cod}}</div>
+            <div style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">{{p.nombre}}</div>
+            <div style="font-size:12.5px;color:{{c.textSecondary}};font-variant-numeric:tabular-nums;">{{p.ruc}}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;">
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div style="font-size:12px;color:{{c.textSecondary}};">{{provPageInfo}}</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div style="font-size:12px;color:{{c.textSecondary}};">Filas por página</div>
+            <select value="{{provPageSize}}" onChange="{{setProvPageSize}}" style="padding:5px 8px;border-radius:7px;border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};font-size:12.5px;">
+              <option value="6">6</option><option value="10">10</option><option value="20">20</option><option value="50">50</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <button onClick="{{onProvPrev}}" style="border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};padding:5px 12px;border-radius:7px;font-size:12.5px;cursor:pointer;opacity:{{provPrevOpacity}};">← Anterior</button>
+          <div style="font-size:12.5px;color:{{c.textSecondary}};">Página {{provPage}} de {{provTotalPages}}</div>
+          <button onClick="{{onProvNext}}" style="border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};padding:5px 12px;border-radius:7px;font-size:12.5px;cursor:pointer;opacity:{{provNextOpacity}};">Siguiente →</button>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{isPlanContable}}" hint-placeholder-val="{{false}}">
+    <div>
+      <div style="display:flex;align-items:flex-start;justify-content:space-between;margin-bottom:16px;">
+        <div>
+          <div style="font-size:22px;font-weight:700;margin-bottom:2px;">Plan contable</div>
+          <div style="font-size:13px;color:{{c.textSecondary}};">Cuentas disponibles para los asientos contables · solo lectura</div>
+        </div>
+        <button onClick="{{exportPlanContable}}" style="display:flex;align-items:center;gap:6px;border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};padding:7px 12px;border-radius:8px;font-size:12.5px;cursor:pointer;white-space:nowrap;">
+          <div style="width:11px;height:11px;border:1.3px solid #1f8a3d;border-radius:2px;position:relative;flex-shrink:0;">
+            <div style="position:absolute;left:1.5px;right:1.5px;top:2px;height:1.1px;background:#1f8a3d;"></div>
+            <div style="position:absolute;left:1.5px;right:1.5px;top:5px;height:1.1px;background:#1f8a3d;"></div>
+          </div>
+          Exportar a Excel
+        </button>
+      </div>
+
+      <input type="text" placeholder="Buscar por código o denominación…" value="{{planSearch}}" onChange="{{setPlanSearch}}" style="padding:7px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};font-size:12.5px;width:260px;margin-bottom:16px;" />
+
+      <div style="background:{{c.cardBg}};border:1px solid {{c.border}};border-radius:12px;overflow:hidden;">
+        <div style="display:grid;grid-template-columns:100px 1fr;padding:10px 16px;font-size:11px;font-weight:600;color:{{c.textSecondary}};border-bottom:1px solid {{c.border}};text-transform:uppercase;letter-spacing:0.03em;">
+          <div onClick="{{onPlanSortCodigo}}" style="cursor:pointer;">{{planLblCodigo}}</div><div onClick="{{onPlanSortNombre}}" style="cursor:pointer;">{{planLblNombre}}</div>
+        </div>
+        <sc-for list="{{planContableRows}}" as="c2" hint-placeholder-count="8">
+          <div style="display:grid;grid-template-columns:100px 1fr;padding:11px 16px;font-size:13px;border-bottom:1px solid {{c.border}};align-items:center;">
+            <div style="font-size:12.5px;font-weight:600;color:{{c.textSecondary}};">{{c2.codigo}}</div>
+            <div>{{c2.nombre}}</div>
+          </div>
+        </sc-for>
+      </div>
+
+      <div style="display:flex;align-items:center;justify-content:space-between;margin-top:12px;">
+        <div style="display:flex;align-items:center;gap:14px;">
+          <div style="font-size:12px;color:{{c.textSecondary}};">{{planPageInfo}}</div>
+          <div style="display:flex;align-items:center;gap:6px;">
+            <div style="font-size:12px;color:{{c.textSecondary}};">Filas por página</div>
+            <select value="{{planPageSize}}" onChange="{{setPlanPageSize}}" style="padding:5px 8px;border-radius:7px;border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};font-size:12.5px;">
+              <option value="6">6</option><option value="10">10</option><option value="20">20</option><option value="50">50</option>
+            </select>
+          </div>
+        </div>
+        <div style="display:flex;align-items:center;gap:10px;">
+          <button onClick="{{onPlanPrev}}" style="border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};padding:5px 12px;border-radius:7px;font-size:12.5px;cursor:pointer;opacity:{{planPrevOpacity}};">← Anterior</button>
+          <div style="font-size:12.5px;color:{{c.textSecondary}};">Página {{planPage}} de {{planTotalPages}}</div>
+          <button onClick="{{onPlanNext}}" style="border:1px solid {{c.border}};background:{{c.cardBg}};color:{{c.text}};padding:5px 12px;border-radius:7px;font-size:12.5px;cursor:pointer;opacity:{{planNextOpacity}};">Siguiente →</button>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+    <sc-if value="{{isAjustes}}" hint-placeholder-val="{{false}}">
+    <div>
+      <div style="font-size:22px;font-weight:700;margin-bottom:2px;">Configuración</div>
+      <div style="font-size:13px;color:{{c.textSecondary}};margin-bottom:20px;">Preferencias generales del sistema</div>
+
+      <div style="display:flex;flex-direction:column;gap:14px;max-width:640px;">
+        <div style="background:{{c.cardBg}};border:1px solid {{c.border}};border-radius:12px;padding:18px;">
+          <div style="font-size:13px;font-weight:600;margin-bottom:14px;">Listados</div>
+          <div>
+            <div style="font-size:11.5px;color:{{c.textSecondary}};margin-bottom:5px;">Filas por página por defecto</div>
+            <select value="{{defaultPageSize}}" onChange="{{setDefaultPageSize}}" style="padding:8px 10px;border-radius:8px;border:1px solid {{c.border}};background:{{c.inputBg}};color:{{c.text}};font-size:13px;width:160px;">
+              <option value="6">6</option>
+              <option value="10">10</option>
+              <option value="20">20</option>
+              <option value="50">50</option>
+            </select>
+            <div style="font-size:11px;color:{{c.textTertiary}};margin-top:6px;">Se aplica a Bandeja principal, Registro de compra, Proveedores y Plan contable.</div>
+          </div>
+        </div>
+
+        <div style="background:{{c.cardBg}};border:1px solid {{c.border}};border-radius:12px;padding:18px;">
+          <div style="font-size:13px;font-weight:600;margin-bottom:14px;">Notificaciones</div>
+          <div style="display:flex;flex-direction:column;gap:12px;">
+            <div onClick="{{toggleNotifDuplicados}}" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+              <div>
+                <div style="font-size:12.5px;color:{{c.text}};">Alertar por facturas duplicadas</div>
+                <div style="font-size:11px;color:{{c.textSecondary}};">Notifica cuando se detecte un posible duplicado.</div>
+              </div>
+              <div style="width:34px;height:20px;border-radius:10px;background:{{notifDuplicados ? c.accent : c.border}};flex-shrink:0;"></div>
+            </div>
+            <div onClick="{{toggleNotifProveedor}}" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+              <div>
+                <div style="font-size:12.5px;color:{{c.text}};">Alertar por proveedor no encontrado</div>
+                <div style="font-size:11px;color:{{c.textSecondary}};">Notifica cuando se asigna P0000 (Varios) a una factura.</div>
+              </div>
+              <div style="width:34px;height:20px;border-radius:10px;background:{{notifProveedorFaltante ? c.accent : c.border}};flex-shrink:0;"></div>
+            </div>
+            <div onClick="{{toggleNotifErrores}}" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+              <div>
+                <div style="font-size:12.5px;color:{{c.text}};">Alertar por errores de conexión</div>
+                <div style="font-size:11px;color:{{c.textSecondary}};">Notifica cuando falla la sincronización con correo, Drive o Sheets.</div>
+              </div>
+              <div style="width:34px;height:20px;border-radius:10px;background:{{notifErroresConexion ? c.accent : c.border}};flex-shrink:0;"></div>
+            </div>
+            <div onClick="{{toggleNotifResumen}}" style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;">
+              <div>
+                <div style="font-size:12.5px;color:{{c.text}};">Resumen diario por correo</div>
+                <div style="font-size:11px;color:{{c.textSecondary}};">Envía un resumen de facturas pendientes cada mañana.</div>
+              </div>
+              <div style="width:34px;height:20px;border-radius:10px;background:{{notifResumenDiario ? c.accent : c.border}};flex-shrink:0;"></div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+    </sc-if>
+
+  </div>
+</div>
+</sc-if>
+
+</div>
+
+</x-dc>
+<script type="text/x-dc" data-dc-script>
+class Component extends DCLogic {
+  state = {
+    dark: false,
+    screen: 'login',
+    loginUser: '', loginPass: '', loginError: '',
+    filterEstado: 'todos', filterProveedor: '', filterDesde: '', filterHasta: '',
+    sortField: null, sortDir: 'asc', dashboardPage: 1, dashboardPageSize: 6,
+    selectedId: null, form: null, dupAck: false, historyOpen: false,
+    sidebarCollapsed: false, profileOpen: false, driveSyncing: false, driveLastSync: 'Hace 4 minutos',
+    sheetsSyncing: false,
+    profileModalOpen: false, profileName: 'María Fernanda Ríos', profileUsuario: 'mrios',
+    profileEmail: 'mrios@empresa.com', profilePassActual: '', profilePassNueva: '', profilePassConfirmar: '',
+    invoices: [
+      {id:1, compro:'CP-000112', proveedor:'Ferretería San Martín S.A.C.', proveedorCod:'P1042', ruc:'20456789123', glosa:'Materiales de construcción', tipo:'01', numero:'F001-00234', monto:1250.00, moneda:'PEN', fecha:'2026-07-28', estado:'pendiente', tc:3.782, tcFecha:'2026-07-28', duplicado:false, provGenerico:false, faltantes:[], adjuntos:true},
+      {id:2, compro:'CP-000113', proveedor:'Distribuidora Andina EIRL', proveedorCod:'P1088', ruc:'20512345678', glosa:'Repuestos eléctricos', tipo:'01', numero:'F045-01210', monto:3400.50, moneda:'USD', fecha:'2026-07-27', estado:'pendiente', tc:null, tcFecha:null, duplicado:false, provGenerico:false, faltantes:['monto'], adjuntos:false},
+      {id:3, compro:'CP-000114', proveedor:'P0000 (Varios)', proveedorCod:null, ruc:'-', glosa:'Útiles de oficina', tipo:'03', numero:'B012-08890', monto:180.00, moneda:'PEN', fecha:'2026-07-27', estado:'alerta', tc:3.782, tcFecha:'2026-07-27', duplicado:false, provGenerico:true, faltantes:[], adjuntos:true},
+      {id:4, compro:'CP-000115', proveedor:'Textiles del Norte S.A.', ruc:'20601122334', glosa:'Tela e insumos textiles', tipo:'01', numero:'F010-00567', monto:5200.00, moneda:'PEN', fecha:'2026-07-26', estado:'validada', tc:3.775, tcFecha:'2026-07-26', duplicado:false, provGenerico:false, faltantes:[], asiento:'A-3021', asientoEstado:'registrado', adjuntos:true, migracion:'migrado', sheetsSync:true},
+      {id:5, compro:'CP-000116', proveedor:'Suministros Industriales Perú', ruc:'20489912345', glosa:'Tela e insumos textiles', tipo:'01', numero:'F010-00567', monto:5200.00, moneda:'PEN', fecha:'2026-07-26', estado:'alerta', tc:3.775, tcFecha:'2026-07-26', duplicado:true, provGenerico:false, faltantes:[], adjuntos:true},
+      {id:6, compro:'CP-000117', proveedor:'Global Import Trading', ruc:'20533221100', glosa:'Nota de crédito por devolución', tipo:'07', numero:'NC01-00089', monto:450.00, moneda:'USD', fecha:'2026-07-25', estado:'error', tc:null, tcFecha:null, duplicado:false, provGenerico:false, faltantes:[], adjuntos:false},
+      {id:7, compro:'CP-000118', proveedor:'Servicios Logísticos RQ', ruc:'20599887766', glosa:'Servicio de transporte de carga', tipo:'01', numero:'F002-01890', monto:980.00, moneda:'PEN', fecha:'2026-07-25', estado:'validada', tc:3.771, tcFecha:'2026-07-25', duplicado:false, provGenerico:false, faltantes:[], asiento:null, asientoEstado:'pendiente', adjuntos:true, migracion:'pendiente', sheetsSync:true},
+      {id:8, compro:'CP-000119', proveedor:'Comercial Los Andes SRL', ruc:'20456123789', glosa:'Artículos de limpieza', tipo:'03', numero:'B004-00456', monto:320.00, moneda:'PEN', fecha:'2026-07-24', estado:'pendiente', tc:3.768, tcFecha:'2026-07-24', duplicado:false, provGenerico:false, faltantes:['fecha de emisión'], adjuntos:true},
+      {id:9, compro:'CP-000120', proveedor:'Importadora Vallejo', ruc:'20477788899', glosa:'Impresoras y equipos de cómputo', tipo:'01', numero:'F007-00312', monto:2100.00, moneda:'USD', fecha:'2026-07-24', estado:'validada', tc:3.769, tcFecha:'2026-07-24', duplicado:false, provGenerico:false, faltantes:[], asiento:'A-3018', asientoEstado:'registrado', adjuntos:true, migracion:'pendiente', sheetsSync:false},
+      {id:10, compro:'CP-000121', proveedor:'Papelería Central', ruc:'20411223344', glosa:'Útiles de oficina', tipo:'01', numero:'F003-00098', monto:150.00, moneda:'PEN', fecha:'2026-07-23', estado:'pendiente', tc:3.760, tcFecha:'2026-07-23', duplicado:false, provGenerico:false, faltantes:[], adjuntos:true},
+      {id:11, compro:'CP-000122', proveedor:'Repuestos y Motores SAC', ruc:'20544556677', glosa:'Repuestos para maquinaria', tipo:'01', numero:'F009-00721', monto:4300.00, moneda:'PEN', fecha:'2026-07-22', estado:'error', tc:3.758, tcFecha:'2026-07-22', duplicado:false, provGenerico:false, faltantes:[], adjuntos:false},
+      {id:12, compro:'CP-000123', proveedor:'Autopartes del Sur', ruc:'20522334455', glosa:'Repuestos de vehículo', tipo:'01', numero:'F005-00187', monto:670.00, moneda:'PEN', fecha:'2026-07-21', estado:'validada', tc:3.760, tcFecha:'2026-07-21', duplicado:false, provGenerico:false, faltantes:[], asiento:'A-3005', asientoEstado:'registrado', adjuntos:true, migracion:'pendiente', sheetsSync:true}
+    ],
+    bitacoraSearch: '', bitacoraDesde: '', bitacoraHasta: '', regPage: 1, regPageSize: 6,
+    regAnio: '', regMes: '', regDia: '',
+    provSearch: '', provPage: 1, provPageSize: 6, provSortField: null, provSortDir: 'asc',
+    planSearch: '', planPage: 1, planPageSize: 6, planSortField: null, planSortDir: 'asc',
+    asientoLineas: {}, asientoAnulado: {}, asientoHistorial: {}, asientoDetailId: null,
+    proveedorPickerOpen: false, proveedorQuery: '',
+    proveedorCatalogo: [
+      {cod:'P1042', nombre:'Ferretería San Martín S.A.C.', ruc:'20456789123'},
+      {cod:'P1088', nombre:'Distribuidora Andina EIRL', ruc:'20512345678'},
+      {cod:'P1105', nombre:'Textiles del Norte S.A.', ruc:'20601122334'},
+      {cod:'P1119', nombre:'Suministros Industriales Perú', ruc:'20489912345'},
+      {cod:'P1133', nombre:'Global Import Trading', ruc:'20533221100'},
+      {cod:'P1140', nombre:'Servicios Logísticos RQ', ruc:'20599887766'},
+      {cod:'P1152', nombre:'Comercial Los Andes SRL', ruc:'20456123789'},
+      {cod:'P1167', nombre:'Importadora Vallejo', ruc:'20477788899'},
+      {cod:'P1170', nombre:'Papelería Central', ruc:'20411223344'},
+      {cod:'P1185', nombre:'Repuestos y Motores SAC', ruc:'20544556677'},
+      {cod:'P1190', nombre:'Autopartes del Sur', ruc:'20522334455'}
+    ],
+    cuentaOptions: [
+      '10111 Caja', '10411 Cuentas corrientes operativas', '60111 Compras - Mercaderías',
+      '60911 Compras - Servicios prestados por terceros', '63991 Gastos - Servicios prestados por terceros',
+      '40111 IGV - Cuenta propia', '42011 Facturas por pagar - Terceros (nacionales)',
+      '42012 Facturas por pagar - Terceros (relacionadas)', '46911 Cuentas por pagar diversas - Terceros',
+      '65911 Gastos diversos de gestión', '66911 Gastos financieros', '75911 Otros ingresos de gestión'
+    ],
+    detLineas: {}, detBaseIgv: {}, cuentaPickerOpen: null, cuentaQuery: '',
+    ordenesCompra: {}, mediosProbatorios: {}, attachModalOpen: null,
+    defaultPageSize: 6, notifDuplicados: true, notifProveedorFaltante: true, notifErroresConexion: true, notifResumenDiario: false,
+    syncTab: 'correo',
+    connections: [
+      {id:'gmail', nombre:'Correo electrónico', letra:'G', color:'#ea4335', estado:'conectado', cuenta:'compras@empresa.com', detalle:'Descarga y procesa automáticamente las facturas de compra recibidas por correo.', ultima:'Hace 4 minutos',
+        proveedor:'Google Workspace', autenticado:true, frecuencia:'15', diasAtras:'30', carpeta:'Facturas de compra',
+        marcarLeidos:true, descargarAdjuntos:true, eliminarProcesados:false,
+        filtroRemitentes:'', filtroAsunto:'factura, comprobante, boleta', filtroPalabras:'factura, total, importe', filtroExts:'PDF, XML',
+        stats:{procesados:1248, extraidas:523, registradas:497, tiempoProm:'2.2 min'},
+        carpetas:[{nombre:'Bandeja de entrada', activa:true},{nombre:'Facturas de compra', activa:true},{nombre:'Proveedores', activa:true}],
+        proxima:'Hoy 09:30'},
+      {id:'drive', nombre:'Google Drive', letra:'D', color:'#0071e3', estado:'conectado', cuenta:'contabilidad@empresa.com', detalle:'Crea automáticamente la carpeta por cada factura validada con su respectivo respaldo.', ultima:'Hace 4 minutos',
+        proveedor:'Google Drive', autenticado:true, frecuencia:'15', diasAtras:'—', carpeta:'Facturas validadas',
+        stats:{procesados:497, extraidas:497, registradas:497, tiempoProm:'0.8 min'},
+        carpetas:[{nombre:'Facturas validadas', activa:true},{nombre:'Respaldos', activa:true}],
+        proxima:'Hoy 09:30'},
+      {id:'sheets', nombre:'Google Sheets', letra:'S', color:'#1f8a3d', estado:'error', cuenta:'contabilidad@empresa.com', detalle:'Carga los datos de facturas validadas hacia la hoja de cálculo que alimenta el dashboard de Looker Studio.', ultima:'Falló hace 2 horas',
+        proveedor:'Google Sheets', autenticado:true, frecuencia:'30', diasAtras:'—', carpeta:'Reporte facturas 2026',
+        stats:{procesados:497, extraidas:412, registradas:412, tiempoProm:'1.1 min'},
+        carpetas:[{nombre:'Reporte facturas 2026', activa:true}],
+        proxima:'Reintentando…'},
+      {id:'telegram', nombre:'Bot de Telegram', letra:'T', color:'#26a5e4', estado:'desconectado', cuenta:'', detalle:'Envía alertas de respaldo (duplicados, proveedores no encontrados, errores de conexión) a un chat o canal de Telegram.', ultima:'Nunca',
+        proveedor:'Telegram Bot API', autenticado:false, frecuencia:'—', diasAtras:'—', carpeta:'',
+        tokenBot:'', chatId:'',
+        stats:{procesados:0, extraidas:0, registradas:0, tiempoProm:'—'},
+        carpetas:[],
+        proxima:'Pendiente de configurar'}
+    ],
+    errorFilter: 'todos', errorFechaDesde: '2026-07-23', errorFechaHasta: '2026-07-30',
+    errores: [
+      {id:1, categoria:'error', sistema:'Gmail', detalle:'Fallo al descargar adjunto de la factura F009-00721', fecha:'22/07/2026 09:14', fechaISO:'2026-07-22', reintentos:3, backupOk:true},
+      {id:2, categoria:'error', sistema:'Drive', detalle:'No se pudo crear la carpeta para la factura NC01-00089', fecha:'25/07/2026 11:02', fechaISO:'2026-07-25', reintentos:3, backupOk:true},
+      {id:3, categoria:'notificacion', sistema:'Telegram', detalle:'El bot no respondió al enviar la alerta de duplicado (factura F010-00567)', fecha:'26/07/2026 16:40', fechaISO:'2026-07-26', reintentos:1, backupOk:true},
+      {id:4, categoria:'notificacion', sistema:'Correo', detalle:'Alerta de respaldo enviada por proveedor no encontrado (factura B012-08890)', fecha:'27/07/2026 10:05', fechaISO:'2026-07-27', reintentos:0, backupOk:true},
+      {id:5, categoria:'error', sistema:'Gmail', detalle:'Reintento agotado al descargar orden de compra (factura NC01-00089)', fecha:'25/07/2026 11:00', fechaISO:'2026-07-25', reintentos:3, backupOk:true}
+    ]
+  };
+
+  tipoLabel(t){ return {'01':'01 Factura','03':'03 Boleta','07':'07 Nota de Crédito'}[t] || t; }
+
+  estadoInfo(estado){
+    const dark = this.state.dark;
+    const map = dark ? {
+      pendiente:{bg:'rgba(10,132,255,0.18)', fg:'#409cff', label:'Pendiente'},
+      validada:{bg:'rgba(48,209,88,0.16)', fg:'#30d158', label:'Validada'},
+      error:{bg:'rgba(255,69,58,0.18)', fg:'#ff453a', label:'Error'},
+      alerta:{bg:'rgba(255,159,10,0.18)', fg:'#ff9f0a', label:'Alerta'}
+    } : {
+      pendiente:{bg:'rgba(0,113,227,0.1)', fg:'#0071e3', label:'Pendiente'},
+      validada:{bg:'rgba(52,199,89,0.13)', fg:'#1f8a3d', label:'Validada'},
+      error:{bg:'rgba(255,59,48,0.1)', fg:'#d70015', label:'Error'},
+      alerta:{bg:'rgba(255,149,0,0.13)', fg:'#c93400', label:'Alerta'}
+    };
+    return map[estado] || map.pendiente;
+  }
+
+  fmtMonto(m, moneda){
+    const sign = moneda === 'USD' ? '$' : 'S/';
+    return sign + ' ' + Number(m).toLocaleString('es-PE', {minimumFractionDigits:3, maximumFractionDigits:3});
+  }
+  avatarInitials(name){
+    const parts = name.replace(/[()]/g,'').trim().split(/\s+/);
+    return ((parts[0]||'')[0] + (parts[1]||'')[0]).toUpperCase();
+  }
+  avatarColor(name){
+    const palette = ['#0071e3','#1f8a3d','#c93400','#8944ab','#0a84ff','#d70015','#6e6e73'];
+    let hash = 0;
+    for(let i=0;i<name.length;i++) hash = (hash*31 + name.charCodeAt(i)) >>> 0;
+    return palette[hash % palette.length];
+  }
+  fmtNum(n){
+    return Number(n).toLocaleString('es-PE', {minimumFractionDigits:3, maximumFractionDigits:3});
+  }
+  round2(n){ return Math.round(Number(n)*1000)/1000; }
+  baseImponible(m){ return this.round2(m / 1.18); }
+  igv(m){ return this.round2(m - (m / 1.18)); }
+  fmtFecha(f){
+    if(!f) return '—';
+    const [y,m,d] = f.split('-');
+    return d + '/' + m + '/' + y;
+  }
+
+  colors(){
+    const dark = this.state.dark;
+    return dark ? {
+      bg:'#1c1c1e', sidebarBg:'#232326', cardBg:'#2c2c2e', cardBg2:'#242426',
+      text:'#f5f5f7', textSecondary:'#98989d', textTertiary:'#6e6e73', border:'rgba(255,255,255,0.09)',
+      accent:'#0a84ff', accentSoft:'rgba(10,132,255,0.16)', inputBg:'#1c1c1e', colorScheme:'dark'
+    } : {
+      bg:'#f5f5f7', sidebarBg:'#eef0f3', cardBg:'#ffffff', cardBg2:'#fbfbfc',
+      text:'#1d1d1f', textSecondary:'#6e6e73', textTertiary:'#86868b', border:'rgba(0,0,0,0.08)',
+      accent:'#0071e3', accentSoft:'rgba(0,113,227,0.08)', inputBg:'#ffffff', colorScheme:'light'
+    };
+  }
+
+  navStyleObj(active){
+    const c = this.colors();
+    return 'display:flex;align-items:center;gap:10px;padding:7px 10px;border-radius:7px;cursor:pointer;font-size:13px;font-weight:' + (active?'600':'500') + ';color:' + (active?'#ffffff':c.text) + ';background:' + (active?c.accent:'transparent') + ';';
+  }
+  asientoDetailVals(){
+    const s = this.state;
+    const c = this.colors();
+    if(!s.asientoDetailId) return {asientoDetailOpen:false, asientoLineasRows:[], asientoHistRows:[]};
+    const inv = s.invoices.find(i=>i.id===s.asientoDetailId);
+    const lineas = s.asientoLineas[s.asientoDetailId] || this.defaultLineas(inv);
+    const sumDebe = lineas.reduce((a,l)=>a+Number(l.debe||0),0), sumHaber = lineas.reduce((a,l)=>a+Number(l.haber||0),0);
+    const cuadra = Math.abs(sumDebe-sumHaber) < 0.01;
+    const hist = s.asientoHistorial[s.asientoDetailId] || [];
+    return {
+      asientoDetailOpen: true,
+      asientoDetailNumero: inv.numero, asientoDetailCompro: inv.compro, asientoDetailProveedor: inv.proveedor, asientoDetailGlosa: inv.glosa || '—',
+      asientoDetailOrigen: '02 Compras', asientoDetailAnulado: !!s.asientoAnulado[s.asientoDetailId],
+      asientoDetailFechaContable: 'Año ' + inv.fecha.split('-')[0] + ' · Mes ' + (inv.mesContable || inv.fecha.split('-')[1]) + ' · Día ' + (inv.diaContable || inv.fecha.split('-')[2]),
+      asientoCuadra: cuadra, asientoNoCuadra: !cuadra,
+      asientoSumDebe: this.fmtNum(sumDebe), asientoSumHaber: this.fmtNum(sumHaber),
+      asientoLineasRows: lineas.map((l,idx)=>({
+        idx, cuenta:l.cuenta, debeFmt: this.fmtNum(l.debe||0), haberFmt: this.fmtNum(l.haber||0)
+      })),
+      asientoHistRows: hist,
+      onAnular: this.anularAsiento(s.asientoDetailId), onReactivar: this.reactivarAsiento(s.asientoDetailId),
+      closeAsientoDetail: this.closeAsientoDetail
+    };
+  }
+  setProvSort = (field) => () => this.setState(s => ({provSortField:field, provSortDir:(s.provSortField===field && s.provSortDir==='asc')?'desc':'asc'}));
+  setPlanSort = (field) => () => this.setState(s => ({planSortField:field, planSortDir:(s.planSortField===field && s.planSortDir==='asc')?'desc':'asc'}));
+  provListVals(){
+    const s = this.state, c = this.colors();
+    let rows = s.proveedorCatalogo;
+    if(s.provSearch){
+      const q = s.provSearch.toLowerCase();
+      rows = rows.filter(p => p.nombre.toLowerCase().includes(q) || p.cod.toLowerCase().includes(q) || p.ruc.includes(q));
+    }
+    if(s.provSortField){
+      const f=s.provSortField, dir=s.provSortDir==='asc'?1:-1;
+      rows = [...rows].sort((a,b)=>{ const va=(f==='cod'?a.cod:f==='nombre'?a.nombre.toLowerCase():a.ruc), vb=(f==='cod'?b.cod:f==='nombre'?b.nombre.toLowerCase():b.ruc); return va<vb?-1*dir:va>vb?1*dir:0; });
+    }
+    const provArrow = (f)=> s.provSortField===f ? (s.provSortDir==='asc'?' ▲':' ▼') : '';
+    const total = rows.length, totalPages = Math.max(1, Math.ceil(total/s.provPageSize)), page = Math.min(s.provPage, totalPages);
+    const start = (page-1)*s.provPageSize;
+    rows = rows.slice(start, start+s.provPageSize);
+    return {
+      proveedoresListRows: rows,
+      provSearch: s.provSearch, setProvSearch: (e)=>this.setState({provSearch:e.target.value, provPage:1}),
+      exportProveedores: this.exportProveedores,
+      onProvSortCod: this.setProvSort('cod'), onProvSortNombre: this.setProvSort('nombre'), onProvSortRuc: this.setProvSort('ruc'),
+      provLblCod: 'Código'+provArrow('cod'), provLblNombre: 'Razón social'+provArrow('nombre'), provLblRuc: 'RUC'+provArrow('ruc'),
+      provPageInfo: 'Mostrando ' + (total===0?0:start+1) + '–' + Math.min(start+s.provPageSize,total) + ' de ' + total,
+      provPageSize: s.provPageSize, setProvPageSize: (e)=>this.setState({provPageSize:Number(e.target.value), provPage:1}),
+      provPage: page, provTotalPages: totalPages,
+      provPrevOpacity: page<=1?0.4:1, provNextOpacity: page>=totalPages?0.4:1,
+      onProvPrev: page>1 ? ()=>this.setState({provPage:page-1}) : undefined,
+      onProvNext: page<totalPages ? ()=>this.setState({provPage:page+1}) : undefined
+    };
+  }
+  planListVals(){
+    const s = this.state;
+    let rows = s.cuentaOptions.map(o=>{ const parts=o.split(' '); return {codigo:parts[0], nombre:o.slice(parts[0].length+1)}; });
+    if(s.planSearch){
+      const q = s.planSearch.toLowerCase();
+      rows = rows.filter(r => r.nombre.toLowerCase().includes(q) || r.codigo.toLowerCase().includes(q));
+    }
+    if(s.planSortField){
+      const f=s.planSortField, dir=s.planSortDir==='asc'?1:-1;
+      rows = [...rows].sort((a,b)=>{ const va=(f==='codigo'?a.codigo:a.nombre.toLowerCase()), vb=(f==='codigo'?b.codigo:b.nombre.toLowerCase()); return va<vb?-1*dir:va>vb?1*dir:0; });
+    }
+    const planArrow = (f)=> s.planSortField===f ? (s.planSortDir==='asc'?' ▲':' ▼') : '';
+    const total = rows.length, totalPages = Math.max(1, Math.ceil(total/s.planPageSize)), page = Math.min(s.planPage, totalPages);
+    const start = (page-1)*s.planPageSize;
+    rows = rows.slice(start, start+s.planPageSize);
+    return {
+      planContableRows: rows,
+      planSearch: s.planSearch, setPlanSearch: (e)=>this.setState({planSearch:e.target.value, planPage:1}),
+      exportPlanContable: this.exportPlanContable,
+      onPlanSortCodigo: this.setPlanSort('codigo'), onPlanSortNombre: this.setPlanSort('nombre'),
+      planLblCodigo: 'Código'+planArrow('codigo'), planLblNombre: 'Denominación'+planArrow('nombre'),
+      planPageInfo: 'Mostrando ' + (total===0?0:start+1) + '–' + Math.min(start+s.planPageSize,total) + ' de ' + total,
+      planPageSize: s.planPageSize, setPlanPageSize: (e)=>this.setState({planPageSize:Number(e.target.value), planPage:1}),
+      planPage: page, planTotalPages: totalPages,
+      planPrevOpacity: page<=1?0.4:1, planNextOpacity: page>=totalPages?0.4:1,
+      onPlanPrev: page>1 ? ()=>this.setState({planPage:page-1}) : undefined,
+      onPlanNext: page<totalPages ? ()=>this.setState({planPage:page+1}) : undefined
+    };
+  }
+  chipStyleObj(active){
+    const c = this.colors();
+    return 'padding:6px 14px;border-radius:20px;font-size:12.5px;font-weight:600;cursor:pointer;border:1px solid ' + (active?c.accent:c.border) + ';color:' + (active?'#ffffff':c.text) + ';background:' + (active?c.accent:c.cardBg) + ';';
+  }
+
+  submitLogin = () => {
+    if(!this.state.loginUser || !this.state.loginPass){
+      this.setState({loginError:'Ingresa tu usuario y contraseña.'});
+      return;
+    }
+    if(this.state.loginPass.length < 4){
+      this.setState({loginError:'Usuario o contraseña incorrectos.'});
+      return;
+    }
+    this.setState({screen:'dashboard', loginError:''});
+  };
+
+  goto = (screen) => () => this.setState({screen});
+  openDetail = (inv) => () => this.setState(s => ({
+    screen:'detail', selectedId: inv.id, form:{...inv}, dupAck:false, historyOpen:false,
+    detLineas: s.detLineas[inv.id] ? s.detLineas : {...s.detLineas, [inv.id]: this.defaultLineas(inv)},
+    detBaseIgv: s.detBaseIgv[inv.id] ? s.detBaseIgv : {...s.detBaseIgv, [inv.id]: {base:this.baseImponible(inv.monto), igv:this.igv(inv.monto)}}
+  }));
+  setDetBase = (id) => (e) => this.setState(s => ({detBaseIgv:{...s.detBaseIgv, [id]:{...s.detBaseIgv[id], base:e.target.value}}}));
+  setDetIgv = (id) => (e) => this.setState(s => ({detBaseIgv:{...s.detBaseIgv, [id]:{...s.detBaseIgv[id], igv:e.target.value}}}));
+  addLinea = (ctx, invId) => () => {
+    const newLine = {cuenta:'Seleccionar cuenta contable', debe:0, haber:0};
+    if(ctx==='det'){
+      this.setState(s => ({detLineas:{...s.detLineas, [invId]: [...(s.detLineas[invId]||[]), newLine]}}));
+    } else {
+      this.setState(s => {
+        const lineas = [...(s.asientoLineas[invId]||[]), newLine];
+        const hist = s.asientoHistorial[invId] || [];
+        const entry = {ts:new Date().toLocaleString('es-PE'), campo:'línea agregada', de:'—', a:'Nueva línea'};
+        return {asientoLineas:{...s.asientoLineas, [invId]:lineas}, asientoHistorial:{...s.asientoHistorial, [invId]:[entry, ...hist]}};
+      });
+    }
+  };
+  removeLinea = (ctx, invId, idx) => () => {
+    if(ctx==='det'){
+      this.setState(s => ({detLineas:{...s.detLineas, [invId]: s.detLineas[invId].filter((_,i)=>i!==idx)}}));
+    } else {
+      this.setState(s => {
+        const removed = s.asientoLineas[invId][idx];
+        const lineas = s.asientoLineas[invId].filter((_,i)=>i!==idx);
+        const hist = s.asientoHistorial[invId] || [];
+        const entry = {ts:new Date().toLocaleString('es-PE'), campo:'línea eliminada', de:removed.cuenta, a:'—'};
+        return {asientoLineas:{...s.asientoLineas, [invId]:lineas}, asientoHistorial:{...s.asientoHistorial, [invId]:[entry, ...hist]}};
+      });
+    }
+  };
+  openAttachModal = (kind) => () => this.setState({attachModalOpen:kind});
+  closeAttachModal = () => this.setState({attachModalOpen:null});
+  addAttachFiles = (kind) => (e) => {
+    const invId = this.state.form.id;
+    const key = kind==='orden' ? 'ordenesCompra' : 'mediosProbatorios';
+    const files = Array.from(e.target.files || []).map(f => ({name:f.name}));
+    if(files.length===0) return;
+    this.setState(s => ({[key]: {...s[key], [invId]: [...(s[key][invId]||[]), ...files]}}));
+    e.target.value = '';
+  };
+  removeAttachFile = (kind, idx) => () => {
+    const invId = this.state.form.id;
+    const key = kind==='orden' ? 'ordenesCompra' : 'mediosProbatorios';
+    this.setState(s => ({[key]: {...s[key], [invId]: s[key][invId].filter((_,i)=>i!==idx)}}));
+  };
+  setLineaMonto = (ctx, invId, idx, field) => (e) => {
+    const val = e.target.value;
+    if(ctx==='det'){
+      this.setState(s => ({detLineas:{...s.detLineas, [invId]: s.detLineas[invId].map((l,i)=> i===idx ? {...l, [field]:val} : l)}}));
+    } else {
+      this.setState(s => ({asientoLineas:{...s.asientoLineas, [invId]: s.asientoLineas[invId].map((l,i)=> i===idx ? {...l, [field]:val} : l)}}));
+    }
+  };
+  editInvoice = (inv) => (e) => { e.stopPropagation(); this.openDetail(inv)(); };
+  deleteInvoice = (inv) => (e) => {
+    e.stopPropagation();
+    if(window.confirm('¿Eliminar la factura ' + inv.numero + '?')){
+      this.setState(s => ({invoices: s.invoices.filter(i => i.id !== inv.id)}));
+    }
+  };
+  backToDashboard = () => this.setState({screen:'dashboard', selectedId:null, form:null, cuentaPickerOpen:null});
+  setFormField = (field) => (e) => { const val = e && e.target ? e.target.value : e; this.setState(s => ({form:{...s.form, [field]:val}})); };
+  openProveedorPicker = () => this.setState({proveedorPickerOpen:true, proveedorQuery:''});
+  closeProveedorPicker = () => this.setState({proveedorPickerOpen:false, proveedorQuery:''});
+  setProveedorQuery = (e) => this.setState({proveedorQuery:e.target.value});
+  chooseProveedor = (p) => () => this.setState(s => ({
+    form:{...s.form, proveedor:p.nombre, proveedorCod:p.cod, ruc:p.ruc, provGenerico:false},
+    proveedorPickerOpen:false, proveedorQuery:''
+  }));
+
+  validar = () => {
+    this.setState(s => ({
+      invoices: s.invoices.map(i => i.id===s.form.id ? {...s.form, estado:'validada'} : i),
+      asientoLineas: {...s.asientoLineas, [s.form.id]: s.detLineas[s.form.id] || this.defaultLineas(s.form)},
+      screen:'dashboard', selectedId:null, form:null, cuentaPickerOpen:null
+    }));
+  };
+  guardarAvance = () => {
+    this.setState(s => ({
+      invoices: s.invoices.map(i => i.id===s.form.id ? {...s.form} : i),
+      screen:'dashboard', selectedId:null, form:null, cuentaPickerOpen:null
+    }));
+  };
+
+  setSort = (field) => () => this.setState(s => ({
+    sortField: field, sortDir: (s.sortField===field && s.sortDir==='asc') ? 'desc' : 'asc'
+  }));
+  setDashboardPage = (p) => () => this.setState({dashboardPage:p});
+  setDashboardPageSize = (e) => this.setState({dashboardPageSize: Number(e.target.value), dashboardPage:1});
+  toggleDark = () => this.setState(s => ({dark:!s.dark}));
+  toggleSidebar = () => this.setState(s => ({sidebarCollapsed:!s.sidebarCollapsed, profileOpen:false}));
+  toggleProfile = () => this.setState(s => ({profileOpen:!s.profileOpen}));
+  openProfileModal = () => this.setState({profileModalOpen:true, profileOpen:false});
+  closeProfileModal = () => this.setState({profileModalOpen:false, profilePassActual:'', profilePassNueva:'', profilePassConfirmar:''});
+  setProfileField = (field) => (e) => this.setState({[field]: e.target.value});
+  logout = () => this.setState({screen:'login', profileOpen:false, loginUser:'', loginPass:''});
+  printList = () => window.print();
+  syncDrive = () => {
+    this.setState({driveSyncing:true});
+    setTimeout(() => this.setState({driveSyncing:false, driveLastSync:'Hace instantes'}), 1100);
+  };
+  syncSheets = () => {
+    this.setState({sheetsSyncing:true});
+    setTimeout(() => this.setState(s => ({
+      sheetsSyncing:false,
+      invoices: s.invoices.map(i => (i.estado==='validada' && !i.sheetsSync) ? {...i, sheetsSync:true} : i)
+    })), 1100);
+  };
+  exportExcel = () => {
+    const s = this.state;
+    const header = ['Proveedor','RUC','Tipo','Numero','Monto','Moneda','Fecha emision','Tipo de cambio','Estado'];
+    const lines = [header.join(',')];
+    s.invoices.forEach(i => {
+      lines.push([i.proveedor, i.ruc, this.tipoLabel(i.tipo), i.numero, i.monto, i.moneda, i.fecha, (i.tc==null?'':i.tc), i.estado].map(v => '"' + String(v).replace(/"/g,'""') + '"').join(','));
+    });
+    const blob = new Blob(['\uFEFF' + lines.join('\n')], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'facturas_bandeja.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+  exportProveedores = () => {
+    const s = this.state;
+    const header = ['Código','Razón social','RUC'];
+    const lines = [header.join(',')];
+    s.proveedorCatalogo.forEach(p => lines.push([p.cod, p.nombre, p.ruc].map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')));
+    const blob = new Blob(['\uFEFF' + lines.join('\n')], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'proveedores.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+  exportPlanContable = () => {
+    const s = this.state;
+    const header = ['Código','Denominación'];
+    const lines = [header.join(',')];
+    s.cuentaOptions.forEach(o => { const parts=o.split(' '); lines.push([parts[0], o.slice(parts[0].length+1)].map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')); });
+    const blob = new Blob(['\uFEFF' + lines.join('\n')], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'plan_contable.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+  exportErrores = () => {
+    const s = this.state;
+    const header = ['Categoria','Sistema','Detalle','Fecha','Reintentos','Notificacion de respaldo enviada'];
+    const lines = [header.join(',')];
+    s.errores.forEach(e => {
+      lines.push([e.categoria==='error'?'Error de conexion':'Notificacion', e.sistema, e.detalle, e.fecha, e.reintentos, (e.backupOk?'Si':'No')].map(v => '"' + String(v).replace(/"/g,'""') + '"').join(','));
+    });
+    const blob = new Blob(['\uFEFF' + lines.join('\n')], {type:'text/csv;charset=utf-8;'});
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url; a.download = 'errores_notificaciones.csv';
+    document.body.appendChild(a); a.click(); document.body.removeChild(a);
+    URL.revokeObjectURL(url);
+  };
+  toggleHistory = () => this.setState(s => ({historyOpen:!s.historyOpen}));
+  toggleDupAck = () => this.setState(s => ({dupAck:!s.dupAck}));
+  reconnectService = (id) => () => this.setState(s => ({connections: s.connections.map(c => c.id===id ? {...c, estado:'conectado', ultima:'Hace instantes'} : c)}));
+  disconnectService = (id) => () => this.setState(s => ({connections: s.connections.map(c => c.id===id ? {...c, estado:'desconectado'} : c)}));
+  setSyncTab = (tab) => () => this.setState({syncTab:tab});
+  setDefaultPageSize = (e) => {
+    const val = Number(e.target.value);
+    this.setState({defaultPageSize:val, dashboardPageSize:val, regPageSize:val, provPageSize:val, planPageSize:val, dashboardPage:1, regPage:1, provPage:1, planPage:1});
+  };
+  toggleNotif = (field) => () => this.setState(s => ({[field]:!s[field]}));
+  setConnField = (id, field) => (e) => {
+    const val = e && e.target ? (e.target.type==='checkbox' ? e.target.checked : e.target.value) : e;
+    this.setState(s => ({connections: s.connections.map(c => c.id===id ? {...c, [field]:val} : c)}));
+  };
+  toggleConnBool = (id, field) => () => this.setState(s => ({connections: s.connections.map(c => c.id===id ? {...c, [field]:!c[field]} : c)}));
+  syncNowConn = (id) => () => this.setState(s => ({connections: s.connections.map(c => c.id===id ? {...c, estado:'conectado', ultima:'Hace instantes'} : c)}));
+  syncScreenVals(){
+    const s = this.state, c = this.colors();
+    const conn = s.connections.find(x=>x.id===s.syncTab) || s.connections[0];
+    const info = this.estadoInfo(conn.estado==='error' ? 'error' : (conn.estado==='conectado' ? 'validada' : 'pendiente'));
+    const isCorreo = conn.id==='gmail';
+    const isTelegram = conn.id==='telegram';
+    return {
+      syncTab: s.syncTab, setSyncTabCorreo: this.setSyncTab('gmail'), setSyncTabDrive: this.setSyncTab('drive'), setSyncTabSheets: this.setSyncTab('sheets'), setSyncTabTelegram: this.setSyncTab('telegram'),
+      syncTabCorreoStyle: this.chipStyleObj(s.syncTab==='gmail'), syncTabDriveStyle: this.chipStyleObj(s.syncTab==='drive'), syncTabSheetsStyle: this.chipStyleObj(s.syncTab==='sheets'), syncTabTelegramStyle: this.chipStyleObj(s.syncTab==='telegram'),
+      isTelegram, isNotTelegram: !isTelegram,
+      tokenBot: conn.tokenBot, chatId: conn.chatId, onTokenBot: this.setConnField(conn.id,'tokenBot'), onChatId: this.setConnField(conn.id,'chatId'),
+      connLetra: conn.letra, connColor: conn.color, connNombre: conn.nombre, connDetalle: conn.detalle,
+      connEstadoLabel: conn.estado==='conectado' ? 'Conectada' : (conn.estado==='error' ? 'Con error' : 'Desconectada'),
+      connEstadoBg: info.bg, connEstadoFg: info.fg,
+      connProveedor: conn.proveedor, connCuenta: conn.cuenta, connUltima: conn.ultima, connProxima: conn.proxima,
+      connFrecuencia: conn.frecuencia, connDiasAtras: conn.diasAtras, connCarpeta: conn.carpeta,
+      onFrecuencia: this.setConnField(conn.id,'frecuencia'), onDiasAtras: this.setConnField(conn.id,'diasAtras'), onCarpeta: this.setConnField(conn.id,'carpeta'),
+      onCuenta: this.setConnField(conn.id,'cuenta'),
+      isCorreo, isNotCorreo: !isCorreo,
+      marcarLeidos: !!conn.marcarLeidos, descargarAdjuntos: !!conn.descargarAdjuntos, eliminarProcesados: !!conn.eliminarProcesados,
+      toggleMarcarLeidos: this.toggleConnBool(conn.id,'marcarLeidos'), toggleDescargarAdjuntos: this.toggleConnBool(conn.id,'descargarAdjuntos'), toggleEliminarProcesados: this.toggleConnBool(conn.id,'eliminarProcesados'),
+      filtroRemitentes: conn.filtroRemitentes, filtroAsunto: conn.filtroAsunto, filtroPalabras: conn.filtroPalabras, filtroExts: conn.filtroExts,
+      onFiltroRemitentes: this.setConnField(conn.id,'filtroRemitentes'), onFiltroAsunto: this.setConnField(conn.id,'filtroAsunto'),
+      onFiltroPalabras: this.setConnField(conn.id,'filtroPalabras'), onFiltroExts: this.setConnField(conn.id,'filtroExts'),
+      connStats: [
+        {label:'Correos/documentos procesados', value: conn.stats.procesados},
+        {label:'Facturas extraídas', value: conn.stats.extraidas},
+        {label:'Facturas registradas', value: conn.stats.registradas},
+        {label:'Tiempo promedio', value: conn.stats.tiempoProm}
+      ],
+      connCarpetasList: conn.carpetas.map(f=>({nombre:f.nombre, activa:f.activa})),
+      onSyncNow: this.syncNowConn(conn.id), onReconnect: this.reconnectService(conn.id), onDisconnect: this.disconnectService(conn.id),
+      connIsConectado: conn.estado==='conectado'
+    };
+  }
+  defaultLineas(inv){
+    const base = this.baseImponible(inv.monto), igv = this.igv(inv.monto), monto = this.round2(inv.monto);
+    return [
+      {cuenta:'60111 Compras - Bienes', debe:base, haber:0, sinCuenta:false},
+      {cuenta:'40111 IGV - Cuenta propia', debe:igv, haber:0, sinCuenta:false},
+      {cuenta:'42011 Facturas por pagar - Terceros', debe:0, haber:monto, sinCuenta:false}
+    ];
+  }
+  ensureLineas(id){
+    const s = this.state;
+    if(s.asientoLineas[id]) return;
+    const inv = s.invoices.find(i=>i.id===id);
+    this.setState(st => ({asientoLineas: {...st.asientoLineas, [id]: this.defaultLineas(inv)}}));
+  }
+  openAsientoDetail = (id) => () => { this.ensureLineas(id); this.setState({asientoDetailId:id}); };
+  closeAsientoDetail = () => this.setState({asientoDetailId:null, cuentaPickerOpen:null});
+  openCuentaPicker = (ctx, invId, idx) => () => this.setState({cuentaPickerOpen:{ctx, invId, idx}, cuentaQuery:''});
+  closeCuentaPicker = () => this.setState({cuentaPickerOpen:null, cuentaQuery:''});
+  setCuentaQuery = (e) => this.setState({cuentaQuery:e.target.value});
+  chooseCuenta = (value) => () => {
+    const p = this.state.cuentaPickerOpen;
+    if(!p) return;
+    if(p.ctx==='det'){
+      this.setState(st => ({detLineas:{...st.detLineas, [p.invId]: st.detLineas[p.invId].map((l,i)=> i===p.idx ? {...l, cuenta:value} : l)}, cuentaPickerOpen:null, cuentaQuery:''}));
+    } else {
+      this.setState(st => {
+        const lineas = st.asientoLineas[p.invId].map((l,i)=> i===p.idx ? {...l, cuenta:value, sinCuenta:false} : l);
+        const hist = st.asientoHistorial[p.invId] || [];
+        const entry = {ts:new Date().toLocaleString('es-PE'), campo:'cuenta línea '+(p.idx+1), de:st.asientoLineas[p.invId][p.idx].cuenta, a:value};
+        return {asientoLineas:{...st.asientoLineas, [p.invId]:lineas}, asientoHistorial:{...st.asientoHistorial, [p.invId]:[entry, ...hist]}, cuentaPickerOpen:null, cuentaQuery:''};
+      });
+    }
+  };
+  anularAsiento = (id) => () => {
+    if(!window.confirm('¿Anular este asiento contable? Quedará registrado en el historial.')) return;
+    this.setState(s => {
+      const hist = s.asientoHistorial[id] || [];
+      const entry = {ts:new Date().toLocaleString('es-PE'), campo:'estado', de:'Activo', a:'Anulado'};
+      return {asientoAnulado:{...s.asientoAnulado, [id]:true}, asientoHistorial:{...s.asientoHistorial, [id]:[entry, ...hist]}};
+    });
+  };
+  reactivarAsiento = (id) => () => this.setState(s => ({asientoAnulado:{...s.asientoAnulado, [id]:false}}));
+  setAsientoField = (id, field) => (val) => this.setState(s => ({invoices: s.invoices.map(i => i.id===id ? {...i, [field]: (val && val.target) ? val.target.value : val} : i)}));
+
+  renderVals(){
+    const s = this.state;
+    const c = this.colors();
+    const proveedores = Array.from(new Set(s.invoices.map(i=>i.proveedor))).sort();
+
+    let rows = s.invoices;
+    if(s.filterEstado !== 'todos') rows = rows.filter(i=>i.estado===s.filterEstado);
+    if(s.filterProveedor){
+      const q = s.filterProveedor.toLowerCase();
+      rows = rows.filter(i=>i.proveedor.toLowerCase().includes(q) || i.numero.toLowerCase().includes(q));
+    }
+    if(s.filterDesde) rows = rows.filter(i=>i.fecha >= s.filterDesde);
+    if(s.filterHasta) rows = rows.filter(i=>i.fecha <= s.filterHasta);
+
+    if(s.sortField){
+      const f = s.sortField, dir = s.sortDir === 'asc' ? 1 : -1;
+      const getVal = (i) => {
+        if(f==='tipo') return this.tipoLabel(i.tipo);
+        if(f==='numero') return i.numero;
+        if(f==='fecha') return i.fecha;
+        if(f==='proveedor') return i.proveedor.toLowerCase();
+        if(f==='tc') return i.tc==null ? -1 : i.tc;
+        if(f==='base') return this.baseImponible(i.monto);
+        if(f==='igv') return this.igv(i.monto);
+        if(f==='monto') return i.monto;
+        if(f==='estado') return i.estado;
+        return '';
+      };
+      rows = [...rows].sort((a,b)=>{
+        const va = getVal(a), vb = getVal(b);
+        if(va < vb) return -1*dir;
+        if(va > vb) return 1*dir;
+        return 0;
+      });
+    }
+
+    const sortArrow = (field) => s.sortField===field ? (s.sortDir==='asc' ? ' ▲' : ' ▼') : '';
+
+    const totalRows = rows.length;
+    const totalPages = Math.max(1, Math.ceil(totalRows / s.dashboardPageSize));
+    const currentPage = Math.min(s.dashboardPage, totalPages);
+    const pageStart = (currentPage-1) * s.dashboardPageSize;
+    rows = rows.slice(pageStart, pageStart + s.dashboardPageSize);
+
+    const dashboardRows = rows.map(inv=>{
+      const info = this.estadoInfo(inv.estado);
+      return {
+        id:inv.id, compro:inv.compro, origenLibro:'02 Compras', anio:inv.fecha.split('-')[0], mes:inv.fecha.split('-')[1], dia:inv.fecha.split('-')[2],
+        proveedor:inv.proveedor, glosa:inv.glosa||'—', ruc:inv.ruc, tipoCode:inv.tipo, tipoLabel:this.tipoLabel(inv.tipo), numero:inv.numero,
+        baseFmt:this.fmtNum(this.baseImponible(inv.monto)), igvFmt:this.fmtNum(this.igv(inv.monto)),
+        montoFmt:this.fmtMonto(inv.monto, inv.moneda), moneda:inv.moneda, fechaFmt:this.fmtFecha(inv.fecha),
+        tcFmt: inv.tc == null ? '—' : inv.tc.toFixed(3),
+        estadoLabel:info.label, estadoBg:info.bg, estadoFg:info.fg, openFn:this.openDetail(inv),
+        rowAlert: inv.duplicado || inv.provGenerico, adjuntos: inv.adjuntos, sinAdjuntos: !inv.adjuntos,
+        editFn: this.editInvoice(inv), deleteFn: this.deleteInvoice(inv),
+        avatarInit: this.avatarInitials(inv.proveedor), avatarColor: this.avatarColor(inv.proveedor)
+      };
+    });
+
+    const counts = {
+      pendientes: s.invoices.filter(i=>i.estado==='pendiente').length,
+      validadas: s.invoices.filter(i=>i.estado==='validada').length,
+      errores: s.invoices.filter(i=>i.estado==='error').length,
+      alertas: s.invoices.filter(i=>i.estado==='alerta').length
+    };
+
+    const selected = s.form;
+    let detailVals = {};
+    if(selected){
+      const info = this.estadoInfo(selected.estado);
+      detailVals = {
+        detId: selected.id, detProveedor: selected.proveedor, detProveedorMissing: !!selected.provGenerico,
+        detTipo: selected.tipo, detNumero: selected.numero, detMonto: selected.monto, detMoneda: selected.moneda,
+        detFecha: selected.fecha, detTC: selected.tc == null ? 0 : selected.tc, detTCFecha: selected.tcFecha || 'sin dato',
+        detBaseVal: s.detBaseIgv[selected.id] ? s.detBaseIgv[selected.id].base : this.baseImponible(Number(selected.monto)||0),
+        detIgvVal: s.detBaseIgv[selected.id] ? s.detBaseIgv[selected.id].igv : this.igv(Number(selected.monto)||0),
+        onDetBase: this.setDetBase(selected.id), onDetIgv: this.setDetIgv(selected.id),
+        detAddLinea: this.addLinea('det', selected.id),
+        detAsientoLineas: (function(){
+          const lineas = s.detLineas[selected.id] || [];
+          return lineas.map((l,idx)=>({
+            idx, cuenta:l.cuenta, debe:l.debe, haber:l.haber,
+            pickerOpen: !!(s.cuentaPickerOpen && s.cuentaPickerOpen.ctx==='det' && s.cuentaPickerOpen.invId===selected.id && s.cuentaPickerOpen.idx===idx),
+            onOpen: this.openCuentaPicker('det', selected.id, idx),
+            onDebe: this.setLineaMonto('det', selected.id, idx, 'debe'),
+            onHaber: this.setLineaMonto('det', selected.id, idx, 'haber'),
+            onRemove: this.removeLinea('det', selected.id, idx)
+          }));
+        }).call(this),
+        detTCMissing: selected.tc == null,
+        detEstadoLabel: info.label, detEstadoBg: info.bg, detEstadoFg: info.fg,
+        detProveedorCodLabel: selected.proveedorCod || 'P0000',
+        detGlosa: selected.glosa || '', onGlosa: this.setFormField('glosa'),
+        ordenesCount: (s.ordenesCompra[selected.id]||[]).length,
+        mediosCount: (s.mediosProbatorios[selected.id]||[]).length,
+        openOrdenModal: this.openAttachModal('orden'), openMediosModal: this.openAttachModal('medios'),
+        attachModalOpen: s.attachModalOpen,
+        attachModalTitle: s.attachModalOpen==='orden' ? 'Órdenes de compra' : 'Medios probatorios',
+        attachModalItems: (s.attachModalOpen ? (s.attachModalOpen==='orden' ? (s.ordenesCompra[selected.id]||[]) : (s.mediosProbatorios[selected.id]||[])) : []).map((f,idx)=>({name:f.name, onRemove:this.removeAttachFile(s.attachModalOpen, idx)})),
+        closeAttachModal: this.closeAttachModal, addAttachFiles: this.addAttachFiles(s.attachModalOpen),
+        detDuplicado: !!selected.duplicado,
+        detLineasSumDebeFmt: (function(){ const l=s.detLineas[selected.id]||[]; return this.fmtNum(l.reduce((a,x)=>a+Number(x.debe||0),0)); }).call(this),
+        detLineasSumHaberFmt: (function(){ const l=s.detLineas[selected.id]||[]; return this.fmtNum(l.reduce((a,x)=>a+Number(x.haber||0),0)); }).call(this),
+        detLineasCuadra: (function(){ const l=s.detLineas[selected.id]||[]; const d=l.reduce((a,x)=>a+Number(x.debe||0),0), h=l.reduce((a,x)=>a+Number(x.haber||0),0); return Math.abs(d-h)<0.01; }).call(this),
+        detLineasCuadraLabel: (function(){ const l=s.detLineas[selected.id]||[]; const d=l.reduce((a,x)=>a+Number(x.debe||0),0), h=l.reduce((a,x)=>a+Number(x.haber||0),0); return Math.abs(d-h)<0.01 ? 'Cuadra' : 'No cuadra'; }).call(this),
+        detLineasCuadraBg: (function(){ const l=s.detLineas[selected.id]||[]; const d=l.reduce((a,x)=>a+Number(x.debe||0),0), h=l.reduce((a,x)=>a+Number(x.haber||0),0); return Math.abs(d-h)<0.01 ? (s.dark?'rgba(48,209,88,0.16)':'rgba(52,199,89,0.13)') : (s.dark?'rgba(255,69,58,0.18)':'rgba(255,59,48,0.1)'); }).call(this),
+        detLineasCuadraFg: (function(){ const l=s.detLineas[selected.id]||[]; const d=l.reduce((a,x)=>a+Number(x.debe||0),0), h=l.reduce((a,x)=>a+Number(x.haber||0),0); return Math.abs(d-h)<0.01 ? (s.dark?'#30d158':'#1f8a3d') : (s.dark?'#ff453a':'#d70015'); }).call(this),
+        onProveedor: this.setFormField('proveedor'), onTipo: this.setFormField('tipo'), onNumero: this.setFormField('numero'),
+        onMonto: this.setFormField('monto'), onMoneda: this.setFormField('moneda'), onFecha: this.setFormField('fecha'), onTC: this.setFormField('tc'),
+        detMesContable: selected.mesContable || Number(selected.fecha.split('-')[1]),
+        detDiaContable: selected.diaContable || Number(selected.fecha.split('-')[2]),
+        onMesContable: this.setFormField('mesContable'), onDiaContable: this.setFormField('diaContable'),
+        detCompro: selected.compro
+      };
+    }
+
+    let errRows = s.errores;
+    if(s.errorFilter !== 'todos') errRows = errRows.filter(e=>e.categoria===s.errorFilter);
+    if(s.errorFechaDesde) errRows = errRows.filter(e=>e.fechaISO >= s.errorFechaDesde);
+    if(s.errorFechaHasta) errRows = errRows.filter(e=>e.fechaISO <= s.errorFechaHasta);
+    const erroresRows = errRows.map(e=>({
+      ...e, isError: e.categoria==='error', isNotif: e.categoria==='notificacion',
+      categoriaLabel: e.categoria==='error' ? 'Error de conexión' : 'Notificación',
+      categoriaBg: e.categoria==='error' ? (s.dark?'rgba(255,69,58,0.16)':'rgba(255,59,48,0.1)') : (s.dark?'rgba(10,132,255,0.16)':'rgba(0,113,227,0.1)'),
+      categoriaFg: e.categoria==='error' ? (s.dark?'#ff453a':'#d70015') : (s.dark?'#409cff':'#0071e3')
+    }));
+    const countErrorCat = s.errores.filter(e=>e.categoria==='error').length;
+    const countNotifCat = s.errores.filter(e=>e.categoria==='notificacion').length;
+
+    const connRows = s.connections.map(conn=>{
+      const ok = conn.estado==='conectado';
+      const bg = ok ? (s.dark?'rgba(48,209,88,0.16)':'rgba(52,199,89,0.13)') : (s.dark?'rgba(255,69,58,0.18)':'rgba(255,59,48,0.1)');
+      const fg = ok ? (s.dark?'#30d158':'#1f8a3d') : (s.dark?'#ff453a':'#d70015');
+      return {
+        id:conn.id, nombre:conn.nombre, letra:conn.letra, color:conn.color, cuenta:conn.cuenta, detalle:conn.detalle, ultima:conn.ultima,
+        estadoLabel: ok ? 'Conectado' : (conn.estado==='error' ? 'Con error' : 'Desconectado'),
+        estadoBg:bg, estadoFg:fg, isOk:ok,
+        onReconnect: this.reconnectService(conn.id), onDisconnect: this.disconnectService(conn.id)
+      };
+    });
+
+    let bitacoraSource = s.invoices.filter(i=>i.estado==='validada');
+    if(s.bitacoraSearch){
+      const q = s.bitacoraSearch.toLowerCase();
+      bitacoraSource = bitacoraSource.filter(i => i.proveedor.toLowerCase().includes(q) || i.numero.toLowerCase().includes(q));
+    }
+    if(s.bitacoraDesde) bitacoraSource = bitacoraSource.filter(i => i.fecha >= s.bitacoraDesde);
+    if(s.bitacoraHasta) bitacoraSource = bitacoraSource.filter(i => i.fecha <= s.bitacoraHasta);
+    if(s.regAnio) bitacoraSource = bitacoraSource.filter(i => i.fecha.split('-')[0] === s.regAnio);
+    if(s.regMes) bitacoraSource = bitacoraSource.filter(i => i.fecha.split('-')[1] === s.regMes);
+    if(s.regDia) bitacoraSource = bitacoraSource.filter(i => i.fecha.split('-')[2] === s.regDia);
+    const regAnioOptions = Array.from(new Set(s.invoices.filter(i=>i.estado==='validada').map(i=>i.fecha.split('-')[0]))).sort();
+    const regDiaOptions = Array.from(new Set(s.invoices.filter(i=>i.estado==='validada').map(i=>i.fecha.split('-')[2]))).sort();
+    const regTotalRows = bitacoraSource.length;
+    const regTotalPages = Math.max(1, Math.ceil(regTotalRows / s.regPageSize));
+    const regCurrentPage = Math.min(s.regPage, regTotalPages);
+    const regPageStart = (regCurrentPage-1) * s.regPageSize;
+    bitacoraSource = bitacoraSource.slice(regPageStart, regPageStart + s.regPageSize);
+    const bitacoraRows = bitacoraSource.map(inv=>{
+      const lineas = s.asientoLineas[inv.id] || this.defaultLineas(inv);
+      const sumDebe = lineas.reduce((a,l)=>a+Number(l.debe||0),0), sumHaber = lineas.reduce((a,l)=>a+Number(l.haber||0),0);
+      const cuadra = Math.abs(sumDebe - sumHaber) < 0.01;
+      const anulado = !!s.asientoAnulado[inv.id];
+      return {
+        id:inv.id, proveedor:inv.proveedor, numero:inv.numero, fechaFmt:this.fmtFecha(inv.fecha),
+        compro: inv.compro, origenLibro:'02 Compras', glosa: inv.glosa || '—', moneda: inv.moneda, tcFmt: inv.tc==null ? '—' : inv.tc.toFixed(3),
+        anio: inv.fecha.split('-')[0], mes: inv.fecha.split('-')[1], dia: inv.fecha.split('-')[2],
+        baseFmt:this.fmtNum(this.baseImponible(inv.monto)), igvFmt:this.fmtNum(this.igv(inv.monto)),
+        montoFmt: this.fmtMonto(inv.monto, inv.moneda),
+        anulado, estadoLabel: anulado ? 'Anulado' : (cuadra ? 'Consistente' : 'No cuadra'),
+        estadoBg: anulado ? (s.dark?'rgba(255,255,255,0.08)':'rgba(0,0,0,0.06)') : (cuadra ? (s.dark?'rgba(48,209,88,0.16)':'rgba(52,199,89,0.13)') : (s.dark?'rgba(255,69,58,0.18)':'rgba(255,59,48,0.1)')),
+        estadoFg: anulado ? c.textSecondary : (cuadra ? (s.dark?'#30d158':'#1f8a3d') : (s.dark?'#ff453a':'#d70015')),
+        onVerDetalle: this.openAsientoDetail(inv.id),
+        onAnular: this.anularAsiento(inv.id), onReactivar: this.reactivarAsiento(inv.id),
+        rowOpacity: anulado ? 0.55 : 1
+      };
+    });
+
+    return {
+      dark: s.dark, lightMode: !s.dark, toggleDark: this.toggleDark, c,
+      sidebarCollapsed: s.sidebarCollapsed, showLabels: !s.sidebarCollapsed, toggleSidebar: this.toggleSidebar,
+      sidebarWidthPx: s.sidebarCollapsed ? '60px' : '216px',
+      chevronRotate: s.sidebarCollapsed ? 'rotate(135deg)' : 'rotate(-45deg)',
+      barW1: s.sidebarCollapsed ? '60%' : '100%', barW2: '100%', barW3: s.sidebarCollapsed ? '60%' : '80%',
+      profileOpen: s.profileOpen, toggleProfile: this.toggleProfile, logout: this.logout,
+      profileModalOpen: s.profileModalOpen, openProfileModal: this.openProfileModal, closeProfileModal: this.closeProfileModal,
+      profileName: s.profileName, profileUsuario: s.profileUsuario, profileEmail: s.profileEmail,
+      profilePassActual: s.profilePassActual, profilePassNueva: s.profilePassNueva, profilePassConfirmar: s.profilePassConfirmar,
+      setProfileName: this.setProfileField('profileName'), setProfileEmail: this.setProfileField('profileEmail'),
+      setProfilePassActual: this.setProfileField('profilePassActual'), setProfilePassNueva: this.setProfileField('profilePassNueva'),
+      setProfilePassConfirmar: this.setProfileField('profilePassConfirmar'),
+      printList: this.printList, exportExcel: this.exportExcel,
+      driveSyncing: s.driveSyncing, driveLastSync: s.driveLastSync, syncDrive: this.syncDrive,
+      syncLabel: s.driveSyncing ? 'Sincronizando…' : 'Sincronizar con correo',
+      errorFilter: s.errorFilter, setErrorFilterTodos: ()=>this.setState({errorFilter:'todos'}),
+      setErrorFilterError: ()=>this.setState({errorFilter:'error'}), setErrorFilterNotif: ()=>this.setState({errorFilter:'notificacion'}),
+      chipTodosStyle: this.chipStyleObj(s.errorFilter==='todos'), chipErrorStyle: this.chipStyleObj(s.errorFilter==='error'), chipNotifStyle: this.chipStyleObj(s.errorFilter==='notificacion'),
+      countErrorCat, countNotifCat, exportErrores: this.exportErrores, erroresRows,
+      errorFechaDesde: s.errorFechaDesde, errorFechaHasta: s.errorFechaHasta,
+      setErrorFechaDesde: (e)=>this.setState({errorFechaDesde:e.target.value}),
+      setErrorFechaHasta: (e)=>this.setState({errorFechaHasta:e.target.value}),
+      connRows, ...this.syncScreenVals(),
+      sheetsSyncing: s.sheetsSyncing, syncSheets: this.syncSheets,
+      sheetsSyncLabel: s.sheetsSyncing ? 'Sincronizando…' : 'Sincronizar con Drive',
+      bitacoraSearch: s.bitacoraSearch, setBitacoraSearch: (e)=>this.setState({bitacoraSearch:e.target.value, regPage:1}),
+      bitacoraDesde: s.bitacoraDesde, setBitacoraDesde: (e)=>this.setState({bitacoraDesde:e.target.value, regPage:1}),
+      bitacoraHasta: s.bitacoraHasta, setBitacoraHasta: (e)=>this.setState({bitacoraHasta:e.target.value, regPage:1}),
+      regAnio: s.regAnio, regMes: s.regMes, regDia: s.regDia, regAnioOptions, regDiaOptions,
+      setRegAnio: (e)=>this.setState({regAnio:e.target.value, regPage:1}),
+      setRegMes: (e)=>this.setState({regMes:e.target.value, regPage:1}),
+      setRegDia: (e)=>this.setState({regDia:e.target.value, regPage:1}),
+      regPage: regCurrentPage, regTotalPages, regPageSize: s.regPageSize,
+      setRegPageSize: (e)=>this.setState({regPageSize:Number(e.target.value), regPage:1}),
+      regPageInfo: 'Mostrando ' + (regTotalRows===0?0:regPageStart+1) + '–' + Math.min(regPageStart+s.regPageSize, regTotalRows) + ' de ' + regTotalRows,
+      regPrevOpacity: regCurrentPage<=1 ? 0.4 : 1, regNextOpacity: regCurrentPage>=regTotalPages ? 0.4 : 1,
+      onRegPrev: regCurrentPage>1 ? ()=>this.setState({regPage:regCurrentPage-1}) : undefined,
+      onRegNext: regCurrentPage<regTotalPages ? ()=>this.setState({regPage:regCurrentPage+1}) : undefined,
+      ...this.asientoDetailVals(),
+      cuentaPickerActive: !!s.cuentaPickerOpen, cuentaQuery: s.cuentaQuery, setCuentaQuery: this.setCuentaQuery, closeCuentaPicker: this.closeCuentaPicker,
+      filteredCuentaItems: (s.cuentaPickerOpen ? s.cuentaOptions.filter(o=>o.toLowerCase().includes((s.cuentaQuery||'').toLowerCase())) : []).map(o=>({label:o, onSelect:this.chooseCuenta(o)})),
+      openProveedorPicker: this.openProveedorPicker, closeProveedorPicker: this.closeProveedorPicker,
+      proveedorPickerOpen: s.proveedorPickerOpen, proveedorQuery: s.proveedorQuery, setProveedorQuery: this.setProveedorQuery,
+      filteredProveedores: s.proveedorCatalogo.filter(p => {
+        const q = (s.proveedorQuery||'').toLowerCase();
+        return !q || p.nombre.toLowerCase().includes(q) || p.cod.toLowerCase().includes(q) || p.ruc.includes(q);
+      }).map(p => ({cod:p.cod, nombre:p.nombre, ruc:p.ruc, onSelect:this.chooseProveedor(p)})),
+      isLogin: s.screen==='login', isApp: s.screen!=='login',
+      isDashboard: s.screen==='dashboard', isDetail: s.screen==='detail',
+      isBitacora: s.screen==='bitacora', isErrores: s.screen==='errores', isConfig: s.screen==='config',
+      navDashStyle: this.navStyleObj(s.screen==='dashboard'), navBitStyle: this.navStyleObj(s.screen==='bitacora'),
+      navErrStyle: this.navStyleObj(s.screen==='errores'), navCfgStyle: this.navStyleObj(s.screen==='config'),
+      navProvStyle: this.navStyleObj(s.screen==='proveedores'), navPlanStyle: this.navStyleObj(s.screen==='plancontable'),
+      navAjustesStyle: this.navStyleObj(s.screen==='ajustes'),
+      goDashboard: this.goto('dashboard'), goBitacora: this.goto('bitacora'), goErrores: this.goto('errores'), goConfig: this.goto('config'),
+      goProveedores: this.goto('proveedores'), goPlanContable: this.goto('plancontable'), goAjustes: this.goto('ajustes'),
+      isProveedores: s.screen==='proveedores', isPlanContable: s.screen==='plancontable', isAjustes: s.screen==='ajustes',
+      defaultPageSize: s.defaultPageSize, setDefaultPageSize: this.setDefaultPageSize,
+      notifDuplicados: s.notifDuplicados, notifProveedorFaltante: s.notifProveedorFaltante,
+      notifErroresConexion: s.notifErroresConexion, notifResumenDiario: s.notifResumenDiario,
+      toggleNotifDuplicados: this.toggleNotif('notifDuplicados'), toggleNotifProveedor: this.toggleNotif('notifProveedorFaltante'),
+      toggleNotifErrores: this.toggleNotif('notifErroresConexion'), toggleNotifResumen: this.toggleNotif('notifResumenDiario'),
+      ...this.provListVals(), ...this.planListVals(),
+      loginUser: s.loginUser, loginPass: s.loginPass, loginError: s.loginError,
+      setLoginUser: (e)=>this.setState({loginUser:e.target.value}), setLoginPass: (e)=>this.setState({loginPass:e.target.value}),
+      submitLogin: this.submitLogin,
+      todayLabel: new Date().toLocaleDateString('es-PE', {day:'numeric', month:'long', year:'numeric'}),
+      totalInvoicesLabel: s.invoices.length + ' facturas',
+      cntTodos: s.invoices.length,
+      setEstTodos: ()=>this.setState({filterEstado:'todos', dashboardPage:1}),
+      setEstPendiente: ()=>this.setState({filterEstado:'pendiente', dashboardPage:1}),
+      setEstValidada: ()=>this.setState({filterEstado:'validada', dashboardPage:1}),
+      setEstError: ()=>this.setState({filterEstado:'error', dashboardPage:1}),
+      setEstAlerta: ()=>this.setState({filterEstado:'alerta', dashboardPage:1}),
+      estChipTodosStyle: this.chipStyleObj(s.filterEstado==='todos'),
+      estChipPendienteStyle: this.chipStyleObj(s.filterEstado==='pendiente'),
+      estChipValidadaStyle: this.chipStyleObj(s.filterEstado==='validada'),
+      estChipErrorStyle: this.chipStyleObj(s.filterEstado==='error'),
+      estChipAlertaStyle: this.chipStyleObj(s.filterEstado==='alerta'),
+      filterEstado: s.filterEstado, setFilterEstado: (e)=>this.setState({filterEstado:e.target.value, dashboardPage:1}),
+      filterProveedor: s.filterProveedor, setFilterProveedor:(e)=>this.setState({filterProveedor:e.target.value, dashboardPage:1}),
+      filterDesde: s.filterDesde, setFilterDesde:(e)=>this.setState({filterDesde:e.target.value, dashboardPage:1}),
+      filterHasta: s.filterHasta, setFilterHasta:(e)=>this.setState({filterHasta:e.target.value, dashboardPage:1}),
+      proveedoresOptions: proveedores,
+      countPendientes: counts.pendientes, countValidadas: counts.validadas, countErrores: counts.errores, countAlertas: counts.alertas,
+      dashboardRows, hasRows: dashboardRows.length>0,
+      onSortTipo: this.setSort('tipo'), onSortNumero: this.setSort('numero'), onSortFecha: this.setSort('fecha'),
+      onSortProveedor: this.setSort('proveedor'), onSortTC: this.setSort('tc'), onSortBase: this.setSort('base'),
+      onSortIgv: this.setSort('igv'), onSortMonto: this.setSort('monto'), onSortEstado: this.setSort('estado'),
+      lblTipo: 'Tipo'+sortArrow('tipo'), lblNumero: 'Número'+sortArrow('numero'), lblEmision: 'Emisión'+sortArrow('fecha'),
+      lblProveedor: 'Proveedor'+sortArrow('proveedor'), lblTC: 'T.C.'+sortArrow('tc'), lblBase: 'Base imp.'+sortArrow('base'),
+      lblIgv: 'IGV'+sortArrow('igv'), lblMonto: 'Monto'+sortArrow('monto'), lblEstado: 'Estado'+sortArrow('estado'),
+      dashPage: currentPage, dashTotalPages: totalPages, dashTotalRows: totalRows,
+      dashPageInfo: 'Mostrando ' + (totalRows===0?0:pageStart+1) + '–' + Math.min(pageStart+s.dashboardPageSize, totalRows) + ' de ' + totalRows,
+      dashPrevDisabled: currentPage<=1, dashNextDisabled: currentPage>=totalPages,
+      onDashPrev: currentPage>1 ? this.setDashboardPage(currentPage-1) : undefined,
+      onDashNext: currentPage<totalPages ? this.setDashboardPage(currentPage+1) : undefined,
+      dashPrevOpacity: currentPage<=1 ? 0.4 : 1, dashNextOpacity: currentPage>=totalPages ? 0.4 : 1,
+      dashboardPageSize: s.dashboardPageSize, setDashboardPageSize: this.setDashboardPageSize,
+      ...detailVals,
+      backToDashboard: this.backToDashboard, dupAck: s.dupAck, toggleDupAck: this.toggleDupAck,
+      historyOpen: s.historyOpen, toggleHistory: this.toggleHistory,
+      validar: this.validar, guardarAvance: this.guardarAvance,
+      bitacoraRows
+    };
+  }
+}
+
+</script>
+</body>
+</html>

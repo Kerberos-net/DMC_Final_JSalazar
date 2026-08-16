@@ -1,0 +1,7 @@
+# Configuracion de herramientas de asistencia, no del proyecto
+.claude/
+.agents/
+.atl/
+
+# Temporales de Office al abrir los datos maestros
+~$*.xlsx
