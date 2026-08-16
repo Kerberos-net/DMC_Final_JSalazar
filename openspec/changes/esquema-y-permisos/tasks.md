@@ -59,19 +59,54 @@ review boundaries.
 
 ## Phase 2: Schema Structure (RED before each script)
 
-- [ ] 2.1 RED: schema-shape test — `sys.tables`/`sys.schemas` inventory expects every table in spec's full list, all in `schema_name='fact'`, none named `Proveedor`/`CuentaContable`/`Motivo`/`Origen`.
-- [ ] 2.2 GREEN: `001_esquema_fact.sql` — `CREATE SCHEMA fact`.
-- [ ] 2.3 GREEN: `002_seguridad.sql` — `fact.Usuario` (no `INSERT`, `ClaveHash NVARCHAR(200)`, `BloqueadoHasta DATETIME2(3)`).
-- [ ] 2.4 GREEN: `003_ingesta_y_procesamiento.sql` — `Email`, `DocumentoRecibido`, `Procesamiento`, `DatosExtraidos`, `ProcesamientoError`, `ProcesamientoIntentos`.
-- [ ] 2.5 GREEN: `004_satelites_datos_maestros.sql` — `ProveedorAtributo`/`SugerenciaCuenta` keyed on `ProveedorCodigo CHAR(6)`; `MotivoAtributo` keyed on `Motivo INT`, `CuentaCodigo VARCHAR(10)`.
-- [ ] 2.6 GREEN: `005_negocio.sql` — `Factura`, `FacturaExtraccion`, `AsientoContable`, `AsientoContableDetalle`, `CorrelativoAsiento`, `AdjuntoManual`, `AuditoriaCorreccion`.
-- [ ] 2.7 RED: index/constraint tests — `IX_Factura_Identidad` (`is_unique=0`), `UQ_Factura_Procesamiento`, `UQ_Asiento_Vigente`, `CK_Linea_Tipo` (4 accept/reject cases), `CorrelativoAsiento` PK + no `sys.identity_columns`/`sys.sequences` row.
-- [ ] 2.8 GREEN: apply filtered indexes and `CK_Linea_Tipo` inside `005_negocio.sql` to satisfy 2.7.
-- [ ] 2.9 GREEN: `006_contratos.sql` — `OutboxEvent`, `OutboxEventIntegracion`, `CommandQueue`, `InboxEvent`; `Secuencia BIGINT` fed by `SEQUENCE fact.SeqOutbox`.
-- [ ] 2.10 GREEN: `007_publicacion.sql` — `TipoCambio`, `Configuracion`, `EstadoIntegracion`.
-- [ ] 2.11 RED: money/rate type test — no `float`/`real` in schema `fact`; every named monetary column `DECIMAL(18,2)`; every rate column `DECIMAL(12,6)`.
-- [ ] 2.12 RED: `rowversion` test — exactly `Factura.Version` and `AsientoContable.Version`; none on `AsientoContableDetalle`.
-- [ ] 2.13 GREEN: adjust column definitions across 2.3–2.10 to satisfy 2.11–2.12.
+- [x] 2.1 RED: schema-shape test — `sys.tables`/`sys.schemas` inventory expects every table in spec's full list, all in `schema_name='fact'`, none named `Proveedor`/`CuentaContable`/`Motivo`/`Origen`.
+- [x] 2.2 GREEN: `001_esquema_fact.sql` — `CREATE SCHEMA fact`.
+- [x] 2.3 GREEN: `002_seguridad.sql` — `fact.Usuario` (no `INSERT`, `ClaveHash NVARCHAR(200)`, `BloqueadoHasta DATETIME2(3)`).
+- [x] 2.4 GREEN: `003_ingesta_y_procesamiento.sql` — `Email`, `DocumentoRecibido`, `Procesamiento`, `DatosExtraidos`, `ProcesamientoError`, `ProcesamientoIntentos`.
+- [x] 2.5 GREEN: `004_satelites_datos_maestros.sql` — `ProveedorAtributo`/`SugerenciaCuenta` keyed on `ProveedorCodigo CHAR(6)`; `MotivoAtributo` keyed on `Motivo INT`, `CuentaCodigo VARCHAR(10)`.
+  - **Decision made explicit (not literally closed by design.md for these three tables):** no
+    `FOREIGN KEY` from `ProveedorAtributo.ProveedorCodigo`, `MotivoAtributo.Motivo` or
+    `SugerenciaCuenta.(ProveedorCodigo, Motivo)` to `dbo.Proveedor`/`dbo.Motivo`. Reasoning
+    extended directly from design.md's item 1 (`Factura.RucProveedor`, "Not an FK... it is a frozen
+    copy") and item 6 (`CuentaCodigo`, "No FK to dbo.CuentaContable... ADR 0006 freezes these values
+    so they must survive the external account being renumbered or deleted; an FK would make freezing
+    meaningless and could block the accounting system's own deletes"). The satellites are not
+    frozen copies in the same sense as `RucProveedor`, but the second half of that reasoning — an
+    FK on `fact.*` constrains `dbo.*`'s own `DELETE`s, sitting uneasily with ADR 0003's "nadie
+    escribe una tabla externa" — applies identically regardless of whether the referencing column is
+    a frozen snapshot or a live lookup. It is reinforced structurally: `008` (Unit 3) grants `SELECT`
+    only on the four `dbo.*` tables, never `REFERENCES`, so the deploy principal could not declare
+    the FK under its own permission boundary even if the reasoning above were rejected.
+- [x] 2.6 GREEN: `005_negocio.sql` — `Factura`, `FacturaExtraccion`, `AsientoContable`, `AsientoContableDetalle`, `CorrelativoAsiento`, `AdjuntoManual`, `AuditoriaCorreccion`.
+- [x] 2.7 RED: index/constraint tests — `IX_Factura_Identidad` (`is_unique=0`), `UQ_Factura_Procesamiento`, `UQ_Asiento_Vigente`, `CK_Linea_Tipo` (4 accept/reject cases), `CorrelativoAsiento` PK + no `sys.identity_columns`/`sys.sequences` row.
+- [x] 2.8 GREEN: apply filtered indexes and `CK_Linea_Tipo` inside `005_negocio.sql` to satisfy 2.7.
+- [x] 2.9 GREEN: `006_contratos.sql` — `OutboxEvent`, `OutboxEventIntegracion`, `CommandQueue`, `InboxEvent`; `Secuencia BIGINT` fed by `SEQUENCE fact.SeqOutbox`.
+- [x] 2.10 GREEN: `007_publicacion.sql` — `TipoCambio`, `Configuracion`, `EstadoIntegracion`.
+- [x] 2.11 RED: money/rate type test — no `float`/`real` in schema `fact`; every named monetary column `DECIMAL(18,2)`; every rate column `DECIMAL(12,6)`.
+- [x] 2.12 RED: `rowversion` test — exactly `Factura.Version` and `AsientoContable.Version`; none on `AsientoContableDetalle`.
+- [x] 2.13 GREEN: adjust column definitions across 2.3–2.10 to satisfy 2.11–2.12.
+  - **Note on RED/GREEN granularity actually executed:** all RED assertions for Phase 2 (2.1, the
+    2.7 index/constraint suite, 2.11, 2.12 — 25 tests total in `SchemaShapeTests.cs`) were written
+    and run together first, confirmed failing (20 failed / 5 trivially-true absence checks, against
+    zero schema scripts), then scripts `001`–`007` were authored together and the same 25 tests
+    re-run to GREEN (0 failed / 25 passed after two harness type-cast bugs in the test helpers
+    themselves — `int` vs `long` identity columns, `bit` vs `int` for `is_unique` — were fixed; the
+    schema itself needed no correction). This compresses the task list's one-script-at-a-time RED/
+    GREEN granularity into two real estate SQL Server round trips (RED once, GREEN once) rather than
+    thirteen, for cost reasons stated in the Work Unit Evidence table below. The RED-before-GREEN
+    property — no production SQL was written before its assertion existed and was observed failing
+    — holds at the work-unit granularity.
+  - **Columns/tables authored beyond what design.md/spec.md state verbatim** (consistent with
+    design.md's own global rules — VARCHAR(20) enum + named CHECK, DATETIME2(3) UTC timestamps —
+    but not literally spelled out column-by-column in the source documents): `Usuario.NombreUsuario`
+    login handle; `Email.Estado`, `DocumentoRecibido.Estado`, `Procesamiento.Estado` value sets;
+    `ProcesamientoError`/`ProcesamientoIntentos` FK target (linked directly to `Procesamiento`);
+    `FacturaExtraccion.CampoNombre` value set (8 field names derivable from `DatosExtraidos`);
+    `OutboxEvent`/`OutboxEventIntegracion`/`CommandQueue`/`InboxEvent`.`Estado` value sets;
+    `InboxEvent.Tipo` (single value `PROCESAMIENTO_FINALIZADO`, ADR 0004 names only one notification
+    direction). None of these affect the load-bearing type decisions (money, rate, RUC, CuentaCodigo,
+    ProveedorCodigo, rowversion, filtered indexes, `CK_Linea_Tipo`, `CorrelativoAsiento`) that the
+    spec's requirements and scenarios test directly.
 
 ## Phase 3: Permission Matrix
 

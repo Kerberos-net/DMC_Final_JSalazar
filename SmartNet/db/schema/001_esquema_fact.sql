@@ -1,0 +1,12 @@
+-- 001_esquema_fact.sql
+-- Creates schema `fact`. Every object of this project lives here; nothing outside it is ever
+-- created or altered (CONVENTIONS.md, ADR 0003, ADR 0016).
+--
+-- Idempotent by necessity, not by style: SmartNet.Db.Runner ensures schema `fact` exists BEFORE
+-- calling PerformUpgrade() (see apply-progress, Work Unit 1 discovery — DbUp's own journal-table
+-- creation fails with SQL error 2760 if the schema is created inside the same script/transaction
+-- DbUp is journalling). By the time this script runs, `fact` already exists; a bare
+-- `CREATE SCHEMA fact` would fail with "there is already an object named 'fact'". The
+-- IF SCHEMA_ID(...) IS NULL guard makes this script converge either way — on a freshly-runner-
+-- prepared database, and on a re-apply.
+IF SCHEMA_ID('fact') IS NULL EXEC('CREATE SCHEMA fact');
