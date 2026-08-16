@@ -8,7 +8,7 @@ declara su **origen de libro**, y la pantalla de validación de una factura solo
 
 ## ⚠️ Decisión de demo, no contable
 
-> Los **22 motivos que corresponden realmente a `07` CAJA CHICA se reclasificaron a `02` COMPRAS**
+> Los **23 motivos que corresponden realmente a `07` CAJA CHICA se reclasificaron a `02` COMPRAS**
 > por necesidad de la demostración, para que aparezcan en el registro de compras.
 >
 > **Contablemente son de caja chica.** Esta reclasificación **no es la clasificación real de la
@@ -34,7 +34,7 @@ Si la demo no necesita estos tres en concreto, conviene dejarlos en `07`.
 
 | Origen | Motivos |
 |---|---|
-| `02` COMPRAS | **50** (28 propios + 22 reclasificados para la demo) |
+| `02` COMPRAS | **50** (27 propios + 23 reclasificados para la demo) |
 | `06` BANCOS | 21 |
 | `04` DIARIO | 4 |
 | `10` PLANILLAS | 4 |

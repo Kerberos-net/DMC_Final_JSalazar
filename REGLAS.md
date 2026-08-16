@@ -103,7 +103,7 @@ Una cuenta nueva creada bajo un prefijo ya declarado **aparece sola**, sin tocar
 La pantalla de validación ofrece **únicamente los motivos activos de origen `02` COMPRAS**. De ahí
 se deriva que el origen del asiento sea siempre `02`.
 
-⏳ **Estado actual: 50 motivos disponibles.** De ellos, **22 fueron reclasificados desde
+⏳ **Estado actual: 50 motivos disponibles.** De ellos, **23 fueron reclasificados desde
 `07 CAJA CHICA` por necesidad de la demostración**. Contablemente son de caja chica y **debe
 revertirse antes de producción**. Están marcados con `†` en `MOTIVOS-CLASIFICACION.md`.
 
@@ -725,7 +725,7 @@ Saldo de 421212 para este proveedor:  42,782.36 − 42,782.36 = 0.00  ✓
 
 | ⏳ | Regla | Cuándo revisarla |
 |---|---|---|
-| 1 | **22 motivos de caja chica reclasificados a `02`** | **Antes de producción.** Es una alteración hecha para la demostración. Marcados con `†`. |
+| 1 | **23 motivos de caja chica reclasificados a `02`** | **Antes de producción.** Es una alteración hecha para la demostración. Marcados con `†`. |
 | 2 | IGV siempre a `401111` | Si aparecen ventas no gravadas y hay que prorratear el crédito fiscal |
 | 3 | Facturas mixtas fuera de alcance | Si empiezan a llegar comprobantes con líneas gravadas y no gravadas |
 | 4 | Feriados no controlados | Si la política de la compañía se extiende más allá de los domingos |

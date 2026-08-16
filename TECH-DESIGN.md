@@ -155,12 +155,20 @@ La partición es **por tabla, con orígenes de escritura declarados** (ADR 0003)
 **Externas** — escritas por el **sistema contable de la compañía**, en esta misma base. Esta
 aplicación tiene **`SELECT` únicamente**.
 
-| Tabla | Contenido |
-|---|---|
-| `Proveedor` | Catálogo de proveedores, incluido `P0000 (Varios)` |
-| `CuentaContable` | Plan contable: 1650 cuentas, 907 imputables de 6 dígitos, con `ctarefleja` y `ctapuente` |
-| `Motivo` | 90 motivos de compra con sus prefijos de cuenta |
-| `Origen` | 13 orígenes de libro |
+| Tabla | Contenido | Se identifica por |
+|---|---|---|
+| `Proveedor` | Catálogo de proveedores, incluido `P0000 (Varios)` | **Código de 5 caracteres** |
+| `CuentaContable` | Plan contable: 1650 cuentas, 907 imputables de 6 dígitos, con `ctarefleja` y `ctapuente` | **Código de cuenta, texto de longitud variable** |
+| `Motivo` | 90 motivos de compra con sus prefijos de cuenta | **Entero** |
+| `Origen` | 13 orígenes de libro | **Código de 2 caracteres** |
+
+Las cuatro claves son **códigos de negocio, no identificadores subrogados**. `P0000` es literalmente
+la clave del proveedor genérico, no una etiqueta sobre un `BIGINT`. Toda tabla satélite y toda
+referencia desde el dominio se une por esos códigos.
+
+`CuentaContable` se identifica por texto de **longitud variable** y eso es funcional, no estético:
+los motivos guardan **prefijos de 2 a 6 dígitos**, y un tipo de longitud fija los rellenaría con
+espacios, rompiendo la resolución por `LIKE prefijo + '%'` que sostiene la cascada de sugerencia.
 
 **Este software no escribe ningún dato maestro.** El alta de proveedores ocurre en otro sistema,
 fuera del alcance del proyecto. Lo que este proyecto necesita y el sistema contable no aporta vive
@@ -449,7 +457,7 @@ Aportan lo que el sistema contable no tiene, sin tocar el catálogo externo.
 |---|---|
 | `ProveedorAtributo` | `EsRelacionada`, que elige entre `4212` y `4312` |
 | `MotivoAtributo` | `Activo` y `OrigenLibro` |
-| `SugerenciaCuenta` | `(ProveedorId, MotivoId, CuentaCodigo)` con `Veces` y `UltimoUso` |
+| `SugerenciaCuenta` | `(ProveedorCodigo, MotivoId, CuentaCodigo)` con `Veces` y `UltimoUso` |
 
 `MotivoCuenta` **no es una tabla**: es la interpretación que la aplicación hace del campo de
 prefijos del catálogo externo, resolviéndolos contra las 907 hojas de 6 dígitos.
@@ -708,7 +716,7 @@ El prototipo se aparta del diseño acordado en estos puntos, y **manda el diseñ
   maestros reales de la compañía y están recogidas en **`REGLAS.md`**, que es el documento normativo
   para implementar el asiento. **El sistema ya es construible y operable.** Queda pendiente su
   revisión formal por un contador, con cuatro puntos señalados en el propio documento.
-- **Clasificación de motivos alterada para la demostración.** Los 22 motivos que corresponden a
+- **Clasificación de motivos alterada para la demostración.** Los 23 motivos que corresponden a
   `07 CAJA CHICA` fueron reclasificados a `02 COMPRAS` por necesidad de la demo. **Contablemente son
   de caja chica y debe revertirse antes de producción.** Están marcados con `†` en
   `MOTIVOS-CLASIFICACION.md`, y viven en la tabla satélite `MotivoAtributo`, de modo que revertirlos

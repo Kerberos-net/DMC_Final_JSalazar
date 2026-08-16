@@ -1280,7 +1280,7 @@ validación de una factura **solo ofrece los motivos de origen `02` COMPRAS**.
 La clasificación **validada** está en `MOTIVOS-CLASIFICACION.md`. Reparto final: **50 motivos en
 `02`**, 21 en `06`, 4 en `04`, 4 en `10`, 3 en `05`, 2 en `03`, 6 de baja.
 
-> **Alcance de demo, no contable.** Los 22 motivos que corresponden realmente a `07` CAJA CHICA
+> **Alcance de demo, no contable.** Los 23 motivos que corresponden realmente a `07` CAJA CHICA
 > fueron **reclasificados a `02` COMPRAS por necesidad de la demostración**. Contablemente son de
 > caja chica y la reclasificación **debe revertirse antes de producción**. Está marcada con `†` en
 > el documento de clasificación para que sea reversible sin volver a analizarlos uno por uno.
@@ -1659,7 +1659,7 @@ catálogo externo **no se toca nunca**.
 contable, aparece aquí sin replicar nada. Desaparece el riesgo de dos catálogos que divergen en
 silencio hasta que un asiento usa una cuenta que ya no existe.
 
-**La reclasificación de demo es reversible sin tocar contabilidad.** Los 22 motivos de caja chica
+**La reclasificación de demo es reversible sin tocar contabilidad.** Los 23 motivos de caja chica
 movidos a `02` viven en `MotivoAtributo`, no en el catálogo real. Revertirlos antes de producción es
 actualizar una tabla satélite, no editar el plan contable de la compañía.
 

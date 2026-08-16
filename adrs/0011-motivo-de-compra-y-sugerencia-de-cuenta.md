@@ -71,14 +71,25 @@ referencian y esa referencia debe seguir resolviendo.
 
 ```sql
 CREATE TABLE SugerenciaCuenta (
-    ProveedorId   BIGINT      NOT NULL,
-    MotivoId      BIGINT      NOT NULL,
+    ProveedorCodigo CHAR(5)   NOT NULL,   -- 'P0000' — el catálogo externo se identifica por código
+    MotivoId      INT         NOT NULL,
     CuentaCodigo  VARCHAR(10) NOT NULL,
     Veces         INT         NOT NULL DEFAULT 0,
     UltimoUso     DATETIME2   NOT NULL,
-    PRIMARY KEY (ProveedorId, MotivoId, CuentaCodigo)
+    PRIMARY KEY (ProveedorCodigo, MotivoId, CuentaCodigo)
 );
 ```
+
+> **Corrección (ciclo `esquema-y-permisos`).** La revisión 3 de este ADR escribía
+> `ProveedorId BIGINT` y `MotivoId BIGINT`, dando por hecho que los catálogos externos usan
+> identificadores subrogados. **No es así.** `dbo.Proveedor` se identifica por un **código de cinco
+> caracteres** —`P0000` es literalmente la clave, no una etiqueta—, `dbo.Motivo` por un **entero**,
+> `dbo.CuentaContable` por el **código de cuenta como texto de longitud variable** y `dbo.Origen`
+> por un **código de dos caracteres**.
+>
+> El caso de `CuentaCodigo` no es cosmético: tiene que ser `VARCHAR` y no `CHAR`, porque los motivos
+> guardan **prefijos de 2 a 6 dígitos** y un tipo de longitud fija los rellenaría con espacios,
+> rompiendo la resolución por `LIKE prefijo + '%'` que sostiene toda la cascada de sugerencia.
 
 `Veces` se incrementa **al confirmar el asiento**, no al sugerir.
 
@@ -97,11 +108,11 @@ cuentas distintas en dos días, lo que parece un error aunque no lo sea.
 base (ADR 0003) y siembra la tabla:
 
 ```sql
-INSERT INTO SugerenciaCuenta (ProveedorId, CuentaCodigo, Veces)
-SELECT d.ProveedorId, d.CuentaCodigo, COUNT(*)
+INSERT INTO SugerenciaCuenta (ProveedorCodigo, CuentaCodigo, Veces)
+SELECT d.ProveedorCodigo, d.CuentaCodigo, COUNT(*)
   FROM <asientos históricos del sistema contable> d
  WHERE d.Fecha >= @desde
- GROUP BY d.ProveedorId, d.CuentaCodigo;
+ GROUP BY d.ProveedorCodigo, d.CuentaCodigo;
 ```
 
 **No es migración de datos.** Es un `SELECT` sobre el histórico y un `INSERT` en una tabla propia: no
