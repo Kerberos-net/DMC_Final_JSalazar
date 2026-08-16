@@ -138,12 +138,20 @@ Host mínimo de API, cookie `__Host-session` con `SameSite=Lax`, tabla `fact.Ses
 sesión revocable en servidor, bloqueo por intentos sobre las columnas ya existentes, y el comando de
 restablecimiento de ADR 0007. Depende del ítem #1 (completo).
 
-**Ciclo SDD:** `openspec/changes/autenticacion-y-sesion/` · propuesta aceptada · spec y diseño **en
-curso**. Las fases se definen cuando exista `tasks.md` — no antes, para no inventarlas.
+**Ciclo SDD:** `openspec/changes/autenticacion-y-sesion/` · propuesta, spec y diseño **cerrados** ·
+tareas **pendientes**. Las fases se definen cuando exista `tasks.md` — no antes, para no
+inventarlas.
 
 **Tres decisiones ya tomadas, no reabrir:** Argon2id como algoritmo de *hash*; `fact.Sesion` como
 tabla versionada con sus propios `GRANT`/`DENY`, no caché distribuida; el ítem #2 levanta también el
 host mínimo de API en `SmartNet/api/` (`net10.0`), ya que ningún otro ítem del backlog lo hace.
+
+**Decisión de arquitectura que salió de spec y diseño trabajando en paralelo.** El bloqueo por
+intentos necesitó una columna nueva, `fact.Usuario.NivelBloqueo`, porque `IntentosFallidos` no
+podía cargar dos preguntas con ciclos de vida distintos — cuántos fallos faltan para el próximo
+bloqueo, y cuánto durará ese bloqueo — al mismo tiempo. Migración compensatoria `012`, aditiva, no
+reabre el ítem #1. La secuencia **15 → 30 → 60 → 120 minutos con techo** quedó fijada en
+**ADR 0007 Revisión 4**, no solo en este `design.md`, para que tenga un único dueño normativo.
 
 ---
 

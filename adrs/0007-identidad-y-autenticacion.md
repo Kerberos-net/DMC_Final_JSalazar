@@ -2,7 +2,13 @@
 
 ## Estado
 
-Aceptado. Revisión 3. Añade límite de intentos y camino de recuperación de contraseña, dos piezas
+Aceptado. Revisión 4. Fija la secuencia exacta del bloqueo creciente —15, 30, 60 y 120 minutos, con
+techo— y el mecanismo de dos contadores que la sostiene. La revisión 3 dejaba solo la palabra
+"creciente" sin números: al diseñar el ítem #2 del backlog (`autenticación-y-sesión`), la ausencia
+de cifra obligó a decidirla fuera de este documento, y ese es precisamente el problema que este ADR
+existe para evitar. Se trae la decisión aquí para que tenga un único dueño normativo.
+
+Revisión 3. Añade límite de intentos y camino de recuperación de contraseña, dos piezas
 que faltaban del mismo tamaño que las que sí decidía (revisión adversarial v2, A8).
 
 La revisión 2 reemplazó la versión previa (`adrs - v1/0007`), que dejaba sin decidir el valor de
@@ -82,12 +88,40 @@ sobre `SameSite` se habría manifestado como un panel en blanco (ADR 0013).
 ```sql
 ALTER TABLE Usuario
     ADD IntentosFallidos INT       NOT NULL DEFAULT 0,
-        BloqueadoHasta   DATETIME2 NULL;
+        BloqueadoHasta   DATETIME2 NULL,
+        NivelBloqueo     INT       NOT NULL DEFAULT 0;
 ```
 
-Cinco fallos consecutivos: bloqueo de 15 minutos, creciente en bloqueos sucesivos. Un inicio de
-sesión correcto pone el contador a cero. El mensaje de bloqueo **no revela si el usuario existe**,
-igual que el de credenciales.
+Cinco fallos consecutivos arman un bloqueo. La duración crece con cada bloqueo sucesivo sobre la
+misma cuenta: **15 → 30 → 60 → 120 minutos**, duplicando desde la base y con techo en 120. Un
+inicio de sesión correcto pone `IntentosFallidos` **y** `NivelBloqueo` a cero — el bloqueo se
+olvida por completo, no solo se descuenta. El mensaje de bloqueo **no revela si el usuario
+existe**, igual que el de credenciales.
+
+**Dos contadores, no uno, porque responden preguntas con ciclos de vida distintos.**
+`IntentosFallidos` responde "cuántos fallos faltan para el próximo bloqueo" y se resetea **al
+armar** el bloqueo, no al expirar — así no depende de ningún trabajo en segundo plano ni de una
+corrección al leer, y el campo tiene un solo significado bajo cualquier valor del reloj.
+`NivelBloqueo` responde "cuánto durará el próximo bloqueo": crece al armar, satura en el techo, y
+solo vuelve a cero con un éxito o con el comando de restablecimiento. Consecuencia deliberada: tras
+expirar un bloqueo, la cuenta recibe el mismo margen de cinco fallos —ningún número nuevo, el mismo
+umbral reconcedido entero— antes de volver a bloquearse, pero si vuelve a bloquearse, la duración
+seguirá creciendo donde se quedó, no reinicia a 15 minutos como si fuera la primera vez.
+
+| Evento | `IntentosFallidos` | `NivelBloqueo` | Bloqueo |
+|---|---|---|---|
+| fallo 5 | 0 | 1 | 15 min |
+| fallo 6 tras expirar (el margen) | 1 | 1 | ninguno |
+| fallo 10 | 0 | 2 | 30 min |
+| fallo 15 | 0 | 3 | 60 min |
+| fallo 20 | 0 | 3 (techo) | 120 min |
+| cualquier éxito | 0 | 0 | olvidado |
+
+**Costo aceptado, no oculto.** El techo hace la secuencia no decreciente, no estrictamente
+creciente: sin él, duplicar sin límite llega a días de bloqueo contra un sistema de un solo
+usuario, que es peor que el propio ataque. En el techo, un adversario sostiene del orden de 22 mil
+intentos al año — es el precio de dar margen tras cada expiración en vez de re-bloquear al primer
+fallo.
 
 El límite va **en la aplicación, no en el proxy inverso**, por dos razones: no depende de la
 topología —funciona igual en desarrollo, donde no hay proxy— y **el proxy no distingue usuarios**,
