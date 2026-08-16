@@ -63,7 +63,7 @@ review boundaries.
 - [ ] 2.2 GREEN: `001_esquema_fact.sql` — `CREATE SCHEMA fact`.
 - [ ] 2.3 GREEN: `002_seguridad.sql` — `fact.Usuario` (no `INSERT`, `ClaveHash NVARCHAR(200)`, `BloqueadoHasta DATETIME2(3)`).
 - [ ] 2.4 GREEN: `003_ingesta_y_procesamiento.sql` — `Email`, `DocumentoRecibido`, `Procesamiento`, `DatosExtraidos`, `ProcesamientoError`, `ProcesamientoIntentos`.
-- [ ] 2.5 GREEN: `004_satelites_datos_maestros.sql` — `ProveedorAtributo`/`SugerenciaCuenta` keyed on `ProveedorCodigo CHAR(5)`; `MotivoAtributo` keyed on `Motivo INT`, `CuentaCodigo VARCHAR(10)`.
+- [ ] 2.5 GREEN: `004_satelites_datos_maestros.sql` — `ProveedorAtributo`/`SugerenciaCuenta` keyed on `ProveedorCodigo CHAR(6)`; `MotivoAtributo` keyed on `Motivo INT`, `CuentaCodigo VARCHAR(10)`.
 - [ ] 2.6 GREEN: `005_negocio.sql` — `Factura`, `FacturaExtraccion`, `AsientoContable`, `AsientoContableDetalle`, `CorrelativoAsiento`, `AdjuntoManual`, `AuditoriaCorreccion`.
 - [ ] 2.7 RED: index/constraint tests — `IX_Factura_Identidad` (`is_unique=0`), `UQ_Factura_Procesamiento`, `UQ_Asiento_Vigente`, `CK_Linea_Tipo` (4 accept/reject cases), `CorrelativoAsiento` PK + no `sys.identity_columns`/`sys.sequences` row.
 - [ ] 2.8 GREEN: apply filtered indexes and `CK_Linea_Tipo` inside `005_negocio.sql` to satisfy 2.7.

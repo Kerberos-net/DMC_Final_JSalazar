@@ -1,0 +1,90 @@
+1|Pago a Cuenta de Proveedores|656412
+2|Anticipos a Proveedor|4221,4321
+3|Entrega a rendir Cta.|141301,141302,1424,169103,169104
+4|Transferencia a Caja|1011,1012
+5|Transferencia a Caja chica|1013,1021,1022
+6|Transferencia entre Bancos|104
+7|Préstamos a Empleados|141101,141102
+8|Tributos Por Pagar|4011,4017,4018,403,417,167101,1674
+9|Deposito en garantia alquiler|1643
+10|Remuneraciones por pagar|4111,4113,4114,4115,4131,4151,4191
+11|Servicio custodia mercad.SS|639922
+12|Fotocopia-Impresión|639914
+13|Movilidad|631123
+14|Refrigerio al personal|625111
+15|Cumpleaños al personal|625113
+16|Parqueo o cochera|6393
+17|Tasas de contratos|644311
+18|Peaje|639915
+19|Utiles de escritorio menores|656111
+20|Utiles de Limpieza menores|656211
+21|Botiquin menores|656212
+22|Fletes traslado de mercaderia|631111
+23|Combustibles Unidades de trans|656311,656312
+24|Lubricantes Unidades Transpor|656313
+25|Repuestos Unidades Transporte|656314
+26|Devol.prestamo a relacionada|17
+27|Utilidades Socios|142301,142302,142303
+28|NO USAR|1424
+29|Comisiones ventas o gastos|142304,142305
+30|Mantenimiento localmenores|634311
+31|Prestamos a EmpresasRelacionad|17
+32|Comisión deposito de tercero|639134
+33|Envio de documentos|631211
+34|Cinta de embalajes-sucursales|656412
+35|Bolsas -sucursales|656411
+36|Liquidaciones por Cese|4114,4115,4151
+37|Deposito cta corriente(vuelto)|104
+38|Copia Literal o vigencia pode|636913
+39|Otros servicios sin sustentos|639921
+40|Legalizaciones|632211
+41|Recarga de toner|656111
+42|Recarga denextel<100|636412
+43|Servicio de cuadrilla|639917
+44|Servicio cuadrilla sin sustent|639921
+45|Servicio custodia Importación|639922
+46|Repuesto soporte tecnico <50|656511
+47|Devolución- entrega a rendir|141303, 141304
+48|Gastos de representación<100|6373
+49|Servicio Reparación equipo<50.|634314
+50|Anuncio en periodico personal|637211
+51|Muestras de mercaderia|601111
+52|Remesa en transito|103
+53|Recarga de tarjetas peruanas|169901
+54|Recarga de extintores|656614
+55|Multas fiscales|6592
+56|Reniec|636912
+57|Uniforme para el personal|625112
+58|Mantenimiento Unidades Transpo|634212,634312
+59|Tasas Judiciales y Policiales|644311
+60|Arreglo Floral|659913
+61|Pago de CTS|41
+62|Servicio de Vigilancia ss|639922
+63|Anticipo de Cliente(Devol)|122
+64|Adelanto de alquileres|1831
+65|Arbitrios Municipales|643211
+66|Devolución prestamo Socios|44
+67|Cajas Contables|656414
+68|Devol.nota de credito Cliente|121201,121202
+69|Remuneraciones por pagar vc|4111
+70|Prestamos a terceros|16
+71|Comision pago de ServiciosPubl|639130
+72|Refrigerio del personal SS|625116
+73|Pago de percepción|401131
+74|Reclamaciones a terceros|4611
+75|Compra de equipos diversos|656613
+76|Otros gastos sin sustentos|659914
+77|Periódico|659914
+78|Comisión planilla trabajadores|639131
+79|Prestamo a Socios|1422
+80|Intereses moratorios|645
+81|Movilidad-Taxi por viaje|631124
+82|Comisiones de ventas reclamaci|4611
+83|Alquileres|1423
+84|Flete traslado entre almacenes|631112
+85|Depósito de garantia  Aduanas|164401
+86|Cuentas por cobrar a terceros|1699
+87|Adelanto de sueldo|1412
+88|Devolución Comprobante CChica|169105
+89|Atención Medica|625117
+90|Mantenimiento rep muebles y eq|634313

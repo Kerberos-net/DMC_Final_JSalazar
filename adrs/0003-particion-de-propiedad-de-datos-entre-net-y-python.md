@@ -93,7 +93,7 @@ Escritas por un **sistema ajeno al proyecto**, en la misma base. Esta aplicació
 
 | Tabla | Contenido |
 |---|---|
-| `Proveedor` | Catálogo de proveedores, incluido el genérico `P0000 (Varios)` |
+| `Proveedor` | Catálogo de proveedores, incluido el genérico `P00000 (Varios)` |
 | `CuentaContable` | Plan contable de la compañía, con `ctarefleja` y `ctapuente` |
 | `Motivo` | Motivos de compra con sus prefijos de cuenta |
 | `Origen` | Orígenes de libro |
@@ -168,7 +168,7 @@ Dos consecuencias que valen más que la tabla:
   > 0006 no necesita ningún indicador de espera.
   >
   > Es la premisa que más sostenía en pie: de ella dependían el descarte de la replicación, el
-  > bloqueo de `P0000` y la reversión 3 del PRD. Merecía verificarse en vez de darse por buena.
+  > bloqueo de `P00000` y la reversión 3 del PRD. Merecía verificarse en vez de darse por buena.
 - **Añadir las columnas que faltan directamente a las tablas externas.** Evitaría los satélites. Se
   descartó porque modificar el esquema de un sistema ajeno lo acopla a este proyecto y rompe la
   regla de que nadie escribe una tabla externa.

@@ -27,11 +27,11 @@ Si el sistema funciona como se espera, el equipo cuenta con un software web úni
   - **Detalle**: al navegar un registro de la lista de asientos generados se muestra el detalle del asiento (líneas contables asociadas, en débito/crédito).
   - Las líneas del detalle se generan automáticamente mapeando cada producto del catálogo a su cuenta contable asociada (y el IGV/proveedor a sus cuentas predefinidas); el asistente contable puede ajustar manualmente la cuenta de una línea antes de confirmar el asiento.
   - El plan contable y el catálogo de productos se cargan como datos maestros iniciales en la base de datos del software; en esta versión no hay pantalla de mantenimiento (alta/edición) para ellos.
-  - El asiento generado puede editarse o anularse después de creado (ej. al corregir un proveedor P0000 por el proveedor real); toda corrección queda trazable (quién, cuándo, valor anterior vs. nuevo).
+  - El asiento generado puede editarse o anularse después de creado (ej. al corregir un proveedor P00000 por el proveedor real); toda corrección queda trazable (quién, cuándo, valor anterior vs. nuevo).
   - El asiento generado se guarda únicamente en la base de datos asignada al software; no hay integración ni migración hacia ningún sistema de gestión contable externo.
 - Manejo de moneda extranjera: se registra el monto y la moneda original de la factura; el sistema mantiene un registro diario del tipo de cambio (compra y venta); para efectos de conversión/reporte se usa el **tipo de cambio compra correspondiente a la fecha de emisión de la factura**.
 - El tipo de cambio se extrae de la web de la sbs, si no existe el tipo de cambio de la fecha de emisión del documento se registra en 0.00 y se coloca la observación que falta el registro del tipo de cambio. 
-- Si el proveedor existe, se registra con el nombre del proveedor. De no existir se elige el proveedor **P0000** (Varios). Se debe de mostrar un mensaje que falta registrar al proveedor.
+- Si el proveedor existe, se registra con el nombre del proveedor. De no existir se elige el proveedor **P00000** (Varios). Se debe de mostrar un mensaje que falta registrar al proveedor.
 - Detección de facturas duplicadas según el criterio: **ruc del proveedor + tipo de comprobante + número de comprobante**.
 - Creación automática de una carpeta en Google Drive por factura validada, con la factura y los medios probatorios correspondientes.
 - Manejo de fallas de conexión con Gmail/Drive: reintento automático hasta 3 veces antes de marcar la operación como error.
@@ -65,7 +65,7 @@ Si el sistema funciona como se espera, el equipo cuenta con un software web úni
 
 - Correo de factura que llega sin OC o sin medios probatorios adjuntos.
 - El OCR/IA no logra extraer uno o más campos clave: la factura queda en "Pendiente de validación" con esos campos vacíos, resaltados para carga manual.
-- El proveedor de la factura no existe en el sistema: se registra con el proveedor genérico **P0000 (Varios)** y se muestra un mensaje indicando que falta registrar al proveedor real.
+- El proveedor de la factura no existe en el sistema: se registra con el proveedor genérico **P00000 (Varios)** y se muestra un mensaje indicando que falta registrar al proveedor real.
 - Factura duplicada (mismo ruc + tipo de comprobante + número ya registrados): el sistema debe alertar y bloquear el registro antes de continuar.
 - Adjunto corrupto, protegido con contraseña, o en un formato no soportado.
 - Falla de conexión con la API de Gmail o de Google Drive: el sistema reintenta hasta 3 veces antes de marcar error y notificar.
@@ -74,7 +74,7 @@ Si el sistema funciona como se espera, el equipo cuenta con un software web úni
 - Correo mal etiquetado, en spam, o que no corresponde a una factura de compra real (falso positivo de detección).
 - Un mismo correo con múltiples facturas adjuntas.
 - Corrección manual de un dato mal extraído por el asistente contable, que debe quedar trazable (quién corrigió, cuándo, valor original vs. valor corregido).
-- El asiento contable se genera con el proveedor genérico **P0000 (Varios)** por no detección automática; al corregir el proveedor después, el asiento ya generado debe editarse y el cambio quedar trazable (quién, cuándo, valor anterior vs. nuevo).
+- El asiento contable se genera con el proveedor genérico **P00000 (Varios)** por no detección automática; al corregir el proveedor después, el asiento ya generado debe editarse y el cambio quedar trazable (quién, cuándo, valor anterior vs. nuevo).
 - Inconsistencia entre cabecera y detalle del asiento generado (ej. base imponible + IGV no cuadra con el neto) que deba quedar señalada antes de dar el asiento por consistente.
 - Un producto de la factura no existe en el catálogo (o no tiene cuenta contable mapeada): la línea de detalle queda sin cuenta asignada, pendiente de que el asistente contable la complete manualmente antes de confirmar el asiento.
 - Corrección manual de la cuenta contable de una línea del detalle (ajuste sobre el mapeo automático) o anulación de un asiento ya generado, ambas trazables.
@@ -95,7 +95,7 @@ Si el sistema funciona como se espera, el equipo cuenta con un software web úni
 - Confirmado: para moneda extranjera se registra el monto original y se usa el tipo de cambio compra de la fecha de emisión, extraído automáticamente de la web de la SBS.
 - Confirmado: duplicados se detectan por ruc proveedor + tipo de comprobante + número.
 - Confirmado: ante fallas de conexión con Gmail/Drive, se reintenta automáticamente 3 veces antes de notificar.
-- Confirmado: si un proveedor no existe en el sistema, se usa el proveedor genérico P0000 (Varios) y se alerta que falta registrarlo.
+- Confirmado: si un proveedor no existe en el sistema, se usa el proveedor genérico P00000 (Varios) y se alerta que falta registrarlo.
 - Confirmado: meta de precisión de la extracción OCR/IA es ≥90% de campos correctos.
 - Confirmado: si falla el envío por Telegram, el sistema envía la alerta por correo electrónico como respaldo.
 - Confirmado: acceso a Gmail API, Google Drive API y cuenta de Google Workspace compatible con Looker Studio ya está disponible.
@@ -124,7 +124,7 @@ distinguir un cambio deliberado de un error de transcripción.
 |---|---|---|---|
 | 1 | Tipo de cambio **compra** de la fecha de emisión | Tipo de cambio **venta** | [ADR 0018](adrs/0018-tipo-de-cambio-aplicable.md) |
 | 2 | Sin tipo de cambio del día se registra **0.00** con observación | La factura **no se abre para edición**; `409`. La salida es la carga manual | [ADR 0018](adrs/0018-tipo-de-cambio-aplicable.md) |
-| 3 | El asiento **se genera** con `P0000 (Varios)` y se corrige después | `409` al validar. El proveedor se registra en el sistema externo antes | [ADR 0006](adrs/0006-asiento-contable-como-entidad-propia.md) |
+| 3 | El asiento **se genera** con `P00000 (Varios)` y se corrige después | `409` al validar. El proveedor se registra en el sistema externo antes | [ADR 0006](adrs/0006-asiento-contable-como-entidad-propia.md) |
 | 4 | Detalle generado **mapeando cada producto** del catálogo a su cuenta | El **motivo de compra** determina la cuenta. `FacturaDetalle` y `Producto` eliminados | [ADR 0011](adrs/0011-motivo-de-compra-y-sugerencia-de-cuenta.md) |
 | 5 | Reintento **3 veces** para todo fallo | Tres clases de error con política propia, más una clase terminal | [ADR 0010](adrs/0010-politica-de-reintentos-y-clasificacion-de-errores.md) |
 

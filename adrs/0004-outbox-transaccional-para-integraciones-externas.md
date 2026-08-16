@@ -128,7 +128,7 @@ cuyo propósito explícito es cambiarla —corregir el número de un duplicado�
 `FACTURA_CORREGIDA` existe para propagar ese cambio. Con la identidad como clave, corregir el número
 de una factura ya sincronizada produce un *upsert* que no encuentra la fila anterior e **inserta una
 nueva**: Looker Studio contaría el gasto dos veces, de forma permanente y silenciosa. Corregir el
-proveedor `P0000` cambia el RUC, con el mismo efecto.
+proveedor `P00000` cambia el RUC, con el mismo efecto.
 
 El nombre de la carpeta de Drive **puede** incluir el número de comprobante, porque lo leen personas.
 Lo que no puede es ser el criterio de búsqueda.

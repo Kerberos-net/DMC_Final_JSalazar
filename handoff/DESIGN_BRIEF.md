@@ -35,7 +35,7 @@ La pantalla central del producto — aquí se pasa la mayor parte del tiempo.
 - Campos editables: tipo de comprobante (01 Factura / 03 Boleta / 07 Nota de Crédito), número, proveedor, monto, moneda, fecha de emisión, tipo de cambio compra aplicado.
 - Campos que el OCR/IA no logró extraer: resaltados visualmente (no solo vacíos) para forzar la atención del usuario.
 - Indicador de tipo de cambio: si se tomó automáticamente de la SBS, mostrarlo con su fecha; si no había dato disponible, mostrar 0.00 con la observación de que falta el registro.
-- Indicador de proveedor: si el proveedor no existe, mostrar que se asignó **P0000 (Varios)** con un aviso explícito para corregirlo más adelante.
+- Indicador de proveedor: si el proveedor no existe, mostrar que se asignó **P00000 (Varios)** con un aviso explícito para corregirlo más adelante.
 - Indicador de posible duplicado (mismo RUC + tipo de comprobante + número): alerta visible antes de permitir validar.
 - Adjuntos secundarios visibles y accesibles: orden de compra, medios probatorios.
 - Historial de corrección trazable: qué campo se corrigió, valor original vs. corregido, cuándo (puede ser un detalle secundario, tipo tooltip o panel expandible, no protagonismo visual).

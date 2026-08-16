@@ -69,7 +69,7 @@ Los mantiene el **sistema contable de la compañía**. Esta aplicación **solo l
 |---|---|
 | `CuentaContable` | 1650 cuentas. **Solo las de 6 dígitos son imputables** (907). Los niveles 2 a 5 son jerarquía. |
 | `Motivo` | 90 motivos, cada uno con uno o varios **prefijos** de cuenta separados por coma |
-| `Proveedor` | Incluye el genérico `P0000 (Varios)` |
+| `Proveedor` | Incluye el genérico `P00000 (Varios)` |
 | `Origen` | 13 orígenes de libro |
 
 Los atributos que este proyecto necesita y el catálogo no aporta viven en **tablas satélite**:
@@ -157,7 +157,7 @@ Siempre bajo `4212` / `4312` **EMITIDAS**. Las subcuentas `4211` / `4311` **NO E
 provisiones sin comprobante, y este sistema parte siempre de un comprobante recibido.
 
 `EsRelacionada` es un atributo **estable del proveedor**, no una decisión por factura.
-`P0000 (Varios)` es siempre **tercero**.
+`P00000 (Varios)` es siempre **tercero**.
 
 ---
 
@@ -380,7 +380,7 @@ Un asiento **no puede pasar a `CONFIRMADO`** si falla cualquiera de estas.
 1. `SUM(Debe) = SUM(Haber)` sobre el asiento completo, ambos bloques.
 2. Ninguna línea sin cuenta contable asignada.
 3. `FechaContable` no anterior a `Configuracion.FechaCorteContable`.
-4. El proveedor no es `P0000 (Varios)`.
+4. El proveedor no es `P00000 (Varios)`.
 5. `Tipo = 'D'` exige `Debe > 0` y `Haber = 0`; `Tipo = 'H'`, lo contrario.
 
 ### Del bloque PRINCIPAL
@@ -442,7 +442,7 @@ El sistema rechaza la validación con `409` en estos casos. Cada uno tiene salid
 | Duplicado `(RUC, tipo, número)` sin resolver | Corregir el número, o **descartar** la factura |
 | Comprobante emitido en **domingo** | Corregir la fecha, o descartar |
 | Factura en moneda extranjera sin tipo de cambio | Cargar el tipo de cambio |
-| Proveedor `P0000 (Varios)` | Registrarlo en el sistema externo y seleccionarlo |
+| Proveedor `P00000 (Varios)` | Registrarlo en el sistema externo y seleccionarlo |
 | `FechaContable` anterior a la fecha de corte | Ajustar la fecha contable |
 | Nota de crédito con **referencia interna** sin factura válida | Resolver primero la factura original |
 | Factura con líneas gravadas y no gravadas mezcladas | Fuera de alcance: registrar por otra vía |

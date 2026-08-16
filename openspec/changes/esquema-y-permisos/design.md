@@ -422,13 +422,13 @@ worker. This change delivers only step 1; steps 2 and 3 have no artifact yet.
 
       | External table | Key |
       |---|---|
-      | `dbo.Proveedor` | **`CHAR(5)`** — `P0000` is literally the key |
+      | `dbo.Proveedor` | **`CHAR(6)`** — `P00000` is literally the key |
       | `dbo.CuentaContable` | **account code, variable-length text** |
       | `dbo.Motivo` | **`INT`** |
       | `dbo.Origen` | **`CHAR(2)`** — matches what `CorrelativoAsiento` already assumed |
 
       Consequences for `004` and beyond: `ProveedorAtributo`, `SugerenciaCuenta` and the supplier
-      reference on `Factura` key on **`ProveedorCodigo CHAR(5)`**, not a `BIGINT` id. The design's
+      reference on `Factura` key on **`ProveedorCodigo CHAR(6)`**, not a `BIGINT` id. The design's
       own choice of `VARCHAR` (not `CHAR`) for `CuentaCodigo` is confirmed as load-bearing: fixed
       length would pad the 2-to-6-digit prefixes and break `LIKE prefix + '%'`.
 - [x] **RESOLVED — `MOTIVOS-CLASIFICACION.md` contradicted itself on the count.** The prose said 22

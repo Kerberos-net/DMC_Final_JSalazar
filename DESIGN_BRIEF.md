@@ -25,7 +25,7 @@ Es una herramienta de trabajo diario, no un producto de cara al público: priori
 Vista por defecto al ingresar. Debe responder "¿qué necesito atender hoy?".
 - Lista o tabla de facturas con columnas: proveedor, tipo de comprobante, número, monto, moneda, fecha de emisión, estado.
 - Estados a distinguir visualmente (chip o etiqueta de color, no solo texto): **Pendiente de validación**, **Validada**, **Descartada**.
-- El chip de **atención** se **deriva** de los indicadores de la factura, no es un estado propio. Seis indicadores lo encienden: proveedor genérico `P0000`, posible duplicado, campos no extraídos, fecha en domingo, **afectación no verificada** (el comprobante llegó solo en PDF y no se pudo comprobar si mezcla líneas gravadas y no gravadas) y **referencia externa** (nota de crédito contra una factura anterior al sistema).
+- El chip de **atención** se **deriva** de los indicadores de la factura, no es un estado propio. Seis indicadores lo encienden: proveedor genérico `P00000`, posible duplicado, campos no extraídos, fecha en domingo, **afectación no verificada** (el comprobante llegó solo en PDF y no se pudo comprobar si mezcla líneas gravadas y no gravadas) y **referencia externa** (nota de crédito contra una factura anterior al sistema).
 - Las **incidencias de procesamiento** —documentos que fallaron antes de llegar a ser factura— aparecen en la misma bandeja pero no son facturas y no tienen estado de factura. La bandeja es una vista combinada que entrega el servidor ya resuelta.
 - Filtros mínimos: por estado, por rango de fechas, por proveedor.
 - Contador o resumen rápido: cuántas pendientes, cuántas con error/alerta.
@@ -37,7 +37,7 @@ La pantalla central del producto — aquí se pasa la mayor parte del tiempo.
 - Campos editables: tipo de comprobante (01 Factura / 03 Boleta / 07 Nota de Crédito), número, proveedor, monto, moneda, fecha de emisión, tipo de cambio **venta** aplicado.
 - Campos que el OCR/IA no logró extraer: resaltados visualmente (no solo vacíos) para forzar la atención del usuario.
 - Indicador de tipo de cambio: se toma de la SBS y se muestra con su fecha. **Si no hay dato disponible, la factura en moneda extranjera no se abre para edición**: la pantalla ofrece cargar el tipo de cambio a mano, y al hacerlo el trabajo se desbloquea al instante. No existe el registro con 0.00.
-- Indicador de proveedor: si el proveedor no existe, mostrar que se asignó **P0000 (Varios)** con un aviso explícito. **No se puede validar con `P0000`**: el asistente lo registra en el sistema externo y vuelve a seleccionarlo. No hay alta de proveedores desde esta aplicación.
+- Indicador de proveedor: si el proveedor no existe, mostrar que se asignó **P00000 (Varios)** con un aviso explícito. **No se puede validar con `P00000`**: el asistente lo registra en el sistema externo y vuelve a seleccionarlo. No hay alta de proveedores desde esta aplicación.
 - Indicador de **afectación no verificada**: sobre un comprobante sin XML, el asistente debe confirmar explícitamente la afectación antes de poder validar.
 - En una **nota de crédito**, la referencia al comprobante rectificado puede ser interna —se selecciona la factura— o **externa**, cuando es anterior al sistema: en ese caso se capturan serie, número y fecha, y el asistente elige motivo y cuenta, porque no hay de quién heredarlos.
 - **Conflicto de edición:** si el registro cambió mientras estaba abierto, la pantalla lo distingue de un error de validación. Son dos mensajes distintos: *"alguien más lo cambió, recarga"* frente a *"este dato viola una regla"*.

@@ -148,7 +148,7 @@ significa *"tu dato viola una regla"*; el segundo, *"alguien más lo cambió, re
 | Duplicado sin resolver | Corregir el número, o descartar la factura |
 | Comprobante emitido en **domingo** (`01`, `03` y `07`) | Corregir la fecha, o descartar |
 | Factura en moneda extranjera **sin tipo de cambio** | Cargarlo con `POST /api/tipos-cambio` |
-| Proveedor `P0000 (Varios)` sin resolver | Registrarlo en el sistema externo y seleccionarlo |
+| Proveedor `P00000 (Varios)` sin resolver | Registrarlo en el sistema externo y seleccionarlo |
 | `FechaContable` anterior a la **fecha de corte** | Ajustar la fecha contable |
 | Nota de crédito con referencia **interna** cuya factura no existe, no está validada, está descartada o tiene el asiento **vigente** anulado | Resolver primero la factura original |
 | Asiento ya confirmado | Reabrirlo con motivo |

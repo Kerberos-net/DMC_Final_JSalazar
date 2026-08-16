@@ -256,7 +256,7 @@ CONSTRAINT CK_Linea_Tipo CHECK (
 1. `SUM(Debe) = SUM(Haber)` sobre todo el asiento.
 2. Ninguna línea sin cuenta contable.
 3. `FechaContable` **no anterior** a `Configuracion.FechaCorteContable`.
-4. El proveedor **no es** `P0000 (Varios)`.
+4. El proveedor **no es** `P00000 (Varios)`.
 
 **Del bloque `PRINCIPAL`** — dependen del tipo de comprobante:
 
@@ -419,11 +419,11 @@ no existe, sigue en `PENDIENTE_VALIDACION`, está `DESCARTADA`, o **su asiento v
 - **Costo:** cuatro columnas de texto congeladas por asiento y línea. El precio es de esquema, no de
   rendimiento, y a cambio el asiento deja de depender de un catálogo que otro sistema puede cambiar
   mañana.
-- **Premisa verificada:** la invariante global 4 —el proveedor no es `P0000`— se apoya en que el
+- **Premisa verificada:** la invariante global 4 —el proveedor no es `P00000`— se apoya en que el
   asistente puede dar de alta un proveedor en el sistema contable **de inmediato**. Confirmado (ADR
   0003). El bloqueo con `409` no deja la factura esperando: el asistente sale, registra al proveedor,
   vuelve y lo selecciona.
-- **Reversión al PRD, declarada:** el PRD pide que el asiento **se genere** con `P0000` y se corrija
+- **Reversión al PRD, declarada:** el PRD pide que el asiento **se genere** con `P00000` y se corrija
   después. Este ADR lo invierte, con el fundamento de que `421211` es una cuenta por pagar por
   proveedor y un saldo contra "Varios" no se puede conciliar ni pagar. Consta en la tabla de
   reversiones del PRD.

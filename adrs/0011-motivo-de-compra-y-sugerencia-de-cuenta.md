@@ -71,7 +71,7 @@ referencian y esa referencia debe seguir resolviendo.
 
 ```sql
 CREATE TABLE SugerenciaCuenta (
-    ProveedorCodigo CHAR(5)   NOT NULL,   -- 'P0000' — el catálogo externo se identifica por código
+    ProveedorCodigo CHAR(6)   NOT NULL,   -- 'P00000' — el catálogo externo se identifica por código
     MotivoId      INT         NOT NULL,
     CuentaCodigo  VARCHAR(10) NOT NULL,
     Veces         INT         NOT NULL DEFAULT 0,
@@ -83,7 +83,7 @@ CREATE TABLE SugerenciaCuenta (
 > **Corrección (ciclo `esquema-y-permisos`).** La revisión 3 de este ADR escribía
 > `ProveedorId BIGINT` y `MotivoId BIGINT`, dando por hecho que los catálogos externos usan
 > identificadores subrogados. **No es así.** `dbo.Proveedor` se identifica por un **código de cinco
-> caracteres** —`P0000` es literalmente la clave, no una etiqueta—, `dbo.Motivo` por un **entero**,
+> caracteres** —`P00000` es literalmente la clave, no una etiqueta—, `dbo.Motivo` por un **entero**,
 > `dbo.CuentaContable` por el **código de cuenta como texto de longitud variable** y `dbo.Origen`
 > por un **código de dos caracteres**.
 >

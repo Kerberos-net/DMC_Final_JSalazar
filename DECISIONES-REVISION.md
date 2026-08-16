@@ -1538,7 +1538,7 @@ facturas siguen pendientes de pago, y saber cuándo cierra el periodo.
 El plan de cuentas tiene la estructura **espejo completa** bajo `43`, confirmada contra el dato
 real. Todo se resuelve de forma automática: el asistente no decide nada nuevo.
 
-**`P0000 (Varios)` es siempre tercero.** Una parte relacionada nunca sería un proveedor sin
+**`P00000 (Varios)` es siempre tercero.** Una parte relacionada nunca sería un proveedor sin
 identificar.
 
 ### Por qué es atributo del proveedor y no de la factura
@@ -1585,7 +1585,7 @@ cerró qué y cuándo. La fecha de corte solo avanza.
 
 ## C3 — Asiento contra el proveedor genérico · CERRADO
 
-**No se puede validar una factura con `P0000 (Varios)`.** Se rechaza con `409`.
+**No se puede validar una factura con `P00000 (Varios)`.** Se rechaza con `409`.
 
 ### El alta de proveedores NO entra en el alcance
 
@@ -1669,12 +1669,12 @@ Los prefijos de cuenta llegan como una **lista separada por comas** dentro del p
 motivos. `MotivoCuenta` no es una tabla externa aparte: es la **interpretación** que esta aplicación
 hace de ese campo, resolviendo cada prefijo contra las 907 hojas de 6 dígitos del plan.
 
-### Por qué se rechaza P0000
+### Por qué se rechaza P00000
 
 `421211` es una cuenta por pagar **por proveedor**. Un saldo acumulado contra "Varios" no se puede
 conciliar ni pagar: no se sabe a quién se le debe.
 
-`P0000` conserva su papel como **marcador temporal** de la factura recién promovida, que el
+`P00000` conserva su papel como **marcador temporal** de la factura recién promovida, que el
 asistente debe resolver antes de validar.
 
 ---
@@ -2114,7 +2114,7 @@ explícito es cambiarla, más el evento `FACTURA_CORREGIDA` para propagar el cam
 
 Consecuencia: corregir el número de una factura ya sincronizada hace que el *upsert* no encuentre la
 fila anterior e **inserte una nueva**. La vieja permanece. Looker Studio cuenta el gasto dos veces,
-de forma permanente y silenciosa. Corregir el proveedor `P0000` cambia el RUC, con el mismo efecto.
+de forma permanente y silenciosa. Corregir el proveedor `P00000` cambia el RUC, con el mismo efecto.
 
 ### La decisión
 
@@ -2178,7 +2178,7 @@ porque son la misma familia:
 3. La **fecha** cuyo tipo de cambio se aplica: la de emisión del comprobante, y su congelamiento al
    confirmar.
 
-El bloqueo de `P0000` **no entra en 0018**: pertenece a ADR 0006, donde ya está como invariante
+El bloqueo de `P00000` **no entra en 0018**: pertenece a ADR 0006, donde ya está como invariante
 global 4. Lo que falta ahí es declarar explícitamente que revierte al PRD, no la decisión.
 
 Y en `PRD.md`, una sección nueva:
@@ -2187,7 +2187,7 @@ Y en `PRD.md`, una sección nueva:
 |---|---|---|---|
 | 1 | Tipo de cambio **compra** de la fecha de emisión | Tipo de cambio **venta** | ADR 0018 |
 | 2 | Sin TC del día se registra **0.00** con observación | La factura no se abre para edición; `409` | ADR 0018 |
-| 3 | Asiento con `P0000`, corregido después | `409` al validar | ADR 0006 |
+| 3 | Asiento con `P00000`, corregido después | `409` al validar | ADR 0006 |
 | 4 | Detalle mapeando cada producto del catálogo | El **motivo** determina la cuenta | ADR 0011 |
 | 5 | Reintento **3 veces** para todo fallo | Tres clases de error | ADR 0010 |
 
@@ -2210,7 +2210,7 @@ artefacto que un contador o un auditor puede leer en un minuto.
 ### Hallazgos afectados
 
 R2-C6 cerrado. Crea `adrs/0018-tipo-de-cambio-aplicable.md`, toca `PRD.md` (sección nueva) y ADR
-0006 (declarar la reversión de `P0000`).
+0006 (declarar la reversión de `P00000`).
 
 ---
 
@@ -3182,7 +3182,7 @@ pregunta del derecho a DDL en una mucho más fácil de conceder.
 
 ## R2-A15 — La premisa del alta inmediata de proveedores · CERRADO
 
-**El problema.** El bloqueo de `P0000` está decidido y bien razonado: `421211` es una cuenta por pagar
+**El problema.** El bloqueo de `P00000` está decidido y bien razonado: `421211` es una cuenta por pagar
 **por proveedor**, y un saldo acumulado contra "Varios" no se puede conciliar ni pagar porque no se
 sabe a quién se le debe. Eso no se discute.
 
@@ -3210,7 +3210,7 @@ contingencia.
 *Si la premisa 5 resulta falsa*, el diseño no cambia de criterio pero sí gana dos piezas:
 
 - Un indicador **"esperando alta de proveedor"** en la factura, distinto del genérico de proveedor
-  `P0000`, para que esas facturas se puedan ver y contar aparte.
+  `P00000`, para que esas facturas se puedan ver y contar aparte.
 - Un **criterio de aceptación para la espera** —cuánto tiempo es tolerable— que hoy no existe en
   ninguna parte, y sin el cual nadie sabe si el sistema está funcionando mal o la compañía está
   tardando.
@@ -3523,7 +3523,7 @@ esquema `fact` y aplicar DDL sin intermediarios. Y el asistente contable sí tie
 proveedores en el sistema contable, con efecto inmediato: sale, lo registra, vuelve y lo encuentra.
 
 La premisa 5 era la que más sostenía en pie. De ella dependían **tres decisiones distintas**: el
-descarte de replicar los datos maestros (ADR 0003), el bloqueo de `P0000` al validar (ADR 0006) y la
+descarte de replicar los datos maestros (ADR 0003), el bloqueo de `P00000` al validar (ADR 0006) y la
 reversión 3 del PRD. Las tres quedan firmes.
 
 **Premisas 1 a 3 — no aplican al entorno actual.** El proyecto es una demostración académica sin

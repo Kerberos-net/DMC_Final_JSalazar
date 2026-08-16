@@ -178,9 +178,9 @@ el proveedor genérico por el real.
 
 ## C3. Asiento contra el proveedor genérico
 
-Cuando el sistema no identifica al proveedor, asigna `P0000 (Varios)`.
+Cuando el sistema no identifica al proveedor, asigna `P00000 (Varios)`.
 
-- ¿Es admisible **confirmar un asiento** contra `P0000`?
+- ¿Es admisible **confirmar un asiento** contra `P00000`?
 - ¿O el asiento debe quedar retenido hasta identificar al proveedor real?
 
 > **Qué cambia:** el PRD asume lo primero, pero es una decisión contable, no de producto. Si la

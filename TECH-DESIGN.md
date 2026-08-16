@@ -157,12 +157,12 @@ aplicación tiene **`SELECT` únicamente**.
 
 | Tabla | Contenido | Se identifica por |
 |---|---|---|
-| `Proveedor` | Catálogo de proveedores, incluido `P0000 (Varios)` | **Código de 5 caracteres** |
+| `Proveedor` | Catálogo de proveedores, incluido `P00000 (Varios)` | **Código de 6 caracteres** |
 | `CuentaContable` | Plan contable: 1650 cuentas, 907 imputables de 6 dígitos, con `ctarefleja` y `ctapuente` | **Código de cuenta, texto de longitud variable** |
 | `Motivo` | 90 motivos de compra con sus prefijos de cuenta | **Entero** |
 | `Origen` | 13 orígenes de libro | **Código de 2 caracteres** |
 
-Las cuatro claves son **códigos de negocio, no identificadores subrogados**. `P0000` es literalmente
+Las cuatro claves son **códigos de negocio, no identificadores subrogados**. `P00000` es literalmente
 la clave del proveedor genérico, no una etiqueta sobre un `BIGINT`. Toda tabla satélite y toda
 referencia desde el dominio se une por esos códigos.
 
@@ -202,7 +202,7 @@ verificaron todos, y **ninguno bloquea ya**:
 | 5 | El asistente da de alta proveedores, y es inmediato | **Confirmado.** Sale, lo registra, vuelve y lo encuentra |
 
 Las premisas **4 y 5 quedan cerradas** y con ellas la partición de ADR 0003, su matriz de permisos,
-el bloqueo de `P0000` y el descarte de replicar los datos maestros. La 5 era la que más sostenía: de
+el bloqueo de `P00000` y el descarte de replicar los datos maestros. La 5 era la que más sostenía: de
 ella dependían tres decisiones distintas.
 
 Las premisas **1 a 3 no aplican al entorno actual**, que es una demostración académica sin
@@ -502,7 +502,7 @@ prefijos del catálogo externo, resolviéndolos contra las 907 hojas de 6 dígit
 - [ ] Insertar una factura con `(RUC, tipo, número)` ya existente **sí se permite**: queda en
       `PENDIENTE_VALIDACION` con el indicador de posible duplicado. El rechazo ocurre al validar.
 - [ ] Una segunda factura con el **número no extraído** se promueve sin chocar con la primera.
-- [ ] Si el proveedor no existe, la factura se crea con `P0000` y el indicador correspondiente.
+- [ ] Si el proveedor no existe, la factura se crea con `P00000` y el indicador correspondiente.
 - [ ] Al promover se persiste `FacturaExtraccion` con el valor y la **fuente de cada campo**.
 - [ ] Python **nunca** escribe ni lee `Factura`. Con la matriz de permisos, no puede aunque lo
       intente.
@@ -530,7 +530,7 @@ prefijos del catálogo externo, resolviéndolos contra las 907 hojas de 6 dígit
       distingue del `409`: uno significa "viola una regla", el otro "alguien más lo cambió".
 - [ ] Validar una factura emitida en **domingo** es rechazado con `409`, para los tipos `01`, `03`
       **y** `07`. Los sábados se permiten.
-- [ ] Validar con proveedor `P0000 (Varios)` es rechazado con `409`. El asistente registra al
+- [ ] Validar con proveedor `P00000 (Varios)` es rechazado con `409`. El asistente registra al
       proveedor **en el sistema externo** y vuelve a seleccionarlo; **no existe alta desde esta
       aplicación**.
 - [ ] Validar con `FechaContable` anterior a `Configuracion.FechaCorteContable` es rechazado con
