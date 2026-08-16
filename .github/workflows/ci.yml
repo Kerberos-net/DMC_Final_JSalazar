@@ -1,0 +1,89 @@
+# Two jobs on purpose.
+#
+# `verificaciones-estaticas` needs no database, so it answers in seconds and can never be skipped
+# for infrastructure reasons. It carries the two guardians this project cannot lose: the `dbo`
+# write lint (ADR 0003's strongest invariant -- nobody writes an external table) and the checksum
+# manifest (DbUp records a script NAME and never re-reads its content, so an edited applied script
+# drifts from the database in silence).
+#
+# `pruebas-de-base-de-datos` raises a real SQL Server and runs the whole suite, including the
+# permission matrix under EXECUTE AS. That is the job that actually proves the schema and the
+# GRANT/DENY matrix, and it is why the fast job is not enough on its own.
+
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+  TESTS: SmartNet/db/runner/SmartNet.Db.Runner.Tests
+
+jobs:
+  verificaciones-estaticas:
+    name: Lint dbo y manifiesto de checksums
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restaurar y compilar
+        run: dotnet build ${{ env.TESTS }} --configuration Release
+
+      # These two suites read files only -- no database, no service container.
+      - name: Lint de escritura sobre dbo y verificacion del manifiesto
+        run: >
+          dotnet test ${{ env.TESTS }}
+          --configuration Release --no-build --logger "console;verbosity=normal"
+          --filter "FullyQualifiedName~DboWriteLintTests|FullyQualifiedName~ChecksumManifestTests"
+
+  pruebas-de-base-de-datos:
+    name: Suite completa contra SQL Server
+    runs-on: ubuntu-latest
+
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: 'Y'
+          # Throwaway CI credential for an ephemeral container that is destroyed with the job.
+          # It is not a secret: it guards nothing, reaches no real data, and is never reused.
+          # No real credential belongs in this file -- the repository is public.
+          MSSQL_SA_PASSWORD: 'CiSoloEfimero_2026!'
+          MSSQL_PID: Developer
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'CiSoloEfimero_2026!' -Q 'SELECT 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+          --health-start-period 30s
+
+    env:
+      # The harness reads this; it falls back to local Integrated Security when unset.
+      SMARTNET_TEST_MASTER_CONNECTION: 'Server=localhost,1433;Database=master;User Id=sa;Password=CiSoloEfimero_2026!;TrustServerCertificate=True;Encrypt=False'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Restaurar y compilar
+        run: dotnet build ${{ env.TESTS }} --configuration Release
+
+      # Every test creates its own throwaway `fact_test_<guid>` database and drops it. Nothing
+      # here touches a shared or persistent database -- the container itself is discarded.
+      - name: Suite completa
+        run: >
+          dotnet test ${{ env.TESTS }}
+          --configuration Release --no-build --logger "console;verbosity=normal"

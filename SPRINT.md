@@ -13,7 +13,7 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 |---|---|
 | Ítems del backlog | 1 de 17 en curso, 0 cerrados |
 | Ciclo SDD activo | `openspec/changes/esquema-y-permisos/` |
-| Última fase cerrada | Ítem #1, fase 4 — datos base (la 5 va 4/5: falta cablear CI) |
+| Última fase cerrada | Ítem #1, fase 5 — checksums, rollback y CI |
 
 ---
 
@@ -22,7 +22,7 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 SQL versionado, esquema `fact`, tablas, índices, restricciones y los `GRANT` de los dos usuarios
 de base de datos. Sin dependencias.
 
-**Ciclo SDD:** `openspec/changes/esquema-y-permisos/` · **33 de 36 tareas cerradas**
+**Ciclo SDD:** `openspec/changes/esquema-y-permisos/` · **34 de 36 tareas cerradas**
 
 | Fase | Unidad | Alcance | Tareas | Estado |
 |---|---|---|---|---|
@@ -30,7 +30,7 @@ de base de datos. Sin dependencias.
 | 2 | 2 | Estructura del esquema `001`–`007` + pruebas de forma | 13/13 | ✅ |
 | 3 | 3 | Matriz de permisos `008` + pruebas nivel 2 de ADR 0019 | 4/4 | ✅ |
 | 4 | 4 | Datos base `009`–`010` (`EstadoIntegracion`, `Configuracion`, 23 `MotivoAtributo`) | 7/7 | ✅ |
-| 5 | 5 | Manifiesto de *checksums* + scripts de *rollback* consultivos | 4/5 | 🔄 |
+| 5 | 5 | Manifiesto de *checksums* + *rollback* consultivo + CI | 5/5 | ✅ |
 | 6 | 5 | Integración: suite completa end-to-end sobre base nueva | 0/2 | ⬜ |
 
 ### Lo verificado al cerrar cada fase
@@ -83,7 +83,7 @@ dentro del literal. Queda anotado en el código qué sí evade el lint —un nom
 concatenado— y por qué eso es residuo aceptable.
 
 
-**Fase 5 — 4 de 5.** 102/102 pruebas en verde, verificadas ejecutándolas yo. El manifiesto
+**Fase 5** — 102/102 pruebas en verde, verificadas ejecutándolas yo. El manifiesto
 `checksums.txt` existe porque **DbUp no tiene *checksums***: anota el nombre del script en
 `fact.SchemaVersions` y nunca vuelve a mirar su contenido, así que editar un script ya aplicado no
 falla en ningún sitio y la base y el repositorio divergen en silencio. Comprobé que muerde:
@@ -99,8 +99,10 @@ Al verificar encontré que el lint de `dbo` enumeraba `schema/` sin recursión, 
 ejecutarlos a mano contra una base real: es justo donde una escritura a `dbo` inadvertida haría
 daño. Lo pasé a recursivo y añadí la aserción de que `rollback/` esté incluido.
 
-Queda **la tarea 5.3**: cablear la canalización de CI de dos trabajos que el usuario eligió. Las
-comprobaciones ya son un comando cada una; falta solo el envoltorio.
+**La CI quedó cableada** en `.github/workflows/ci.yml`, con los dos trabajos elegidos. El rápido
+corre el lint y el manifiesto **sin base de datos** — comprobado, no supuesto: el mismo filtro
+apuntando a un host de SQL inexistente pasa 16 pruebas en 243 ms. El otro levanta SQL Server 2022
+como contenedor de servicio y corre la suite entera, matriz de permisos incluida.
 ### Deuda declarada, no olvidada
 
 - ~~**Tarea 1.5** — la aserción literal de idempotencia de `008`~~ **saldada en la fase 3**, y mejor

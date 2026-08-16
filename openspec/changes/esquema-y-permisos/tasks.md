@@ -281,13 +281,14 @@ attach to.
     unlisted is a **warning**. Probe-verified by the coordinator: appending one comment line to
     `007_publicacion.sql` turns `RealManifest_MatchesTheRealScripts_Exactly` red. That is precisely
     the drift DbUp ignores.
-- [ ] 5.3 GREEN: add the CI re-hash step.
-  - Deliberately not done in this unit: the repository had **no CI pipeline at all** — no
-    `.github/`, no workflow. Creating one publishes automation to a public GitHub repository, which
-    is the user's call, not the agent's. The user has since chosen a **two-job workflow** (a
-    database-free job for build + `dbo` lint + checksum verification, and a job running the full
-    suite against SQL Server as a service container). Every check here is already a single command,
-    so the remaining work is wiring only.
+- [x] 5.3 GREEN: add the CI re-hash step.
+  - `.github/workflows/ci.yml`, two jobs, per the user's decision. `verificaciones-estaticas` runs
+    the `dbo` lint and the checksum manifest with **no database at all** — proved, not assumed: the
+    same filter run locally against a nonexistent SQL host passes 16 tests in 243 ms.
+    `pruebas-de-base-de-datos` raises SQL Server 2022 as a service container and runs the whole
+    suite, including the `EXECUTE AS` permission matrix. The SA password in the file is a throwaway
+    credential for an ephemeral container destroyed with the job; it guards nothing and reaches no
+    real data. No real credential belongs in this repository — the remote is public.
 - [x] 5.4 GREEN: author `SmartNet/db/schema/rollback/NNN_down.sql` per script (advisory, never executed by the runner).
   - Ten down scripts, one per forward script. Compensating migrations scoped to `fact`, never a
     snapshot restore: the database is shared with the company's accounting system, so restoring a
