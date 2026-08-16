@@ -1,0 +1,101 @@
+# Sprint: estado de avance
+
+Tablero de seguimiento del `BACKLOG.md`. Un ítem por sección, y dentro de cada uno **sus fases**,
+que se marcan conforme se cierran.
+
+**Regla de marcado:** una fase pasa a ✅ solo cuando *todas* sus tareas están cerradas en
+`tasks.md` **y** la verificación independiente pasó. No se marca por reporte del agente que la
+implementó: se marca por evidencia ejecutada.
+
+Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
+
+| Estado global | Valor |
+|---|---|
+| Ítems del backlog | 1 de 17 en curso, 0 cerrados |
+| Ciclo SDD activo | `openspec/changes/esquema-y-permisos/` |
+| Último commit | `4a89418` — `feat(db): add fact schema structure scripts 001-007 with schema-shape tests` |
+
+---
+
+## 🔄 1. Esquema y permisos
+
+SQL versionado, esquema `fact`, tablas, índices, restricciones y los `GRANT` de los dos usuarios
+de base de datos. Sin dependencias.
+
+**Ciclo SDD:** `openspec/changes/esquema-y-permisos/` · **18 de 36 tareas cerradas**
+
+| Fase | Unidad | Alcance | Tareas | Estado |
+|---|---|---|---|---|
+| 1 | 1 | Runner DbUp + arnés de pruebas (`test-bootstrap`) | 5/5 | ✅ |
+| 2 | 2 | Estructura del esquema `001`–`007` + pruebas de forma | 13/13 | ✅ |
+| 3 | 3 | Matriz de permisos `008` + pruebas nivel 2 de ADR 0019 | 0/4 | ⬜ |
+| 4 | 4 | Datos base `009`–`010` (`EstadoIntegracion`, `Configuracion`, 23 `MotivoAtributo`) | 0/7 | ⬜ |
+| 5 | 5 | Manifiesto de *checksums* en CI + scripts de *rollback* consultivos | 0/5 | ⬜ |
+| 6 | 5 | Integración: suite completa end-to-end sobre base nueva | 0/2 | ⬜ |
+
+### Lo verificado al cerrar cada fase
+
+**Fase 1** — el journal de DbUp aterriza en `fact.SchemaVersions`, no en `dbo.SchemaVersions`.
+Descubrimiento no previsto en el diseño: DbUp falla con el error 2760 si el esquema `fact` lo crea
+el *mismo* script dentro de la *misma* transacción. Se resolvió asegurando el esquema en el runner
+antes de `PerformUpgrade()`, lo que obliga a que `001` sea idempotente.
+
+**Fase 2** — 31/31 pruebas en verde, 24 tablas en 7 scripts (558 líneas). Cuatro comprobaciones de
+riesgo alto pasaron: `001` con guarda `IF SCHEMA_ID`; `IX_Factura_Identidad` **no** único; **cero**
+claves foráneas hacia `dbo`; **cero** tipos de punto flotante. `fact` en `BDSmartNet` sigue con 0
+tablas: todo corrió contra bases desechables `fact_test_<id>`.
+
+### Deuda declarada, no olvidada
+
+- **Tarea 1.5** quedó marcada como cerrada, pero lo verificado fue que el mecanismo
+  `CREATE USER … WITHOUT LOGIN` del arnés es idempotente, **no** que `008` lo sea — `008` no
+  existía todavía. La aserción literal vence en la fase 3.
+- El *lint* de `dbo.` de la tarea 5.5 necesita conocer las cuatro líneas
+  `GRANT SELECT ON OBJECT::dbo.*` que escribe la fase 3. Por eso el orden 3 → 5 no es arbitrario.
+
+---
+
+## ⬜ Ítems 2 a 17 — sin ciclo SDD abierto
+
+Las fases de cada ítem **se definen cuando arranca su ciclo SDD**, no antes. Ponerlas aquí ahora
+sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ítem, y ninguno existe.
+
+| # | Ítem | Depende de | Contexto obligatorio | Estado |
+|---|---|---|---|---|
+| 2 | Autenticación y sesión | #1 | — | ⬜ |
+| 3 | Catálogos y satélites | #1 | ⚠ `Cuentas.xlsx` | ⬜ |
+| 4 | Tipos de cambio | #1 | — | ⬜ |
+| 5 | Ingesta Gmail | #1 | — | ⬜ |
+| 6 | Extracción y asociación | #5 | — | ⬜ |
+| 7 | Inbox y promoción | #6, #3 | — | ⬜ |
+| 8 | Núcleo contable | #3 | ⚠ `REGLAS.md` §5–§10 | ⬜ |
+| 9 | Sugerencia de cuenta | #8 | ⚠ `REGLAS.md` §3 | ⬜ |
+| 10 | Notas de crédito | #8 | ⚠ `REGLAS.md` §5, §7 | ⬜ |
+| 11 | API de facturas y asientos | #7, #8 | — | ⬜ |
+| 12 | Detalle y validación | #11 | — | ⬜ |
+| 13 | Bandeja e incidencias | #11 | — | ⬜ |
+| 14 | Outbox y mensajería | #11 | — | ⬜ |
+| 15 | Publicación a Drive | #14 | — | ⬜ |
+| 16 | Publicación a Sheets | #14 | — | ⬜ |
+| 17 | Errores, notificaciones y operación | #14 | — | ⬜ |
+
+---
+
+## Abierto y sin decidir
+
+No bloquea construir, pero tampoco debe cerrarse por omisión.
+
+| Tema | Dónde está anotado | Qué decide |
+|---|---|---|
+| `Factura.RucProveedor` admite 11 dígitos, pero 124 proveedores tienen DNI o carné | `SmartNet/db/fixtures/README.md` | Criterio contable. Afecta al ítem #3 y al #7 |
+| Las tres preguntas de respaldo de ADR 0014 | ADR 0014 | Condición de puesta en producción |
+| Las seis reglas sin ratificar de `REGLAS.md` §12 | `REGLAS.md` §12 | Los puntos 1 y 5 afectan a **todo asiento en moneda extranjera ya confirmado** |
+
+## Condiciones del entorno
+
+- **RDD de gentle-ai: desactivado.** La unidad `D:` está formateada en exFAT, que no soporta ACL,
+  así que Windows sintetiza `Everyone` como propietario de todo archivo y la validación de
+  autoridad de gentle-ai no puede pasar. No es una preferencia reversible: es estructural. No
+  reintentar `takeown` ni `icacls`.
+- **El usuario carga las tablas.** Los scripts de `SmartNet/db/fixtures/` se escriben aquí, pero
+  no se ejecutan contra `BDSmartNet` desde este lado.
