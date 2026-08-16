@@ -30,7 +30,7 @@ se pisan; si ninguno, quedan huérfanas.
 ### El esquema es SQL plano, versionado, con herramienta neutral
 
 ```
-db/schema/
+SmartNet/db/schema/
   001_esquema_inicial.sql
   002_motivo_y_sugerencia_cuenta.sql
   003_contratos_outbox_command_inbox.sql
