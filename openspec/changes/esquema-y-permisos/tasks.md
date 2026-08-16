@@ -314,5 +314,18 @@ attach to.
 
 ## Phase 6: Integration
 
-- [ ] 6.1 Run the full schema-shape + permission-matrix + base-data suite against a fresh `fact_test_<id>` end to end.
-- [ ] 6.2 Verify `SmartNet.Db.Runner` halts before any downstream artifact on non-zero exit (ADR 0012 order), per Decision 1.
+- [x] 6.1 Run the full schema-shape + permission-matrix + base-data suite against a fresh `fact_test_<id>` end to end.
+  - **104/104**, run by the coordinator. Every test creates and drops its own `fact_test_<guid>`,
+    so "end to end against a fresh database" is what the suite does on every single case, not a
+    separate ceremony. Verified after the run: `master` has no `fact` schema, `BDSmartNet` is
+    unchanged (0 `fact` tables, 5 `dbo`), 0 orphaned test databases.
+- [x] 6.2 Verify `SmartNet.Db.Runner` halts before any downstream artifact on non-zero exit (ADR 0012 order), per Decision 1.
+  - `RunnerFailureHaltTests`. There is no deploy pipeline in this repository, so the *ordering*
+    claim of ADR 0012 has nothing to assert against; what is assertable is the failure contract it
+    rests on. Proved: a failing script exits non-zero (so any caller stops on it); the failing
+    script rolls back **entirely**, leaving no half-created object; already-applied scripts stay
+    journalled, so a fix-forward re-run resumes instead of re-applying.
+  - Probe-verified, not assumed: replacing `.WithTransactionPerScript()` with `.WithoutTransaction()`
+    turns the first test red — the partial table survives the failure. Restored immediately.
+  - These passed without new production code. Phase 6 verifies the contract already built; recorded
+    as such rather than dressed up as RED-first.

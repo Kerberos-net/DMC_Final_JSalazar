@@ -11,18 +11,18 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | 1 de 17 en curso, 0 cerrados |
+| Ítems del backlog | **1 de 17 cerrado**, ninguno en curso |
 | Ciclo SDD activo | `openspec/changes/esquema-y-permisos/` |
-| Última fase cerrada | Ítem #1, fase 5 — checksums, rollback y CI |
+| Última fase cerrada | Ítem #1 COMPLETO — las seis fases cerradas |
 
 ---
 
-## 🔄 1. Esquema y permisos
+## ✅ 1. Esquema y permisos
 
 SQL versionado, esquema `fact`, tablas, índices, restricciones y los `GRANT` de los dos usuarios
 de base de datos. Sin dependencias.
 
-**Ciclo SDD:** `openspec/changes/esquema-y-permisos/` · **34 de 36 tareas cerradas**
+**Ciclo SDD:** `openspec/changes/esquema-y-permisos/` · **36 de 36 tareas cerradas**
 
 | Fase | Unidad | Alcance | Tareas | Estado |
 |---|---|---|---|---|
@@ -31,7 +31,7 @@ de base de datos. Sin dependencias.
 | 3 | 3 | Matriz de permisos `008` + pruebas nivel 2 de ADR 0019 | 4/4 | ✅ |
 | 4 | 4 | Datos base `009`–`010` (`EstadoIntegracion`, `Configuracion`, 23 `MotivoAtributo`) | 7/7 | ✅ |
 | 5 | 5 | Manifiesto de *checksums* + *rollback* consultivo + CI | 5/5 | ✅ |
-| 6 | 5 | Integración: suite completa end-to-end sobre base nueva | 0/2 | ⬜ |
+| 6 | 5 | Integración: suite completa end-to-end sobre base nueva | 2/2 | ✅ |
 
 ### Lo verificado al cerrar cada fase
 
@@ -103,6 +103,23 @@ daño. Lo pasé a recursivo y añadí la aserción de que `rollback/` esté incl
 corre el lint y el manifiesto **sin base de datos** — comprobado, no supuesto: el mismo filtro
 apuntando a un host de SQL inexistente pasa 16 pruebas en 243 ms. El otro levanta SQL Server 2022
 como contenedor de servicio y corre la suite entera, matriz de permisos incluida.
+
+**Fase 6** — 104/104, ejecutadas por mí. «End-to-end sobre base nueva» no es una ceremonia aparte:
+cada prueba crea y destruye su propia `fact_test_<guid>`, así que la suite entera ya es eso en cada
+caso.
+
+De la tarea 6.2 hay que ser honesto sobre qué se probó. **No hay canalización de despliegue en este
+repositorio**, de modo que la afirmación de *orden* de ADR 0012 —el runner antes que la API y el
+worker— no tiene contra qué afirmarse todavía. Lo que sí es afirmable es el contrato de fallo sobre
+el que ese orden descansa, y quedó probado: un script que falla sale con código distinto de cero,
+**se revierte entero** sin dejar objetos a medio crear, y los scripts ya aplicados siguen anotados
+en el journal, de modo que reejecutar tras corregir **reanuda** en vez de reaplicar.
+
+Lo verifiqué por sonda: cambiando `.WithTransactionPerScript()` por `.WithoutTransaction()`, la
+tabla a medio crear sobrevive al fallo y la prueba se pone roja. Restaurado de inmediato.
+
+Estas pruebas pasaron sin código de producción nuevo. La fase 6 **verifica** el contrato ya
+construido; queda anotado así en vez de disfrazarse de RED primero.
 ### Deuda declarada, no olvidada
 
 - ~~**Tarea 1.5** — la aserción literal de idempotencia de `008`~~ **saldada en la fase 3**, y mejor
