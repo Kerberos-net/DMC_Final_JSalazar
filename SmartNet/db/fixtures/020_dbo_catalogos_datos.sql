@@ -9,6 +9,14 @@
     Los CSV van delimitados por barra vertical y NO por coma, porque
     Motivo.cuenta contiene comas dentro del valor.
 
+    ROWTERMINATOR es 0x0d0a (CRLF) y NO 0x0a. Los archivos se escriben con fin
+    de linea de Windows, y .gitattributes fuerza CRLF en cada checkout para que
+    esto sea cierto en cualquier maquina. Declarar solo 0x0a deja el retorno de
+    carro pegado al ULTIMO campo de cada fila: en Proveedor eso desborda
+    rucpro VARCHAR(11) y da error de truncamiento, y en los otros cuatro
+    catalogos ni siquiera falla -- carga un \r invisible al final de cada fila,
+    que rompe silenciosamente las uniones por ctapuente y el parseo de prefijos.
+
     REQUISITO: BULK INSERT lee las rutas desde el SERVIDOR, no desde el cliente.
     Si SQL Server no corre en esta maquina, copia .\data\ a una ruta que el
     servidor alcance y ajusta @ruta.
@@ -32,19 +40,19 @@ DELETE FROM dbo.DocumentoIdentidad;
 /*  CODEPAGE 65001 = UTF-8. Los CSV se escriben sin BOM. */
 SET @sql = N'
 BULK INSERT dbo.DocumentoIdentidad FROM ''' + @ruta + N'DocumentoIdentidad.csv''
-    WITH (FIELDTERMINATOR = ''|'', ROWTERMINATOR = ''0x0a'', CODEPAGE = ''65001'', TABLOCK);
+    WITH (FIELDTERMINATOR = ''|'', ROWTERMINATOR = ''0x0d0a'', CODEPAGE = ''65001'', TABLOCK);
 
 BULK INSERT dbo.Origen FROM ''' + @ruta + N'Origen.csv''
-    WITH (FIELDTERMINATOR = ''|'', ROWTERMINATOR = ''0x0a'', CODEPAGE = ''65001'', TABLOCK);
+    WITH (FIELDTERMINATOR = ''|'', ROWTERMINATOR = ''0x0d0a'', CODEPAGE = ''65001'', TABLOCK);
 
 BULK INSERT dbo.Motivo FROM ''' + @ruta + N'Motivo.csv''
-    WITH (FIELDTERMINATOR = ''|'', ROWTERMINATOR = ''0x0a'', CODEPAGE = ''65001'', TABLOCK);
+    WITH (FIELDTERMINATOR = ''|'', ROWTERMINATOR = ''0x0d0a'', CODEPAGE = ''65001'', TABLOCK);
 
 BULK INSERT dbo.CuentaContable FROM ''' + @ruta + N'CuentaContable.csv''
-    WITH (FIELDTERMINATOR = ''|'', ROWTERMINATOR = ''0x0a'', CODEPAGE = ''65001'', TABLOCK);
+    WITH (FIELDTERMINATOR = ''|'', ROWTERMINATOR = ''0x0d0a'', CODEPAGE = ''65001'', TABLOCK);
 
 BULK INSERT dbo.Proveedor FROM ''' + @ruta + N'Proveedor.csv''
-    WITH (FIELDTERMINATOR = ''|'', ROWTERMINATOR = ''0x0a'', CODEPAGE = ''65001'', TABLOCK);
+    WITH (FIELDTERMINATOR = ''|'', ROWTERMINATOR = ''0x0d0a'', CODEPAGE = ''65001'', TABLOCK);
 ';
 
 EXEC sp_executesql @sql;

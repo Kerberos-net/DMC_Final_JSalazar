@@ -1,0 +1,11 @@
+# Los CSV de fixtures se cargan con BULK INSERT, que declara el terminador de
+# fila de forma literal (0x0d0a). Si git los convirtiera segun la plataforma,
+# el terminador declarado dejaria de coincidir y el retorno de carro acabaria
+# dentro del ultimo campo de cada fila.
+SmartNet/db/fixtures/data/*.csv text eol=crlf
+
+# Los .sql tambien se ejecutan tal cual; conviene que no varien por plataforma.
+*.sql text eol=crlf
+
+# Datos maestros: binarios, git no debe tocarlos ni intentar hacer diff de texto.
+*.xlsx binary
