@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- design.md Decision 6: the API host references SmartNet.Auth.Core / .Infrastructure ONLY.
+       It must NEVER reference SmartNet.Db.Runner, direct or transitive — a runtime that can alter
+       a shared database at boot is precisely the thing item #1's permission boundary exists to
+       prevent (task 4.2/4.3's structural guard proves this, not just this comment). -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\auth\SmartNet.Auth.Core\SmartNet.Auth.Core.csproj" />
+    <ProjectReference Include="..\..\auth\SmartNet.Auth.Infrastructure\SmartNet.Auth.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <!-- Makes the top-level-statements Program class visible to WebApplicationFactory<Program> in
+       SmartNet.Api.Tests (standard ASP.NET Core testing pattern). -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="SmartNet.Api.Tests" />
+  </ItemGroup>
+
+</Project>

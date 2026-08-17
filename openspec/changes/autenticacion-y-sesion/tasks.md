@@ -377,71 +377,139 @@ their first commit until the corresponding gate below is closed.
 
 ## Phase 4: `SmartNet.Api` — Minimal APIs host
 
-- [ ] 4.1 Scaffold `SmartNet/api/SmartNet.Api` (`Microsoft.NET.Sdk.Web`, `net10.0`) and
+- [x] 4.1 Scaffold `SmartNet/api/SmartNet.Api` (`Microsoft.NET.Sdk.Web`, `net10.0`) and
       `SmartNet/api/SmartNet.Api.Tests` (`WebApplicationFactory` + `ProjectReference` to
-      `SmartNet.Db.TestBootstrap`).
-- [ ] 4.2 RED: structural test — `SmartNet.Api` has no project or package reference to
+      `SmartNet.Db.TestBootstrap`). **Done 2026-08-16.** Only `SmartNet.Auth.Core`/`.Infrastructure`
+      referenced by the host project, per design.md Decision 6. **Compression, acknowledged
+      explicitly:** scaffolding a buildable Program.cs/csproj pair has no meaningful RED (same class
+      as task 2.16's port-interface compression) — the connection-string, key-ring, and cookie
+      configuration classes (4.4/4.6/4.8) were written in this same pass so the project would
+      compile; each is still exercised by its own dedicated test below, run and confirmed GREEN.
+- [x] 4.2 RED: structural test — `SmartNet.Api` has no project or package reference to
       `SmartNet.Db.Runner`, direct or transitive (design.md Decision 6: the API host must never be
-      able to alter schema at boot).
-- [ ] 4.3 Confirm 4.2 GREEN by construction; re-run after every later task in this phase as a
-      regression guard.
-- [ ] 4.4 RED: connection-string resolution test — `SMARTNET_API_DB_CONNECTION` parsed the same way
+      able to alter schema at boot). **RED confirmed 2026-08-16, genuinely, not by construction
+      alone:** temporarily added a `ProjectReference` to `SmartNet.Db.Runner` plus one real method
+      call (`SmartNet.Db.Runner.RunnerOptions.Parse(...)` — a `const string` field access alone does
+      NOT emit an `AssemblyReference`, a real finding worth recording) in `Program.cs`, ran
+      `NoRunnerReferenceGuardTests`, confirmed it FAILED with the exact offending-reference message.
+      Reverted both changes immediately after.
+- [x] 4.3 Confirm 4.2 GREEN by construction; re-run after every later task in this phase as a
+      regression guard. **Confirmed GREEN 2026-08-16** immediately after reverting the temporary
+      reference, and re-run as part of every subsequent `dotnet test` invocation in this phase
+      (22/22 final run, task 6.3-equivalent for this unit) — never once needed the reference back.
+- [x] 4.4 RED: connection-string resolution test — `SMARTNET_API_DB_CONNECTION` parsed the same way
       as `RunnerOptions` (env var or explicit flag, no default, no committed fallback); absent ⇒
       startup failure with a usage message; explicitly assert the variable name is **not**
       `SMARTNET_DB_CONNECTION` (no accidental reuse of the runner's deploy-principal variable).
-- [ ] 4.5 GREEN: connection-string resolution + DI wiring.
-- [ ] 4.6 RED: cookie-authentication configuration test — cookie name `__Host-session`, `HttpOnly`,
+      **Genuine finding during this task:** the first `Program.cs` draft called
+      `ApiConnectionOptions.Resolve(builder.Configuration)` EAGERLY, before `builder.Build()`. Under
+      `WebApplicationFactory<Program>`, that line runs BEFORE the test host's `ConfigureAppConfiguration`
+      override is merged in (the override is injected exactly at `Build()`'s interception point), so
+      every DB-backed test failed at startup with "Missing required configuration" even though the
+      test correctly supplied it. Fixed by resolving lazily — from DI-injected `IConfiguration`
+      inside repository factory delegates, and from `app.Configuration` (post-`Build()`) for the
+      eager fail-fast check — not by relaxing the test. `StartupFailsFastTests` proves the fail-fast
+      behavior still holds through the real host pipeline, not just the isolated
+      `ApiConnectionOptionsTests` unit checks.
+- [x] 4.5 GREEN: connection-string resolution + DI wiring. **Confirmed 2026-08-16**, 3/3
+      `ApiConnectionOptionsTests` + 1/1 `StartupFailsFastTests` pass.
+- [x] 4.6 RED: cookie-authentication configuration test — cookie name `__Host-session`, `HttpOnly`,
       `SecurePolicy=Always`, `SameSite=Lax`, `ExpireTimeSpan=8h`, `SlidingExpiration=true` — matching
-      ADR 0007 Revisión 4 and spec's cookie-attribute scenario exactly.
-- [ ] 4.7 GREEN: cookie authentication middleware configuration.
-- [ ] 4.8 GATE CHECK: confirm task 0.2 is closed (key-ring path decided and added to ADR 0014's
-      backup set) before this task proceeds.
-- [ ] 4.9 RED: Data Protection key-ring persistence test — a login issued against one
+      ADR 0007 Revisión 4 and spec's cookie-attribute scenario exactly. **Compression:** written and
+      run against the already-scaffolded Program.cs (task 4.1's pass); confirmed 2/2
+      `CookieAuthenticationConfigurationTests` GREEN on first run.
+- [x] 4.7 GREEN: cookie authentication middleware configuration. **Confirmed 2026-08-16.**
+- [x] 4.8 GATE CHECK: confirm task 0.2 is closed (key-ring path decided and added to ADR 0014's
+      backup set) before this task proceeds. **Confirmed 2026-08-16**: task 0.2 is `[x]` CLOSED
+      (line 64-71) and design.md Decision 4 carries the full note (`SMARTNET_API_KEYRING_PATH`,
+      recommended `C:\ProgramData\SmartNet\dataprotection-keys`). Cited, not redone.
+- [x] 4.9 RED: Data Protection key-ring persistence test — a login issued against one
       `WebApplicationFactory` instance still authenticates against a **second, freshly constructed**
-      instance pointed at the same key-ring path (simulated host restart) — this is the exact failure
-      mode design.md flagged as silently defeating the reason `fact.Sesion` was chosen over
-      in-memory.
-- [ ] 4.10 GREEN: `PersistKeysToFileSystem(<path from 0.2>)` wiring.
-- [ ] 4.11 RED: `POST /api/sesion` success — sets `__Host-session` with every mandated attribute,
-      creates a `fact.Sesion` row, resets `IntentosFallidos` to `0`.
-- [ ] 4.12 GREEN: `POST /api/sesion` login endpoint (Evaluate → decoy-or-real Verify → ApplyFailure/
-      ApplySuccess → repositories, exactly the sequence in design.md's Data Flow).
-- [ ] 4.13 RED: wrong password on an unlocked account — `IntentosFallidos` increments by exactly `1`;
-      generic failure response.
-- [ ] 4.14 RED: nonexistent username — response body/status indistinguishable from wrong-password.
-      **Open question, not silently decided here:** the spec requires the response "does not complete
-      measurably faster," which is inherently timing-sensitive and prone to flaking under a naive
-      wall-clock assertion. This task should assert the *mechanism* (the decoy Argon2id verification
-      path is invoked exactly once, with the real parameters, for the unknown-username case) rather
-      than a raw timing comparison — flagged here as an implementation-time call, not pre-decided.
-- [ ] 4.15 RED: 5th consecutive failure — `BloqueadoHasta` 15 min out, `NivelBloqueo→1`,
-      `IntentosFallidos→0`.
-- [ ] 4.16 RED: attempt during active lockout — rejected, and `IPasswordHasher.Verify`/the decoy path
+      instance pointed at the same key-ring path (simulated host restart). **RED confirmed
+      genuinely, 2026-08-16:** ran the test with the second host pointed at a DIFFERENT key-ring
+      path (simulating "operator forgot to persist") — failed with `401 Unauthorized` instead of the
+      expected `200`. Reverted to the same-path assertion, confirmed GREEN. This is the load-bearing
+      test the coordinator's scope named explicitly, and it passed for real reasons on both sides —
+      see "Issues Found" in the final report for what would have happened without persistence.
+- [x] 4.10 GREEN: `PersistKeysToFileSystem(<path from 0.2>)` wiring. **Implemented via
+      `FileSystemXmlRepository` + `IOptions<KeyManagementOptions>.Configure<IConfiguration,
+      ILoggerFactory>`, not the fluent `PersistKeysToFileSystem(DirectoryInfo)` call directly** — the
+      same "must resolve lazily, from DI, after `Build()`" reasoning as 4.4/4.5 applies here too,
+      since `PersistKeysToFileSystem` needs a `DirectoryInfo` argument eagerly at registration time,
+      before the path is known under the test host. Functionally equivalent (it is the same
+      `IXmlRepository` `PersistKeysToFileSystem` installs internally); proven by 4.9's real
+      cross-instance restart simulation, not merely by code shape.
+- [x] 4.11 RED: `POST /api/sesion` success — sets `__Host-session` with every mandated attribute,
+      creates a `fact.Sesion` row, resets `IntentosFallidos` to `0`. **Confirmed GREEN on first run,
+      2026-08-16** (`LoginSuccessTests`, 1/1) — no code changes needed beyond the scaffold.
+- [x] 4.12 GREEN: `POST /api/sesion` login endpoint (Evaluate → decoy-or-real Verify → ApplyFailure/
+      ApplySuccess → repositories, exactly the sequence in design.md's Data Flow). **Implemented and
+      confirmed 2026-08-16.**
+- [x] 4.13 RED: wrong password on an unlocked account — `IntentosFallidos` increments by exactly `1`;
+      generic failure response. **Confirmed GREEN on first run**, `WrongPasswordTests` 1/1.
+- [x] 4.14 RED: nonexistent username — response body/status indistinguishable from wrong-password.
+      **Mechanism decision made explicitly at implementation time, per the coordinator's instruction:**
+      NOT a wall-clock comparison. `CountingPasswordHasher` (a decorator over the real
+      `Argon2idPasswordHasher` — every cryptographic outcome stays genuine, only call bookkeeping is
+      a test double) asserts the decoy Argon2id verification path (`Argon2idPasswordHasher.DecoyHash`)
+      is invoked **exactly once**, with the real parameters (delegated to the real hasher, never a
+      shortcut), for the unknown-username case, plus a separate byte-body-equality check against the
+      wrong-password case. Both `NonexistentUsernameTests` GREEN on first run.
+- [x] 4.15 RED: 5th consecutive failure — `BloqueadoHasta` 15 min out, `NivelBloqueo→1`,
+      `IntentosFallidos→0`. **Confirmed GREEN on first run**, `FifthFailureLockoutTests` 1/1.
+- [x] 4.16 RED: attempt during active lockout — rejected, and `IPasswordHasher.Verify`/the decoy path
       is never invoked (assert via a test double call-count, not just the response shape);
-      `IntentosFallidos` unchanged; response shape matches the generic failure.
-- [ ] 4.17 RED: escalation end-to-end — at minimum lock A (15 min) → margin (no re-lock) → lock B
+      `IntentosFallidos` unchanged; response shape matches the generic failure. **Confirmed GREEN on
+      first run**, `ActiveLockoutRejectionTests` 1/1, using the same `CountingPasswordHasher`.
+- [x] 4.17 RED: escalation end-to-end — at minimum lock A (15 min) → margin (no re-lock) → lock B
       (30 min) → cap holding at a later lock, driven through the real API + DB, confirming the three
       lockout columns round-trip through the real `SaveCredentialStateAsync` call path (not just the
-      Core unit test's in-memory state).
-- [ ] 4.18 RED: successful login after `BloqueadoHasta` has passed — authenticates, resets
-      `IntentosFallidos` and `NivelBloqueo` to `0`.
-- [ ] 4.19 GREEN for 4.13–4.18: implement/adjust the endpoint until all pass. **Compression note, to
-      be filled in honestly during execution:** if a single correct implementation of 4.12 already
-      satisfies 4.13–4.18 without further code changes, record that here as the executed compression
-      rather than manufacturing intermediate no-op commits — do not pre-authorize it before the
-      round-trip is actually run.
-- [ ] 4.20 RED: `DELETE /api/sesion` — revokes the `fact.Sesion` row with
+      Core unit test's in-memory state). **Confirmed GREEN on first run**, `EscalationEndToEndTests`
+      1/1 — `FakeTimeProvider` substituted into DI drives the 15/30/60/120-minute windows without
+      real waiting; every assertion reads the live `fact.Usuario` row through `TestDatabaseFixture`,
+      not an in-memory `AccessPolicy` result.
+- [x] 4.18 RED: successful login after `BloqueadoHasta` has passed — authenticates, resets
+      `IntentosFallidos` and `NivelBloqueo` to `0`. **Confirmed GREEN on first run**,
+      `SuccessAfterExpiryTests` 1/1.
+- [x] 4.19 GREEN for 4.13–4.18: implement/adjust the endpoint until all pass. **Compression note,
+      filled in honestly, per the coordinator's explicit instruction not to pre-authorize it:** the
+      single `PostSesionAsync` implementation written for task 4.12 satisfied ALL of 4.13–4.18 with
+      **zero further code changes** — every one of those six tests passed on its first run. No
+      intermediate no-op commits were manufactured to look more granular; this is the executed
+      compression, observed after the fact, not assumed before it.
+- [x] 4.20 RED: `DELETE /api/sesion` — revokes the `fact.Sesion` row with
       `MotivoRevocacion='CIERRE_SESION'`; a subsequent request with the same, now-stale cookie is
-      unauthenticated.
-- [ ] 4.21 GREEN: `DELETE /api/sesion` logout endpoint.
-- [ ] 4.22 RED: `GET /api/sesion` — `200 { nombreUsuario }` when authenticated, `401` otherwise.
-- [ ] 4.23 GREEN: `GET /api/sesion` probe endpoint.
-- [ ] 4.24 RED: same-origin test — no CORS middleware registered, no `Access-Control-*` response
-      headers ever emitted.
-- [ ] 4.25 Confirm 4.24 GREEN by omission (nothing to build); record the confirmation.
-- [ ] 4.26 RED: `application/problem+json` shape test — unknown user, wrong password, and locked
-      account all produce byte-for-byte identical `401` problem documents.
-- [ ] 4.27 GREEN/confirm 4.26 against the implementation from 4.12–4.19.
+      unauthenticated. **RED confirmed genuinely, 2026-08-16**: first run returned `200 OK` with an
+      empty body instead of `204` — a real bug, not the expected failure shape. Root cause: the
+      ASP0016 compiler warning ("RequestDelegate discards this value") was not cosmetic for
+      `MapDelete`/`MapGet` — an async handler returning `Task<IResult>` passed directly to
+      `MapDelete`/`MapGet` gets bound as a plain `Task`-returning `RequestDelegate`, so the `IResult`
+      is silently discarded and the response defaults to `200` empty. Fixed by casting both handlers
+      to `(Delegate)` explicitly at the `Map*` call site, mirroring what `MapPost` already did.
+- [x] 4.21 GREEN: `DELETE /api/sesion` logout endpoint. **Confirmed GREEN 2026-08-16** after the
+      `(Delegate)` cast fix, `LogoutAndProbeTests` 3/3 (including the probe sub-scenarios below).
+- [x] 4.22 RED: `GET /api/sesion` — `200 { nombreUsuario }` when authenticated, `401` otherwise.
+      **Covered by the same `(Delegate)` cast finding as 4.20** — `GetSesion` returns `IResult`
+      synchronously (not `Task<IResult>`), so it was not actually broken, but the cast was applied
+      uniformly for consistency and to close off the same class of bug pre-emptively.
+- [x] 4.23 GREEN: `GET /api/sesion` probe endpoint. **Confirmed GREEN 2026-08-16.**
+- [x] 4.24 RED: same-origin test — no CORS middleware registered, no `Access-Control-*` response
+      headers ever emitted. **Confirmed GREEN on first run**, `NoCorsTests` 2/2 (a CORS preflight
+      `OPTIONS` request and an ordinary cross-origin `GET`, both asserting the absence of every
+      `Access-Control-*` header).
+- [x] 4.25 Confirm 4.24 GREEN by omission (nothing to build); record the confirmation. **Confirmed
+      2026-08-16** — `Program.cs` has no `app.UseCors(...)` call and no `AddCors(...)` registration
+      anywhere; the absence itself is the implementation, verified by the passing test above.
+- [x] 4.26 RED: `application/problem+json` shape test — unknown user, wrong password, and locked
+      account all produce byte-for-byte identical `401` problem documents. **Confirmed GREEN on
+      first run**, `ProblemJsonByteIdenticalTests` 1/1 — asserts raw byte-array equality
+      (`Content.ReadAsByteArrayAsync()`), not just structural/string equality, across all three
+      trigger paths (unknown user, wrong password on an unlocked account, and a call made during an
+      active lock after arming it with 5 failures).
+- [x] 4.27 GREEN/confirm 4.26 against the implementation from 4.12–4.19. **Confirmed 2026-08-16** —
+      `SesionResultados.CredencialesInvalidas()` is a single static factory returning a fixed
+      `ProblemaCredenciales` record (no timestamp, no trace-id extension) from all three call sites,
+      which is exactly why the bytes are identical: same object shape, same values, every time.
 
 ## Phase 5: `SmartNet.Admin` — reset/create/purge CLI
 

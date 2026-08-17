@@ -12,8 +12,8 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 | Estado global | Valor |
 |---|---|
 | Ítems del backlog | 1 de 17 cerrado, **1 en curso** (#2) |
-| Ciclo SDD activo | `openspec/changes/autenticacion-y-sesion/` — 45/88 tareas, fases 0–3 cerradas |
-| Última fase cerrada | Ítem #2, fase 3 — `SmartNet.Auth.Infrastructure` |
+| Ciclo SDD activo | `openspec/changes/autenticacion-y-sesion/` — 72/88 tareas, fases 0–4 cerradas |
+| Última fase cerrada | Ítem #2, fase 4 — `SmartNet.Api` |
 
 ---
 
@@ -138,7 +138,7 @@ Host mínimo de API, cookie `__Host-session` con `SameSite=Lax`, tabla `fact.Ses
 sesión revocable en servidor, bloqueo por intentos sobre las columnas ya existentes, y el comando de
 restablecimiento de ADR 0007. Depende del ítem #1 (completo).
 
-**Ciclo SDD:** `openspec/changes/autenticacion-y-sesion/` · **45 de 88 tareas cerradas**
+**Ciclo SDD:** `openspec/changes/autenticacion-y-sesion/` · **72 de 88 tareas cerradas**
 
 | Fase | Unidad | Alcance | Tareas | Estado |
 |---|---|---|---|---|
@@ -146,7 +146,7 @@ restablecimiento de ADR 0007. Depende del ítem #1 (completo).
 | 1 | 2 | Esquema: `011_sesion.sql`, `012_usuario_nivel_bloqueo.sql` | 12/12 | ✅ |
 | 2 | 3 | `SmartNet.Auth.Core` — dominio puro (ADR 0019 nivel 1) | 17/17 | ✅ |
 | 3 | 4 | `SmartNet.Auth.Infrastructure` — adaptadores Argon2id y SQL | 14/14 | ✅ |
-| 4 | 5 | `SmartNet.Api` — host mínimo, cookie de autenticación | 0/27 | ⬜ |
+| 4 | 5 | `SmartNet.Api` — host mínimo, cookie de autenticación | 27/27 | ✅ |
 | 5 | 6 | `SmartNet.Admin` — CLI de restablecimiento | 0/11 | ⬜ |
 | 6 | 7 | Integración, CI y suite completa end-to-end | 0/5 | ⬜ |
 
@@ -203,6 +203,23 @@ Un hallazgo real durante el ciclo: `ISesionRepository.RenewAsync` no recibía el
 una sesión renovada arrastraría un `ExpiresUtc` desactualizado dentro del *blob* serializado. Lo
 resolvió sobrescribiéndolo en `RetrieveAsync` con la columna `ExpiraEn` —la fuente de verdad—, en
 vez de ensanchar el puerto del dominio puro. Lo atrapó una aserción real que falló, no lo anticipó.
+
+**Unidad 5 (`SmartNet.Api`) cerrada** — 22/22 pruebas en verde, ejecutadas por mí. El *host* no
+tiene ninguna referencia a `SmartNet.Db.Runner`, confirmado en el `.csproj`; el agente probó
+deliberadamente violar esa guarda para ver si la detectaba, encontró que un simple acceso a un
+`const string` no genera referencia de ensamblado real (falso negativo en su primer intento),
+corrigió la prueba y revirtió el cambio prohibido de inmediato. La simulación de reinicio de host
+(clave de protección de datos) se probó con un control negativo: apuntando a una ruta distinta da
+`401` real, a la misma ruta da `200`. Los tres cuerpos `401` de `application/problem+json` son
+**byte a byte idénticos**, verificado con `ReadAsByteArrayAsync`. Sin CORS en ningún punto,
+confirmado por ausencia de `app.UseCors`.
+
+**Hallazgo mío, no del agente, al confirmar que no hubiera regresión.** Una prueba de la unidad 4
+—ya cerrada— resultó **inestable**: `FindByNameAsync_MapsEveryColumn_IncludingNivelBloqueo` falló
+2 de 5 corridas por comparar `DATETIME2(3)` con igualdad exacta, cuando la columna redondea el
+milisegundo al guardar. La propia unidad 4 ya había resuelto el mismo problema en otras dos
+pruebas del mismo archivo con una tolerancia de 1 ms; esta se quedó atrás. Apliqué la convención ya
+establecida en vez de inventar una nueva — 8/8 en corridas repetidas tras el ajuste.
 
 ### Decisión de arquitectura que no estaba en ningún documento inicial
 

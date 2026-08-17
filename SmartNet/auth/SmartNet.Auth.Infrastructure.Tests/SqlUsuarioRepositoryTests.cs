@@ -75,7 +75,11 @@ public sealed class SqlUsuarioRepositoryTests : IAsyncLifetime
         Assert.Equal(3, estado.IntentosFallidos);
         Assert.Equal(2, estado.NivelBloqueo);
         Assert.NotNull(estado.BloqueadoHasta);
-        Assert.Equal(bloqueadoHasta.ToUnixTimeMilliseconds(), estado.BloqueadoHasta!.Value.ToUnixTimeMilliseconds());
+        // DATETIME2(3) round-trip may round the last millisecond (same tolerance already applied
+        // in UpdateClaveHashAsync_UpdatesOnlyClaveHash below, for the identical reason).
+        var deltaMs = Math.Abs(
+            bloqueadoHasta.ToUnixTimeMilliseconds() - estado.BloqueadoHasta!.Value.ToUnixTimeMilliseconds());
+        Assert.True(deltaMs <= 1, $"Expected BloqueadoHasta within 1ms, actual delta {deltaMs}ms.");
         Assert.True(estado.Activo);
     }
 
