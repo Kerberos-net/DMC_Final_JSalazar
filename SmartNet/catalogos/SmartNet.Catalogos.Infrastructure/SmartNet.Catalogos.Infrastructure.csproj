@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- design.md "Two new projects under SmartNet/catalogos/, replicating SmartNet/auth/ exactly" —
+       Microsoft.Data.SqlClient 7.0.2, same pin as SmartNet.Auth.Infrastructure. No
+       FrameworkReference: unlike SmartNet.Auth.Infrastructure, this project has no ASP.NET Core
+       Identity/cookie type dependency (ADR 0003 read-only external-catalog adapters only). -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SmartNet.Catalogos.Core\SmartNet.Catalogos.Core.csproj" />
+  </ItemGroup>
+
+</Project>

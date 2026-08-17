@@ -170,33 +170,57 @@ before any Core code exists, and is a hard gate: WU1's golden-test task cannot s
 
 ## Phase 2: `SmartNet.Catalogos.Infrastructure` — external catalog adapters (read-only)
 
-- [ ] 2.1 Scaffold `SmartNet/catalogos/SmartNet.Catalogos.Infrastructure` (classlib, referencing
+- [x] 2.1 Scaffold `SmartNet/catalogos/SmartNet.Catalogos.Infrastructure` (classlib, referencing
       `SmartNet.Catalogos.Core` + `Microsoft.Data.SqlClient` 7.0.2) and
       `SmartNet/catalogos/SmartNet.Catalogos.Infrastructure.Tests` (+ `ProjectReference` to
-      `SmartNet.Db.TestBootstrap`).
-- [ ] 2.2 Write a local seed helper (in the test project, using the already-public
-      `ExecuteNonQueryAsync`, per design.md Decision 3) that populates `CuentaContable`, `Proveedor`,
-      `Origen`, `DocumentoIdentidad` in `dbo.*` — `TestDatabaseFixture.CreateExternalDboCatalogsAsync`
-      leaves these 4 empty and only seeds `dbo.Motivo`.
-- [ ] 2.3 RED: `SqlCuentaContableRepository` tests — `ListarPlanCompletoAsync` maps every column
+      `SmartNet.Db.TestBootstrap`). **No `FrameworkReference`** (unlike `SmartNet.Auth.Infrastructure`
+      — no ASP.NET Core Identity/cookie dependency here).
+- [x] 2.2 Local seed helper `DboCatalogSeedHelper.cs` (test project, extension methods over
+      `TestDatabaseFixture`, using the already-public `ExecuteNonQueryAsync`, per design.md
+      Decision 3): `SeedCuentaContableAsync`, `SeedProveedorAsync`, `SeedOrigenAsync`,
+      `SeedDocumentoIdentidadAsync`. Shared `TestDatabaseFixture` left untouched.
+- [x] 2.3 RED: `SqlCuentaContableRepositoryTests` — `ListarPlanCompletoAsync` maps every column
       including `Nivel`/`CtaReflejaCodigo`/`CtaPuenteCodigo`; `ObtenerAsync(cuenta)` returns the row
-      for an existing code and an empty/absent result for a missing one, no exception.
-- [ ] 2.4 GREEN: `SqlCuentaContableRepository`.
-- [ ] 2.5 RED: `SqlMotivoRepository` tests — `ObtenerAsync(codigo)`, `ListarAsync`, empty-collection
-      behavior on zero rows.
-- [ ] 2.6 GREEN: `SqlMotivoRepository`.
-- [ ] 2.7 RED: `SqlProveedorRepository` tests — `ObtenerPorCodigoAsync`; `BuscarPorRucAsync` returns
+      for an existing code and null for a missing one, no exception. **Confirmed RED: CS0246, type
+      does not exist (3 call sites).**
+- [x] 2.4 GREEN: `SqlCuentaContableRepository`. **Confirmed GREEN: 3/3.**
+- [x] 2.5 RED: `SqlMotivoRepositoryTests` — `ObtenerAsync(codigo)`, `ListarAsync`, empty-collection
+      behavior on zero rows. **Confirmed RED: CS0246 (4 call sites).**
+- [x] 2.6 GREEN: `SqlMotivoRepository`. **Confirmed GREEN: 4/4 — one fix needed during GREEN:
+      migration `010_motivo_atributo_demo.sql` THROWs unless `dbo.Motivo` has exactly 23
+      reclassified rows, so the empty-collection test could not skip seeding (as first written) —
+      it now seeds normally, migrates, then `DELETE FROM dbo.Motivo` post-migration to exercise the
+      adapter's zero-row path without breaking the migration chain. Deviation from the initial test
+      draft, not from design.md.**
+- [x] 2.7 RED: `SqlProveedorRepositoryTests` — `ObtenerPorCodigoAsync`; `BuscarPorRucAsync` returns
       a list (not a single row) since `rucpro` is non-unique, seeded with two providers sharing one
-      RUC to exercise `IX_Proveedor_Ruc`.
-- [ ] 2.8 GREEN: `SqlProveedorRepository`.
-- [ ] 2.9 RED: `SqlOrigenRepository`/`SqlDocumentoIdentidadRepository` tests — `ListarAsync` returns
-      the seeded 13/6 rows, empty-collection behavior on zero rows.
-- [ ] 2.10 GREEN: `SqlOrigenRepository`, `SqlDocumentoIdentidadRepository`.
-- [ ] 2.11 RED: structural test — none of the 5 external-catalog interfaces/adapters declares or
-      issues `INSERT`/`UPDATE`/`DELETE` against any `dbo.*` table (spec's "No SQL adapter writes to
-      a dbo.* table" scenario) — reflection over interface members plus a literal scan of each
-      adapter's SQL command text.
-- [ ] 2.12 GREEN/confirm 2.11 — passes by construction against 2.4–2.10; record confirmation.
+      RUC to exercise `IX_Proveedor_Ruc`. **Confirmed RED: CS0246 (3 call sites).**
+- [x] 2.8 GREEN: `SqlProveedorRepository`. **Confirmed GREEN: 3/3.**
+- [x] 2.9 RED: `SqlOrigenRepositoryTests`/`SqlDocumentoIdentidadRepositoryTests` — `ListarAsync`
+      returns the seeded rows, empty-collection behavior on zero rows. **Confirmed RED: CS0246 (2
+      files, 4 call sites).**
+- [x] 2.10 GREEN: `SqlOrigenRepository`, `SqlDocumentoIdentidadRepository`. **Confirmed GREEN: 4/4.**
+- [x] 2.11 RED: `NoWriteToDboStructuralTests` — reflection over the 5 external-catalog interfaces'
+      members (no Insert/Update/Delete/Eliminar/Actualizar/Guardar-named method) plus a literal scan
+      of each adapter's own `.cs` source for an `INSERT`/`UPDATE`/`DELETE` keyword outside comments
+      (spec's "No SQL adapter writes to a dbo.* table" scenario). **First run surfaced a false
+      positive: the regex matched "INSERT" inside `SqlCuentaContableRepository.cs`'s own XML doc
+      comment prose ("no INSERT/UPDATE/DELETE ever issued"), not real SQL — fixed by stripping
+      `//`-prefixed lines before scanning.**
+- [x] 2.12 GREEN/confirm 2.11 — passes by construction against 2.4–2.10 once the comment-stripping
+      fix landed. **Confirmed GREEN: 2/2.**
+- [x] 2.13 (not numbered in the original plan, added during apply) `PermissionSufficiencyTests` —
+      requested by the coordinator, analogous to `SmartNet.Auth.Infrastructure.Tests`'s pattern:
+      replays each adapter's exact SQL text under `ExecuteAsUserAsync`. **Deviation from the
+      request, documented in the test file's own XML doc, not silent**: the request assumed
+      `usr_worker` is denied read access to the 5 `dbo.*` catalogs. Verified against
+      `008_usuarios_y_permisos.sql` lines 147–156 — both `fact_api` AND `fact_worker` receive
+      `GRANT SELECT` on all 5 external catalogs (confirmed by the existing
+      `PermissionMatrixTests.BothUsers_CanSelect_FiveExternalDboTables_NeitherCanWrite`). The real
+      denial these adapters are subject to is on WRITE statements, which none of the 5 read-only
+      adapters issues (already covered by 2.11/2.12). Wrote 12 theory cases (`usr_api`/`usr_worker`
+      × 6 SELECT statements, all succeed) plus 2 negative cases confirming both users are denied a
+      `dbo.CuentaContable` `UPDATE`. **Confirmed GREEN: 14/14.**
 
 ## Phase 3: `SmartNet.Catalogos.Infrastructure` — satellite adapters (read/write) + permissions
 

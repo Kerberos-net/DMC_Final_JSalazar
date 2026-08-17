@@ -311,13 +311,13 @@ repositorios de lectura/escritura sobre los 3 satélites propios `fact.*`, más 
 `ResolverCandidatas` (REGLAS.md §3). Sin DDL nuevo: el esquema y los `GRANT` ya existen (ítem #1).
 Depende del ítem #1 (completo).
 
-**Ciclo SDD:** `openspec/changes/catalogos-y-satelites/` · **19 de 47 tareas cerradas (WU0 + WU1)**
+**Ciclo SDD:** `openspec/changes/catalogos-y-satelites/` · **31 de 47 tareas cerradas (WU0 + WU1 + WU2)**
 
 | Fase | Unidad | Alcance | Tareas | Estado |
 |---|---|---|---|---|
 | 0 | 1 | Compuerta: verificación de conteos de `CuentaContable.csv` contra REGLAS.md §3 | 3/3 | ✅ |
 | 1 | 2 | `SmartNet.Catalogos.Core` — dominio puro, `ResolucionDePrefijos`, pruebas golden y de pureza | 16/16 | ✅ |
-| 2 | 3 | `SmartNet.Catalogos.Infrastructure` — 5 adaptadores externos de solo lectura | 0/12 | ⬜ |
+| 2 | 3 | `SmartNet.Catalogos.Infrastructure` — 5 adaptadores externos de solo lectura | 12/12 | ✅ |
 | 3 | 4 | `SmartNet.Catalogos.Infrastructure` — 3 adaptadores de satélites + suficiencia de permisos | 0/12 | ⬜ |
 | 4 | 5 | `SmartNet.sln`, CI y suite completa end-to-end | 0/4 | ⬜ |
 
@@ -355,6 +355,26 @@ los 8 puertos de repositorio referencian siete tipos más (`Motivo`, `Proveedor`
 en el diseño. Se modelaron 1:1 contra las columnas reales del DDL ya existente
 (`010_dbo_catalogos_ddl.sql`, `004_satelites_datos_maestros.sql`) — sin esos registros, las
 interfaces del ítem no compilan. Documentado en `tasks.md` tarea 1.15, no asumido en silencio.
+
+**Unidad 3 (`SmartNet.Catalogos.Infrastructure` — 5 adaptadores externos) cerrada** — 30/30 pruebas
+en verde contra una base `fact_test_<id>` real y migrada (`TestDatabaseFixture`), sin regresiones.
+Ciclo RED→GREEN estricto en cada adaptador: `SqlCuentaContableRepository`, `SqlMotivoRepository`,
+`SqlProveedorRepository` (`BuscarPorRucAsync` devuelve lista — `rucpro` no es único, probado con dos
+proveedores compartiendo un RUC), `SqlOrigenRepository`, `SqlDocumentoIdentidadRepository`. Ningún
+adaptador escribe a `dbo.*` — confirmado por reflexión sobre los 5 puertos más un escaneo literal
+del SQL de cada adaptador (`NoWriteToDboStructuralTests`). El sembrado local de las 4 tablas `dbo.*`
+que el fixture compartido deja vacías vive en `DboCatalogSeedHelper.cs`, propio de este proyecto de
+prueba — `TestDatabaseFixture` no se tocó (Decisión 3 de `design.md`).
+
+Dos desviaciones documentadas, no silenciosas: (1) la migración `010_motivo_atributo_demo.sql`
+exige exactamente 23 motivos reclasificados en `dbo.Motivo` o lanza `THROW` — el caso de prueba de
+colección vacía de `SqlMotivoRepository` no pudo saltar el sembrado como se planeó originalmente;
+siembra, migra, y luego vacía la tabla. (2) La coordinación pidió `PermissionSufficiencyTests` con
+`usr_worker` denegado en lectura — verificado contra `008_usuarios_y_permisos.sql` (líneas 147-156)
+que **ambos** `fact_api` y `fact_worker` tienen `GRANT SELECT` en los 5 catálogos externos; la
+denegación real es solo de escritura (ya cubierta por el escaneo estructural). La suite quedó con
+14 casos: 12 confirmando que ambos usuarios pueden ejecutar cada `SELECT` de los 5 adaptadores, 2
+confirmando que ambos siguen denegados en un `UPDATE`.
 
 ---
 
