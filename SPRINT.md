@@ -12,8 +12,8 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 | Estado global | Valor |
 |---|---|
 | Ítems del backlog | 1 de 17 cerrado, **1 en curso** (#2) |
-| Ciclo SDD activo | `openspec/changes/autenticacion-y-sesion/` — propuesta aceptada, spec y diseño en marcha |
-| Última fase cerrada | Ítem #1 COMPLETO — las seis fases cerradas |
+| Ciclo SDD activo | `openspec/changes/autenticacion-y-sesion/` — 45/88 tareas, fases 0–3 cerradas |
+| Última fase cerrada | Ítem #2, fase 3 — `SmartNet.Auth.Infrastructure` |
 
 ---
 
@@ -138,13 +138,23 @@ Host mínimo de API, cookie `__Host-session` con `SameSite=Lax`, tabla `fact.Ses
 sesión revocable en servidor, bloqueo por intentos sobre las columnas ya existentes, y el comando de
 restablecimiento de ADR 0007. Depende del ítem #1 (completo).
 
-**Ciclo SDD:** `openspec/changes/autenticacion-y-sesion/` · propuesta, spec y diseño **cerrados** ·
-tareas **pendientes**. Las fases se definen cuando exista `tasks.md` — no antes, para no
-inventarlas.
+**Ciclo SDD:** `openspec/changes/autenticacion-y-sesion/` · **45 de 88 tareas cerradas**
+
+| Fase | Unidad | Alcance | Tareas | Estado |
+|---|---|---|---|---|
+| 0 | 1 | Compuertas: verificación de Konscious, ruta del anillo de claves | 2/2 | ✅ |
+| 1 | 2 | Esquema: `011_sesion.sql`, `012_usuario_nivel_bloqueo.sql` | 12/12 | ✅ |
+| 2 | 3 | `SmartNet.Auth.Core` — dominio puro (ADR 0019 nivel 1) | 17/17 | ✅ |
+| 3 | 4 | `SmartNet.Auth.Infrastructure` — adaptadores Argon2id y SQL | 14/14 | ✅ |
+| 4 | 5 | `SmartNet.Api` — host mínimo, cookie de autenticación | 0/27 | ⬜ |
+| 5 | 6 | `SmartNet.Admin` — CLI de restablecimiento | 0/11 | ⬜ |
+| 6 | 7 | Integración, CI y suite completa end-to-end | 0/5 | ⬜ |
 
 **Tres decisiones ya tomadas, no reabrir:** Argon2id como algoritmo de *hash*; `fact.Sesion` como
 tabla versionada con sus propios `GRANT`/`DENY`, no caché distribuida; el ítem #2 levanta también el
 host mínimo de API en `SmartNet/api/` (`net10.0`), ya que ningún otro ítem del backlog lo hace.
+
+### Lo verificado al cerrar cada fase
 
 **Unidad 1 (compuertas) cerrada** — verificada de forma independiente, no solo por el reporte del
 agente. Consulté directamente `dotnet/runtime#19933` (issue en el hito «Future», sin fecha) y la
@@ -194,7 +204,10 @@ una sesión renovada arrastraría un `ExpiresUtc` desactualizado dentro del *blo
 resolvió sobrescribiéndolo en `RetrieveAsync` con la columna `ExpiraEn` —la fuente de verdad—, en
 vez de ensanchar el puerto del dominio puro. Lo atrapó una aserción real que falló, no lo anticipó.
 
-**Decisión de arquitectura que salió de spec y diseño trabajando en paralelo.** El bloqueo por
+### Decisión de arquitectura que no estaba en ningún documento inicial
+
+Salió de spec y diseño trabajando en paralelo, cada uno negándose a inventar el número del otro.
+El bloqueo por
 intentos necesitó una columna nueva, `fact.Usuario.NivelBloqueo`, porque `IntentosFallidos` no
 podía cargar dos preguntas con ciclos de vida distintos — cuántos fallos faltan para el próximo
 bloqueo, y cuánto durará ese bloqueo — al mismo tiempo. Migración compensatoria `012`, aditiva, no
