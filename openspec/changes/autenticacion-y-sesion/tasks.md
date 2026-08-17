@@ -279,44 +279,101 @@ their first commit until the corresponding gate below is closed.
 
 ## Phase 3: `SmartNet.Auth.Infrastructure` — adapters
 
-- [ ] 3.1 GATE CHECK: confirm task 0.1 is closed (Konscious verified, or Decision 1 reversed in
-      writing) before adding any `PackageReference` in this phase.
-- [ ] 3.2 Scaffold `SmartNet/auth/SmartNet.Auth.Infrastructure` (classlib), referencing
+- [x] 3.1 GATE CHECK: confirm task 0.1 is closed (Konscious verified, or Decision 1 reversed in
+      writing) before adding any `PackageReference` in this phase. **Confirmed 2026-08-16**: task
+      0.1 is `[x]` CLOSED in this file (line 51) and design.md's Decision 1 carries the full
+      verification note (version `1.3.1`, MIT, no first-party .NET 10 Argon2id) plus the pinned
+      `PackageReference` paper trail. Not re-verified here, per the gate's own instruction —
+      cited, not redone.
+- [x] 3.2 Scaffold `SmartNet/auth/SmartNet.Auth.Infrastructure` (classlib), referencing
       `SmartNet.Auth.Core` + `Microsoft.Data.SqlClient` + the verified Argon2 package; and its test
-      project against `TestDatabaseFixture`.
-- [ ] 3.3 RED: `IPasswordHasher` adapter tests — `Hash()` produces a PHC string parseable by Core's
+      project against `TestDatabaseFixture`. **Done 2026-08-16.** `Microsoft.Data.SqlClient`
+      pinned at `7.0.2` (same version already used by `SmartNet.Db.Runner`/`TestDatabaseFixture`,
+      not re-chosen independently). `dotnet build` green on both the empty classlib and the empty
+      test project (which also references `SmartNet.Db.Runner` + `SmartNet.Db.TestBootstrap` for
+      the adapter tests coming in 3.7+).
+- [x] 3.3 RED: `IPasswordHasher` adapter tests — `Hash()` produces a PHC string parseable by Core's
       codec with `m=19456,t=2,p=1`; `Verify()` accepts the correct password and rejects an incorrect
       one; a decoy-hash generation test (random-byte PHC created once at process start, same
       parameters as real hashes) for the username-enumeration timing defense from design.md's Login
-      sequence step 1.
-- [ ] 3.4 GREEN: `Argon2idPasswordHasher` — wraps the raw Konscious transform; encoding/decoding
-      delegates to Core's PHC codec, never reimplemented here.
-- [ ] 3.5 RED: `ISessionTokenFactory` adapter tests — `Create()` returns a 256-bit CSPRNG token
+      sequence step 1. **RED confirmed 2026-08-16**: `Argon2idPasswordHasherTests.cs`, 7 tests —
+      CS0246/CS0103, `Argon2idPasswordHasher` does not exist.
+- [x] 3.4 GREEN: `Argon2idPasswordHasher` — wraps the raw Konscious transform; encoding/decoding
+      delegates to Core's PHC codec, never reimplemented here. **GREEN confirmed 2026-08-16**, 7/7
+      pass. `DecoyHash` is a `static readonly string`, computed exactly once per process via a
+      random-byte password, same `m=19456,t=2,p=1` parameters as real hashes — verified both for
+      PHC-parseability and for actually costing one real `Verify()` call (never
+      `StoredHashUnreadable`, always a genuine `Incorrect`/`Correct` outcome, never a shortcut).
+- [x] 3.5 RED: `ISessionTokenFactory` adapter tests — `Create()` returns a 256-bit CSPRNG token
       (Base64Url, 43 chars) and its lowercase-hex SHA-256; `HashOf()` is deterministic and matches
-      `Create()`'s hash for the same token.
-- [ ] 3.6 GREEN: `CsprngSessionTokenFactory`.
-- [ ] 3.7 RED: `IUsuarioRepository` SQL adapter tests (against `TestDatabaseFixture`) —
+      `Create()`'s hash for the same token. **RED confirmed 2026-08-16**:
+      `CsprngSessionTokenFactoryTests.cs`, 5 tests — CS0246/CS8130 (type does not exist, so tuple
+      deconstruction cannot infer its element types either).
+- [x] 3.6 GREEN: `CsprngSessionTokenFactory`. **GREEN confirmed 2026-08-16**, 5/5 pass.
+- [x] 3.7 RED: `IUsuarioRepository` SQL adapter tests (against `TestDatabaseFixture`) —
       `FindByNameAsync` maps every column including `NivelBloqueo`; `SaveCredentialStateAsync`
       round-trips all three lockout fields in one `UPDATE` — explicitly the "a state field the UPDATE
       forgets to write" bug class design.md's Testing Strategy calls out; `UpdateClaveHashAsync`
-      updates only `ClaveHash` and leaves lockout fields untouched.
-- [ ] 3.8 GREEN: `SqlUsuarioRepository`.
-- [ ] 3.9 RED: `ISesionRepository` SQL adapter tests — `CreateAsync` inserts a row; `FindActiveAsync`
+      updates only `ClaveHash` and leaves lockout fields untouched. **RED confirmed 2026-08-16**:
+      `SqlUsuarioRepositoryTests.cs`, 5 tests — CS0246, `SqlUsuarioRepository` does not exist.
+      **Genuine finding during setup, not pre-decided:** the first `RunMigrations()` attempt failed
+      with real exit code 1 (`Login usr_api no existe`) because the test's `MigratedDatabase()`
+      helper initially omitted `CreateWithoutLoginUserAsync("usr_api"/"usr_worker")` and the
+      `dbo` catalog/fixture seeding `008`/`010` need — fixed by mirroring
+      `PermissionMatrixTests.MigratedDatabaseWithUsers()`'s exact setup sequence, not by changing
+      any schema script.
+- [x] 3.8 GREEN: `SqlUsuarioRepository`. **GREEN confirmed 2026-08-16**, 5/5 pass (after also
+      widening one assertion to a 1ms tolerance for a `DATETIME2(3)`-round-trip-via-`'O'`-literal
+      rounding artifact in the test's own setup helper, not an adapter bug).
+- [x] 3.9 RED: `ISesionRepository` SQL adapter tests — `CreateAsync` inserts a row; `FindActiveAsync`
       only returns rows where `RevocadaEn IS NULL AND ExpiraEn > @ahora`; `RenewAsync` updates
       `ExpiraEn`/`UltimaActividadEn`; `RevokeAsync` sets `RevocadaEn` + `MotivoRevocacion`;
-      `RevokeAllForUsuarioAsync` revokes every live session for a user in one call.
-- [ ] 3.10 GREEN: `SqlSesionRepository`.
-- [ ] 3.11 RED: `ITicketStore` adapter test (`SqlSesionTicketStore`) — `StoreAsync`/`RenewAsync`/
+      `RevokeAllForUsuarioAsync` revokes every live session for a user in one call. **RED confirmed
+      2026-08-16**: `SqlSesionRepositoryTests.cs`, 9 tests (including the expired-but-not-revoked
+      boundary and a same-user-only assertion for `RevokeAllForUsuarioAsync`) — CS0246,
+      `SqlSesionRepository` does not exist.
+- [x] 3.10 GREEN: `SqlSesionRepository`. **GREEN confirmed 2026-08-16**, 9/9 pass on first
+      implementation, including the expired-but-not-revoked boundary.
+- [x] 3.11 RED: `ITicketStore` adapter test (`SqlSesionTicketStore`) — `StoreAsync`/`RenewAsync`/
       `RetrieveAsync`/`RemoveAsync` map onto `ISesionRepository` correctly; the persisted ticket
-      payload is the 256-bit token, never the deserialized claims (design.md Decision 4).
-- [ ] 3.12 GREEN: `SqlSesionTicketStore`.
-- [ ] 3.13 RED: permission-sufficiency test — replay the exact SQL statements every adapter above
+      payload is the 256-bit token, never the deserialized claims (design.md Decision 4). **RED
+      confirmed 2026-08-16**: `SqlSesionTicketStoreTests.cs`, 7 tests — CS0246,
+      `SqlSesionTicketStore` does not exist. `ITicketStore`/`AuthenticationTicket` required a new
+      `FrameworkReference Include="Microsoft.AspNetCore.App"` in both the Infrastructure classlib
+      and its test project (shared-framework types are not visible to a plain classlib by
+      default) — no new `PackageReference`, so this does not touch the Konscious/SqlClient gate.
+- [x] 3.12 GREEN: `SqlSesionTicketStore`. **GREEN confirmed 2026-08-16**, 7/7 pass.
+      `StoreAsync` returns the raw `ISessionTokenFactory`-produced token as the `ITicketStore` key
+      (verified directly: `TokenHash` column equals `SHA256(key)`, never a hash derived from the
+      serialized claims) — that key, not the claims, is what the cookie middleware
+      Data-Protection-wraps into `__Host-session`. **One documented implementation decision beyond
+      what design.md spelled out:** `ISesionRepository.RenewAsync` widens only the `ExpiraEn`/
+      `UltimaActividadEn` columns (its shipped Phase 2 signature has no ticket parameter), so a
+      renewed session's serialized `Ticket` blob would otherwise carry a stale embedded
+      `Properties.ExpiresUtc`. Fixed in `RetrieveAsync`, not by widening the Core port: after
+      deserializing, `Properties.ExpiresUtc` is overwritten with `fact.Sesion.ExpiraEn`'s current
+      value, since design.md Decision 4 already declares that column the sole authority for
+      freshness. Caught by `RenewAsync_ExtendsExpiraEn_ForTheSameKey` before the fix (real
+      assertion failure, not a manufactured RED).
+- [x] 3.13 RED: permission-sufficiency test — replay the exact SQL statements every adapter above
       issues through `ExecuteAsUserAsync("usr_api", …)` against the real grants shipped in `011`/`012`,
       confirming each succeeds under `usr_api`'s actual permission set (not an elevated test
       connection). This is the check the design's Testing Strategy names explicitly: "a missing GRANT
-      would ship green" without it.
-- [ ] 3.14 Confirm 3.13 is GREEN with no changes to `011`/`012`. If a statement fails under real
+      would ship green" without it. **RED-by-absence, then run 2026-08-16:**
+      `PermissionSufficiencyTests.cs`, 8 tests, one per adapter statement (`FindByNameAsync`'s
+      `SELECT`, `SaveCredentialStateAsync`'s and `UpdateClaveHashAsync`'s `UPDATE`s, and all five
+      `SqlSesionRepository` statements), each replaying the SQL text byte-for-byte copied from the
+      shipped adapter source, executed via `TestDatabaseFixture.ExecuteAsUserAsync("usr_api", …)`
+      — a real impersonated principal, not a mock and not the elevated fixture connection every
+      other test in this file uses.
+- [x] 3.14 Confirm 3.13 is GREEN with no changes to `011`/`012`. If a statement fails under real
       grants, record the gap and fix at the schema layer (Phase 1), not by relaxing the test.
+      **Confirmed GREEN 2026-08-16, 8/8 pass on the FIRST run, zero edits to `011`/`012`.** No gap
+      found: `011`'s `GRANT SELECT, INSERT, UPDATE, DELETE ON OBJECT::fact.Sesion TO fact_api` and
+      `008`'s existing `fact.Usuario` grants (inherited by `012`'s `NivelBloqueo` column per task
+      1.7/1.8's already-proven finding) were sufficient for every adapter statement without
+      widening anything — design.md's Decision 2/3 "grants ship with DDL" claim holds under the
+      real adapters, not just under `PermissionMatrixTests`' synthetic statements.
 
 ## Phase 4: `SmartNet.Api` — Minimal APIs host
 

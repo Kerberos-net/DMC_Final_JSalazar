@@ -182,6 +182,18 @@ NivelMaximo-1)`; la correcta —verificada a mano contra la tabla de ADR 0007 Re
 tiempo (60 min en vez de 120). Comprobé el código fuente: `Math.Min(estado.NivelBloqueo,
 politica.NivelMaximo)`, sin resta — coincide con la tabla normativa fallo por fallo.
 
+**Unidad 4 (`SmartNet.Auth.Infrastructure`) cerrada** — 41/41 pruebas en verde, ejecutadas por mí.
+La prueba de suficiencia de permisos (tarea 3.13) corrió las 8 sentencias reales de los adaptadores
+bajo `usr_api` **real** vía `ExecuteAsUserAsync` —no una conexión con privilegios elevados—: **8/8
+en verde a la primera**, cero cambios a `011`/`012`. Confirmado que la cookie solo transporta el
+token crudo de 256 bits; `fact.Sesion.Ticket` guarda el *ticket* serializado para que
+`RetrieveAsync` reconstruya el principal en el servidor, coherente con la Decisión 4.
+
+Un hallazgo real durante el ciclo: `ISesionRepository.RenewAsync` no recibía el *ticket*, así que
+una sesión renovada arrastraría un `ExpiresUtc` desactualizado dentro del *blob* serializado. Lo
+resolvió sobrescribiéndolo en `RetrieveAsync` con la columna `ExpiraEn` —la fuente de verdad—, en
+vez de ensanchar el puerto del dominio puro. Lo atrapó una aserción real que falló, no lo anticipó.
+
 **Decisión de arquitectura que salió de spec y diseño trabajando en paralelo.** El bloqueo por
 intentos necesitó una columna nueva, `fact.Usuario.NivelBloqueo`, porque `IntentosFallidos` no
 podía cargar dos preguntas con ciclos de vida distintos — cuántos fallos faltan para el próximo

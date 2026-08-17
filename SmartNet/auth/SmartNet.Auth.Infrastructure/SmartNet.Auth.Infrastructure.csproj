@@ -1,0 +1,32 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- design.md Decision 1, gate task 0.1 (CLOSED 2026-08-16): Konscious.Security.Cryptography.Argon2
+       verified against nuget.org and GitHub with network access, current published version
+       1.3.1, license MIT, no first-party .NET 10 Argon2id shipped (dotnet/runtime#19933 still
+       open). Pinned version below is the paper-trail value design.md records for this
+       PackageReference, not re-verified here (tasks.md task 3.1). -->
+  <ItemGroup>
+    <PackageReference Include="Konscious.Security.Cryptography.Argon2" Version="1.3.1" />
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SmartNet.Auth.Core\SmartNet.Auth.Core.csproj" />
+  </ItemGroup>
+
+  <!-- ITicketStore (task 3.11/3.12) lives in Microsoft.AspNetCore.Authentication.Cookies, part of
+       the shared framework: no separate NuGet package on net10.0. A classlib does not pull the
+       shared framework in by default, hence the explicit FrameworkReference (not a PackageReference,
+       so it carries no extra transitive package surface beyond what SmartNet.Api itself already
+       needs as a Microsoft.NET.Sdk.Web host). -->
+  <ItemGroup>
+    <FrameworkReference Include="Microsoft.AspNetCore.App" />
+  </ItemGroup>
+
+</Project>
