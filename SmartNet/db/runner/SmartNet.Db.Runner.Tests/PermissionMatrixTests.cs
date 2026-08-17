@@ -476,6 +476,83 @@ public sealed class PermissionMatrixTests
     }
 
     // ---------------------------------------------------------------------------------------
+    // Work Unit 2 (Phase 1, tasks 1.3/1.4, 1.7/1.8) — fact.Sesion grants (011_sesion.sql) and
+    // NivelBloqueo column-grant inheritance (012_usuario_nivel_bloqueo.sql), design.md item #2
+    // Decision 2/3/8.
+    // ---------------------------------------------------------------------------------------
+
+    // Task 1.3/1.4 — usr_api holds full SELECT/INSERT/UPDATE/DELETE on fact.Sesion. DELETE is the
+    // one grant this test exercises that no other table in the matrix has (design.md Decision 3).
+    [Fact]
+    public async Task UsrApi_HasFullAccess_OnFactSesion_IncludingDelete()
+    {
+        await using var db = await MigratedDatabaseWithUsers();
+        var usuarioId = await SeedUsuario(db);
+
+        await AssertSucceedsWrite(db, UsrApi,
+            $"""
+             INSERT INTO fact.Sesion (TokenHash, UsuarioId, ExpiraEn, UltimaActividadEn, Ticket)
+             VALUES (REPLICATE('a', 64), {usuarioId}, DATEADD(HOUR, 8, SYSUTCDATETIME()), SYSUTCDATETIME(), 'ticket');
+             """);
+        await AssertSucceedsRead(db, UsrApi, "SELECT COUNT(*) FROM fact.Sesion;");
+        await AssertSucceedsWrite(db, UsrApi,
+            "UPDATE fact.Sesion SET UltimaActividadEn = SYSUTCDATETIME() WHERE TokenHash = REPLICATE('a', 64);");
+        await AssertSucceedsWrite(db, UsrApi, "DELETE FROM fact.Sesion WHERE TokenHash = REPLICATE('a', 64);");
+    }
+
+    // Task 1.3/1.4 — usr_worker is denied all four verbs on fact.Sesion, mirroring the existing
+    // fact.Usuario DENY (008_usuarios_y_permisos.sql).
+    [Fact]
+    public async Task UsrWorker_IsDenied_AllFourVerbs_OnFactSesion()
+    {
+        await using var db = await MigratedDatabaseWithUsers();
+
+        await AssertDenied(db, UsrWorker, "SELECT COUNT(*) FROM fact.Sesion;");
+        await AssertDenied(db, UsrWorker,
+            "INSERT INTO fact.Sesion (TokenHash, UsuarioId, ExpiraEn, UltimaActividadEn, Ticket) " +
+            "VALUES (REPLICATE('b', 64), 1, DATEADD(HOUR, 8, SYSUTCDATETIME()), SYSUTCDATETIME(), 'ticket');");
+        await AssertDenied(db, UsrWorker, "UPDATE fact.Sesion SET UltimaActividadEn = SYSUTCDATETIME() WHERE 1 = 0;");
+        await AssertDenied(db, UsrWorker, "DELETE FROM fact.Sesion WHERE 1 = 0;");
+    }
+
+    // Task 1.7/1.8 — the test that actually proves design.md Decision 8's claim rather than trusting
+    // it: NivelBloqueo carries no column-level grant of its own, so it must be covered end to end by
+    // 008's existing OBJECT-level GRANT/DENY on fact.Usuario, with no change to 008 or a new grant
+    // statement in 012. Both directions checked against the real engine: usr_api can SELECT/UPDATE
+    // the new column; usr_worker is denied it exactly like the rest of the table.
+    [Fact]
+    public async Task NivelBloqueo_InheritsObjectLevelGrant_FromExistingUsuarioPermissions()
+    {
+        await using var db = await MigratedDatabaseWithUsers();
+
+        // (a) No column-level permission exists anywhere for NivelBloqueo — if design.md's claim
+        // were false, a column-level GRANT/DENY overriding the object-level one would show up here.
+        var columnLevelPermissionCount = await db.ExecuteScalarAsync<int>(
+            """
+            SELECT COUNT(*)
+            FROM sys.database_permissions perm
+            JOIN sys.columns c ON perm.major_id = c.object_id AND perm.minor_id = c.column_id
+            WHERE perm.class = 1 AND c.object_id = OBJECT_ID('fact.Usuario') AND c.name = 'NivelBloqueo';
+            """);
+        Assert.Equal(0, columnLevelPermissionCount);
+
+        var usuarioId = await SeedUsuario(db);
+
+        // (b) usr_api's existing object-level GRANT SELECT, INSERT, UPDATE covers the new column,
+        // with zero grant changes in 012_usuario_nivel_bloqueo.sql.
+        await AssertSucceedsRead(db, UsrApi,
+            $"SELECT NivelBloqueo FROM fact.Usuario WHERE UsuarioId = {usuarioId};");
+        await AssertSucceedsWrite(db, UsrApi,
+            $"UPDATE fact.Usuario SET NivelBloqueo = 1 WHERE UsuarioId = {usuarioId};");
+
+        // (c) usr_worker's existing object-level DENY covers the new column too — denied at the
+        // statement level even though NivelBloqueo is not named in the SELECT list, because
+        // fact_worker has no SELECT permission on fact.Usuario at all.
+        await AssertDenied(db, UsrWorker, $"SELECT NivelBloqueo FROM fact.Usuario WHERE UsuarioId = {usuarioId};");
+        await AssertDenied(db, UsrWorker, $"UPDATE fact.Usuario SET NivelBloqueo = 2 WHERE UsuarioId = {usuarioId};");
+    }
+
+    // ---------------------------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------------------------
     private static async Task<TestDatabaseFixture> MigratedDatabaseWithUsers()

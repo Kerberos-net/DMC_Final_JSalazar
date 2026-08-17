@@ -155,6 +155,20 @@ sin revertir. El anillo de claves de Data Protection queda en `C:\ProgramData\Sm
 `fact.Sesion` sobrevive un reinicio pero el ticket cifrado no descifra — la tabla dejaría de servir
 para lo que se eligió.
 
+**Unidad 2 (esquema) cerrada** — 127/127 pruebas en verde, ejecutadas por mí. `011_sesion.sql`
+crea `fact.Sesion` con sus `GRANT`/`DENY` en el mismo archivo; `012_usuario_nivel_bloqueo.sql`
+añade `NivelBloqueo` sin tocar `002_seguridad.sql`. La tarea 1.7 **probó** contra
+`sys.database_permissions` que el `GRANT` a nivel de objeto cubre la columna nueva sin ningún
+cambio a `008` — no se dio por buena la afirmación del diseño. Dos hallazgos reales de SQL Server
+en el ciclo RED/GREEN: `012` necesita `GO` entre sus dos `ALTER TABLE` (el propio `design.md` ya lo
+mostraba, el primer borrador lo perdió), y `DROP COLUMN` no retira una restricción `DEFAULT` con
+nombre (el *rollback* de `012` lo asumía y falló con error 5074, corregido).
+
+El agente corrió una consulta de solo lectura contra `master` **fuera** de `TestDatabaseFixture`
+para confirmar que no quedaran bases de prueba colgadas, y lo declaró explícitamente en el reporte
+en vez de callárselo — la regla que compró el incidente de `master` del ítem #1 sigue viva.
+`master`/`BDSmartNet`/bases huérfanas: limpio, intacta, 0.
+
 **Decisión de arquitectura que salió de spec y diseño trabajando en paralelo.** El bloqueo por
 intentos necesitó una columna nueva, `fact.Usuario.NivelBloqueo`, porque `IntentosFallidos` no
 podía cargar dos preguntas con ciclos de vida distintos — cuántos fallos faltan para el próximo

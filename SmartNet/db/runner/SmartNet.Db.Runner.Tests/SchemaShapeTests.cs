@@ -372,6 +372,182 @@ public sealed class SchemaShapeTests
         Assert.Equal("12,6", row);
     }
 
+    // ---------------------------------------------------------------------------------------
+    // Work Unit 2 (Phase 1, tasks 1.1/1.5) — fact.Sesion (011_sesion.sql) and
+    // fact.Usuario.NivelBloqueo (012_usuario_nivel_bloqueo.sql), design.md Decision 2/8.
+    // ---------------------------------------------------------------------------------------
+
+    // Task 1.1 — column list, types, and collation.
+    [Fact]
+    public async Task FactSesion_HasExpectedColumnsTypesAndCollation()
+    {
+        await using var db = await MigratedDatabase();
+
+        var tokenHash = await db.ExecuteScalarAsync<string>(
+            """
+            SELECT ty.name + '(' + CAST(c.max_length AS VARCHAR) + ')/' + c.collation_name
+            FROM sys.columns c
+            JOIN sys.types ty ON c.user_type_id = ty.user_type_id
+            WHERE c.object_id = OBJECT_ID('fact.Sesion') AND c.name = 'TokenHash';
+            """);
+        Assert.Equal("char(64)/Latin1_General_100_BIN2", tokenHash);
+
+        var nullability = await db.ExecuteScalarAsync<string>(
+            """
+            SELECT STRING_AGG(c.name + ':' + CAST(c.is_nullable AS VARCHAR), ',') WITHIN GROUP (ORDER BY c.column_id)
+            FROM sys.columns c
+            WHERE c.object_id = OBJECT_ID('fact.Sesion')
+              AND c.name IN ('SesionId', 'UsuarioId', 'CreadaEn', 'ExpiraEn', 'UltimaActividadEn',
+                             'RevocadaEn', 'MotivoRevocacion', 'Ticket');
+            """);
+        Assert.Equal(
+            "SesionId:0,UsuarioId:0,CreadaEn:0,ExpiraEn:0,UltimaActividadEn:0,RevocadaEn:1,MotivoRevocacion:1,Ticket:0",
+            nullability);
+
+        var identity = await db.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM sys.identity_columns WHERE object_id = OBJECT_ID('fact.Sesion') AND name = 'SesionId';");
+        Assert.Equal(1, identity);
+
+        foreach (var (column, type, precision) in new[]
+                 {
+                     ("CreadaEn", "datetime2", 3), ("ExpiraEn", "datetime2", 3),
+                     ("UltimaActividadEn", "datetime2", 3), ("RevocadaEn", "datetime2", 3)
+                 })
+        {
+            var scale = await db.ExecuteScalarAsync<int>(
+                $"""
+                 SELECT CAST(c.scale AS INT) FROM sys.columns c
+                 JOIN sys.types ty ON c.system_type_id = ty.system_type_id AND ty.name = '{type}'
+                 WHERE c.object_id = OBJECT_ID('fact.Sesion') AND c.name = '{column}';
+                 """);
+            Assert.Equal(precision, scale);
+        }
+
+        var motivoRevocacionType = await db.ExecuteScalarAsync<string>(
+            """
+            SELECT ty.name + '(' + CAST(c.max_length AS VARCHAR) + ')'
+            FROM sys.columns c
+            JOIN sys.types ty ON c.system_type_id = ty.system_type_id
+            WHERE c.object_id = OBJECT_ID('fact.Sesion') AND c.name = 'MotivoRevocacion';
+            """);
+        Assert.Equal("varchar(20)", motivoRevocacionType);
+
+        var ticketType = await db.ExecuteScalarAsync<string>(
+            """
+            SELECT ty.name FROM sys.columns c
+            JOIN sys.types ty ON c.system_type_id = ty.system_type_id
+            WHERE c.object_id = OBJECT_ID('fact.Sesion') AND c.name = 'Ticket';
+            """);
+        Assert.Equal("nvarchar", ticketType);
+    }
+
+    // Task 1.1 — PK, UQ, FK, and both CHECK constraints.
+    [Fact]
+    public async Task FactSesion_HasExpectedConstraints()
+    {
+        await using var db = await MigratedDatabase();
+
+        var pk = await db.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM sys.key_constraints WHERE name = 'PK_Sesion' AND type = 'PK';");
+        Assert.Equal(1, pk);
+
+        var uq = await db.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM sys.key_constraints WHERE name = 'UQ_Sesion_TokenHash' AND type = 'UQ';");
+        Assert.Equal(1, uq);
+
+        var fk = await db.ExecuteScalarAsync<int>(
+            """
+            SELECT COUNT(*) FROM sys.foreign_keys fk
+            WHERE fk.name = 'FK_Sesion_Usuario'
+              AND fk.parent_object_id = OBJECT_ID('fact.Sesion')
+              AND fk.referenced_object_id = OBJECT_ID('fact.Usuario');
+            """);
+        Assert.Equal(1, fk);
+
+        var ckRevocacion = await db.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM sys.check_constraints WHERE name = 'CK_Sesion_Revocacion' AND parent_object_id = OBJECT_ID('fact.Sesion');");
+        Assert.Equal(1, ckRevocacion);
+
+        var ckMotivo = await db.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM sys.check_constraints WHERE name = 'CK_Sesion_MotivoRevocacion' AND parent_object_id = OBJECT_ID('fact.Sesion');");
+        Assert.Equal(1, ckMotivo);
+
+        var filteredIndex = await db.ExecuteScalarAsync<int>(
+            """
+            SELECT COUNT(*) FROM sys.indexes
+            WHERE object_id = OBJECT_ID('fact.Sesion') AND name = 'IX_Sesion_UsuarioId_Activa'
+              AND has_filter = 1;
+            """);
+        Assert.Equal(1, filteredIndex);
+    }
+
+    // Task 1.1 — CK_Sesion_Revocacion behaviorally: paired nullity, no half-state.
+    [Theory]
+    [InlineData(false, false, true)]   // both NULL -> allowed
+    [InlineData(true, true, true)]     // both set -> allowed
+    [InlineData(true, false, false)]   // RevocadaEn set, MotivoRevocacion NULL -> rejected
+    [InlineData(false, true, false)]   // RevocadaEn NULL, MotivoRevocacion set -> rejected
+    public async Task CkSesionRevocacion_EnforcesPairedNullity(bool setRevocadaEn, bool setMotivo, bool shouldSucceed)
+    {
+        await using var db = await MigratedDatabase();
+        var usuarioId = await SeedUsuarioForSesion(db);
+
+        var revocadaEn = setRevocadaEn ? "SYSUTCDATETIME()" : "NULL";
+        var motivo = setMotivo ? "'CIERRE_SESION'" : "NULL";
+
+        var ex = await Record.ExceptionAsync(() => db.ExecuteNonQueryAsync(
+            $"""
+             INSERT INTO fact.Sesion (TokenHash, UsuarioId, ExpiraEn, UltimaActividadEn, RevocadaEn, MotivoRevocacion, Ticket)
+             VALUES (REPLICATE('a', 64), {usuarioId}, DATEADD(HOUR, 8, SYSUTCDATETIME()), SYSUTCDATETIME(), {revocadaEn}, {motivo}, 'ticket');
+             """));
+
+        if (shouldSucceed)
+        {
+            Assert.Null(ex);
+        }
+        else
+        {
+            Assert.NotNull(ex);
+        }
+    }
+
+    // Task 1.5 — fact.Usuario.NivelBloqueo shape.
+    [Fact]
+    public async Task FactUsuarioNivelBloqueo_IsIntNotNullDefaultZeroWithCheck()
+    {
+        await using var db = await MigratedDatabase();
+
+        var shape = await db.ExecuteScalarAsync<string>(
+            """
+            SELECT ty.name + ':' + CAST(c.is_nullable AS VARCHAR)
+            FROM sys.columns c
+            JOIN sys.types ty ON c.system_type_id = ty.system_type_id
+            WHERE c.object_id = OBJECT_ID('fact.Usuario') AND c.name = 'NivelBloqueo';
+            """);
+        Assert.Equal("int:0", shape);
+
+        await db.ExecuteNonQueryAsync(
+            "INSERT INTO fact.Usuario (NombreUsuario, ClaveHash) VALUES ('usuario.nivel-bloqueo', 'hash');");
+        var defaultValue = await db.ExecuteScalarAsync<int>(
+            "SELECT NivelBloqueo FROM fact.Usuario WHERE NombreUsuario = 'usuario.nivel-bloqueo';");
+        Assert.Equal(0, defaultValue);
+
+        var check = await db.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM sys.check_constraints WHERE name = 'CK_Usuario_NivelBloqueo' AND parent_object_id = OBJECT_ID('fact.Usuario');");
+        Assert.Equal(1, check);
+
+        var ex = await Record.ExceptionAsync(() => db.ExecuteNonQueryAsync(
+            "UPDATE fact.Usuario SET NivelBloqueo = -1 WHERE NombreUsuario = 'usuario.nivel-bloqueo';"));
+        Assert.NotNull(ex);
+    }
+
+    private static async Task<long> SeedUsuarioForSesion(TestDatabaseFixture db)
+    {
+        await db.ExecuteNonQueryAsync(
+            $"INSERT INTO fact.Usuario (NombreUsuario, ClaveHash) VALUES ('usuario.sesion-{Guid.NewGuid():N}', 'hash');");
+        return await db.ExecuteScalarAsync<long>("SELECT MAX(UsuarioId) FROM fact.Usuario;");
+    }
+
     private static async Task<TestDatabaseFixture> MigratedDatabase()
     {
         var db = await TestDatabaseFixture.CreateAsync();

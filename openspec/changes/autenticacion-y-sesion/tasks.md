@@ -72,50 +72,110 @@ their first commit until the corresponding gate below is closed.
 
 ## Phase 1: Schema — `fact.Sesion` and `NivelBloqueo` (RED before each script)
 
-- [ ] 1.1 RED: schema-shape test for `fact.Sesion` — column list/types (`SesionId BIGINT IDENTITY`,
+- [x] 1.1 RED: schema-shape test for `fact.Sesion` — column list/types (`SesionId BIGINT IDENTITY`,
       `TokenHash CHAR(64)` with `Latin1_General_100_BIN2` collation, `UsuarioId BIGINT`,
       `CreadaEn`/`ExpiraEn`/`UltimaActividadEn` `DATETIME2(3)`, `RevocadaEn` nullable,
       `MotivoRevocacion VARCHAR(20)` nullable, `Ticket NVARCHAR(MAX)`), `PK_Sesion`,
       `UQ_Sesion_TokenHash`, `FK_Sesion_Usuario → fact.Usuario`, `CK_Sesion_Revocacion` (paired-nullity
       check), `CK_Sesion_MotivoRevocacion` (value list `CIERRE_SESION`/`RESTABLECIMIENTO`/`ADMIN`),
       filtered index `IX_Sesion_UsuarioId_Activa ON (UsuarioId, ExpiraEn) WHERE RevocadaEn IS NULL`.
-- [ ] 1.2 GREEN: `011_sesion.sql` — the DDL from design.md Decision 2, plus `fact_api` grants
+      **RED confirmed 2026-08-16**: 3 tests added to `SchemaShapeTests.cs`
+      (`FactSesion_HasExpectedColumnsTypesAndCollation`, `FactSesion_HasExpectedConstraints`,
+      `CkSesionRevocacion_EnforcesPairedNullity` — a 4-case `[Theory]`). Run against the repo before
+      `011` existed: 5 of 7 cases failed for the right reason (`Invalid object name 'fact.Sesion'` /
+      "Expected: ... Actual: null"); the other 2 `Theory` cases (both `shouldSucceed: false`) passed
+      trivially — the same documented compression `PermissionMatrixTests.cs` already uses (any
+      exception satisfies "should fail", including "table does not exist").
+- [x] 1.2 GREEN: `011_sesion.sql` — the DDL from design.md Decision 2, plus `fact_api` grants
       (`SELECT, INSERT, UPDATE, DELETE`) and the explicit `fact_worker` four-verb `DENY`, in the same
       file per Decision 2's "grants ship with DDL" rule; `rollback/011_down.sql` (advisory, drops
-      table + grants, never applied by the runner).
-- [ ] 1.3 RED: permission-matrix test — `usr_api` SELECT/INSERT/UPDATE/DELETE on `fact.Sesion` all
+      table + grants, never applied by the runner). **GREEN confirmed 2026-08-16**: all 7 of 1.1's
+      tests pass (one test-side bug found and fixed along the way — `sys.columns.scale` is
+      `TINYINT`, not castable straight to `int`; fixed with an explicit `CAST(... AS INT)` in the
+      query, not a schema issue).
+- [x] 1.3 RED: permission-matrix test — `usr_api` SELECT/INSERT/UPDATE/DELETE on `fact.Sesion` all
       succeed; `usr_worker` is denied all four (`EXECUTE AS USER` pattern, mirroring
-      `PermissionMatrixTests`).
-- [ ] 1.4 Confirm 1.3 is GREEN against 1.2 without further changes (Decision 2 puts grants in the same
+      `PermissionMatrixTests`). **Compression, acknowledged explicitly (same class already documented
+      in `PermissionMatrixTests.cs`'s own header):** written and run AFTER 1.2's `011_sesion.sql`
+      already existed (grants ship in the same file as the DDL, so there is no meaningful
+      table-exists-but-ungranted intermediate state to RED against without hand-editing `011` to
+      strip its own grants first, which nobody would ship). The two new tests
+      (`UsrApi_HasFullAccess_OnFactSesion_IncludingDelete`, `UsrWorker_IsDenied_AllFourVerbs_OnFactSesion`)
+      were GREEN on first run.
+- [x] 1.4 Confirm 1.3 is GREEN against 1.2 without further changes (Decision 2 puts grants in the same
       file as the DDL, so this should already hold). If it does not, that is a genuine finding — record
-      what was missing rather than silently patching `011` without a note.
-- [ ] 1.5 RED: schema-shape test — `fact.Usuario.NivelBloqueo` is `INT NOT NULL DEFAULT (0)` with
-      `CK_Usuario_NivelBloqueo CHECK (NivelBloqueo >= 0)`.
-- [ ] 1.6 GREEN: `012_usuario_nivel_bloqueo.sql` — `ALTER TABLE fact.Usuario ADD NivelBloqueo …` +
+      what was missing rather than silently patching `011` without a note. **Confirmed GREEN, no
+      changes needed** — Decision 2's claim holds: `011`'s grants, shipped in the same file as the
+      DDL, are sufficient with zero edits.
+- [x] 1.5 RED: schema-shape test — `fact.Usuario.NivelBloqueo` is `INT NOT NULL DEFAULT (0)` with
+      `CK_Usuario_NivelBloqueo CHECK (NivelBloqueo >= 0)`. **RED confirmed 2026-08-16** as part of the
+      same batch as 1.1 (`FactUsuarioNivelBloqueo_IsIntNotNullDefaultZeroWithCheck`) — failed with
+      `Invalid object name` / migration exit code before `012` existed.
+- [x] 1.6 GREEN: `012_usuario_nivel_bloqueo.sql` — `ALTER TABLE fact.Usuario ADD NivelBloqueo …` +
       the `CHECK`, as its own script, never touching `002_seguridad.sql` (Decision 8);
-      `rollback/012_down.sql` (advisory, drops constraint + column).
-- [ ] 1.7 RED: grant-inheritance test — this is the task that actually tests design.md's claim rather
+      `rollback/012_down.sql` (advisory, drops constraint + column). **Genuine finding during GREEN,
+      not pre-decided in design.md:** the first draft of `012` put both `ALTER TABLE` statements (ADD
+      column, ADD CHECK) in one batch and failed against the real engine with error 207 ("Invalid
+      column name 'NivelBloqueo'") — SQL Server compiles a batch before executing any statement in
+      it, so the second statement cannot see the column the first one has not yet committed. Fixed
+      with `GO` between them (design.md's own Decision 8 code block already showed this `GO`; the
+      first draft dropped it by oversight, corrected before shipping). `011`/`012` never use `GO`
+      elsewhere in the repo — this is the first script that needs it, and it is needed for a real,
+      verified reason, not copied reflexively.
+- [x] 1.7 RED: grant-inheritance test — this is the task that actually tests design.md's claim rather
       than trusting it. After `012` applies, assert directly against `sys.database_permissions` /
       `EXECUTE AS USER` behavior that (a) `usr_api`'s existing object-level `GRANT SELECT, INSERT,
       UPDATE ON OBJECT::fact.Usuario` already covers `SELECT`/`UPDATE` of the new `NivelBloqueo`
       column with no new grant statement, and (b) `usr_worker`'s existing object-level `DENY` on
       `fact.Usuario` already denies all access to the new column too. Do not assume object-level
       grants auto-cover new columns just because the design doc asserts it — prove it against the real
-      engine.
-- [ ] 1.8 Confirm 1.7 is GREEN with no grant changes to `008_usuarios_y_permisos.sql`. If a gap is
+      engine. **VERIFIED, design.md's claim holds — no gap found.**
+      `NivelBloqueo_InheritsObjectLevelGrant_FromExistingUsuarioPermissions` in
+      `PermissionMatrixTests.cs` checks three things against the real engine: (a) zero rows in
+      `sys.database_permissions` at column-scope (`class = 1` joined to `sys.columns` by
+      `major_id`/`minor_id`) for `NivelBloqueo` — no column-level grant exists anywhere that could
+      override the object-level one; (b) `usr_api` can `SELECT`/`UPDATE` the column with no code
+      change; (c) `usr_worker` is denied both, exactly like the rest of the table. Same compression
+      note as 1.3: written and run against `012` already applied, since `012` ships no grant
+      statement to strip for a meaningful RED state.
+- [x] 1.8 Confirm 1.7 is GREEN with no grant changes to `008_usuarios_y_permisos.sql`. If a gap is
       found (e.g., a column-level grant somewhere overrides the object-level one), that is a blocking
-      finding for this task, not something to route around.
-- [ ] 1.9 Run `DboWriteLintTests` against the schema tree that now includes `011`, `012`,
+      finding for this task, not something to route around. **Confirmed GREEN, `008` untouched — no
+      blocking finding.** This is the one task the coordinator's apply-scope explicitly called out as
+      "actually proves the design doc's claim against the real engine, not a restatement of it," and
+      it does: the test queries `sys.database_permissions` directly rather than asserting the absence
+      of a diff.
+- [x] 1.9 Run `DboWriteLintTests` against the schema tree that now includes `011`, `012`,
       `rollback/011_down.sql`, `rollback/012_down.sql` — confirm it still passes. Do not assume it
-      "just works" because the scan is recursive; actually run it and record the result.
-- [ ] 1.10 Regenerate `SmartNet/db/schema/checksums.txt` via `generate-checksums.ps1` for `011` and
+      "just works" because the scan is recursive; actually run it and record the result. **Actually
+      run, 2026-08-16: 10/10 tests pass**, including
+      `RealSchemaScripts_HaveNoDisallowedDboMentions`, which recursively scans `SmartNet/db/schema/`
+      (`rollback/` included) and found zero disallowed `dbo` mentions in `011`, `012`, or either
+      rollback script — none of the four touches `dbo` in any form, forward or reverse.
+- [x] 1.10 Regenerate `SmartNet/db/schema/checksums.txt` via `generate-checksums.ps1` for `011` and
       `012` — the drift-detection mechanism item #1 built exists specifically for this moment.
-- [ ] 1.11 RED-then-confirm: `ChecksumManifestTests` — run before 1.10 to observe the expected
+      **Run 2026-08-16** — 12 entries written (10 existing + `011_sesion.sql` +
+      `012_usuario_nivel_bloqueo.sql`), via `pwsh -File .\generate-checksums.ps1`.
+- [x] 1.11 RED-then-confirm: `ChecksumManifestTests` — run before 1.10 to observe the expected
       transient warning (unlisted-but-present scripts), then re-run after 1.10 to confirm
-      `RealManifest_MatchesTheRealScripts_Exactly` passes.
-- [ ] 1.12 Confirm `RollbackAdvisoryTests` picks up `011_down.sql`/`012_down.sql`, that the runner
+      `RealManifest_MatchesTheRealScripts_Exactly` passes. **Both halves actually run, 2026-08-16**:
+      before regen, the test failed with exactly the two expected warnings ("011_sesion.sql: exists
+      on disk but is not listed…", "012_usuario_nivel_bloqueo.sql: exists on disk but is not
+      listed…"), zero errors — the expected transient state. After regen, the same test passes with
+      zero errors and zero warnings.
+- [x] 1.12 Confirm `RollbackAdvisoryTests` picks up `011_down.sql`/`012_down.sql`, that the runner
       never applies them, and that each has a forward-script companion and tears `fact.Sesion` /
-      `fact.Usuario.NivelBloqueo` down cleanly when run by hand.
+      `fact.Usuario.NivelBloqueo` down cleanly when run by hand. **Genuine finding during this task,
+      not pre-decided:** the first draft of `rollback/012_down.sql` dropped the CHECK constraint then
+      the column, assuming (per its own comment, since corrected) that `DROP COLUMN` auto-drops the
+      column's named `DEFAULT` constraint the way it auto-drops an *unnamed* one. Verified false
+      against the real engine — error 5074 ("object 'DF_Usuario_NivelBloqueo' is dependent on column
+      'NivelBloqueo'") — because `DF_Usuario_NivelBloqueo` is a named constraint, not implicit. Fixed
+      by explicitly dropping `DF_Usuario_NivelBloqueo` between the `CHECK` drop and the column drop.
+      All 3 `RollbackAdvisoryTests` (the runner-never-executes behavioral proof, the
+      every-forward-script-has-a-companion static check, and the real descending-order full-teardown
+      run against a throwaway database) pass after the fix — `011_down.sql`/`012_down.sql` both
+      execute successfully and `fact.Sesion`/`fact.Usuario.NivelBloqueo` are fully torn down.
 
 ## Phase 2: `SmartNet.Auth.Core` — pure domain (ADR 0019 level 1)
 
