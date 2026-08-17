@@ -311,12 +311,12 @@ repositorios de lectura/escritura sobre los 3 satélites propios `fact.*`, más 
 `ResolverCandidatas` (REGLAS.md §3). Sin DDL nuevo: el esquema y los `GRANT` ya existen (ítem #1).
 Depende del ítem #1 (completo).
 
-**Ciclo SDD:** `openspec/changes/catalogos-y-satelites/` · **3 de 47 tareas cerradas (compuerta WU0)**
+**Ciclo SDD:** `openspec/changes/catalogos-y-satelites/` · **19 de 47 tareas cerradas (WU0 + WU1)**
 
 | Fase | Unidad | Alcance | Tareas | Estado |
 |---|---|---|---|---|
 | 0 | 1 | Compuerta: verificación de conteos de `CuentaContable.csv` contra REGLAS.md §3 | 3/3 | ✅ |
-| 1 | 2 | `SmartNet.Catalogos.Core` — dominio puro, `ResolucionDePrefijos`, pruebas golden y de pureza | 0/16 | ⬜ |
+| 1 | 2 | `SmartNet.Catalogos.Core` — dominio puro, `ResolucionDePrefijos`, pruebas golden y de pureza | 16/16 | ✅ |
 | 2 | 3 | `SmartNet.Catalogos.Infrastructure` — 5 adaptadores externos de solo lectura | 0/12 | ⬜ |
 | 3 | 4 | `SmartNet.Catalogos.Infrastructure` — 3 adaptadores de satélites + suficiencia de permisos | 0/12 | ⬜ |
 | 4 | 5 | `SmartNet.sln`, CI y suite completa end-to-end | 0/4 | ⬜ |
@@ -336,6 +336,25 @@ contra REGLAS.md §2. Sin `dotnet-script`/LINQPad disponibles en este entorno, l
 hizo con un `awk` desechable de semántica equivalente (`StartsWith` ordinal, filtro de hoja,
 unión sin duplicados) — documentado íntegro en `tasks.md` tarea 0.1. Compuerta **PASS**: WU1 puede
 escribir sus pruebas golden (tarea 1.13) usando estos conteos y prefijos como dados.
+
+**Unidad 2 (`SmartNet.Catalogos.Core`) cerrada** — 32/32 pruebas en verde, ejecutadas por mí. Ciclo
+RED→GREEN estricto en cada pieza de lógica: `CuentaContable` (registro con `EsHojaImputable =>
+Nivel is null`), `ParsearPrefijos` (split, trim, descarte de vacíos, dedup ordinal), y
+`ResolverCandidatas`/`EsCandidata` (`StartsWith` ordinal sobre el plan completo, filtrando hojas
+internamente — design.md Decisión 1). Las 5 pruebas golden de REGLAS.md §3 corren contra el
+fixture real `CuentaContable.csv` (1650 filas, enlazado como recurso del proyecto de prueba, cero
+BD): motivo 22→1, 48→6, 6→20, 70→34, 8→22 candidatas, los cinco exactos. `PurityScanTests` —copia
+literal del patrón del ítem #2— corrió primero en verde trivial contra el proyecto vacío (tarea
+1.3) y de nuevo al cierre contra el ensamblado completo (tarea 1.16): cero `PackageReference`,
+cero referencia a `Microsoft.Data.SqlClient`/`Microsoft.AspNetCore`, cero llamada directa a
+`DateTime.Now`/`UtcNow` a nivel de IL.
+
+Una desviación explícita, no silenciosa: `design.md` fija la forma exacta solo de `CuentaContable`;
+los 8 puertos de repositorio referencian siete tipos más (`Motivo`, `Proveedor`, `Origen`,
+`DocumentoIdentidad`, `ProveedorAtributo`, `MotivoAtributo`, `SugerenciaCuenta`) sin forma fijada
+en el diseño. Se modelaron 1:1 contra las columnas reales del DDL ya existente
+(`010_dbo_catalogos_ddl.sql`, `004_satelites_datos_maestros.sql`) — sin esos registros, las
+interfaces del ítem no compilan. Documentado en `tasks.md` tarea 1.15, no asumido en silencio.
 
 ---
 

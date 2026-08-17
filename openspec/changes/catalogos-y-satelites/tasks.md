@@ -114,46 +114,59 @@ before any Core code exists, and is a hard gate: WU1's golden-test task cannot s
 
 ## Phase 1: `SmartNet.Catalogos.Core` — pure domain (ADR 0019 level 1)
 
-- [ ] 1.1 Scaffold `SmartNet/catalogos/SmartNet.Catalogos.Core` (classlib, `net10.0`, zero
+- [x] 1.1 Scaffold `SmartNet/catalogos/SmartNet.Catalogos.Core` (classlib, `net10.0`, zero
       `PackageReference`) and `SmartNet/catalogos/SmartNet.Catalogos.Core.Tests` (xUnit + `Mono.Cecil`
       0.11.6 + `NetArchTest.Rules` 1.3.2, mirroring `SmartNet.Auth.Core.Tests`).
-- [ ] 1.2 RED: purity/architecture-scan test — copy `PurityScanTests` from `SmartNet.Auth.Core.Tests`
+- [x] 1.2 RED: purity/architecture-scan test — copy `PurityScanTests` from `SmartNet.Auth.Core.Tests`
       literally, retargeted at `SmartNet.Catalogos.Core` (5 facts: 3 NetArchTest not-have-dependency
       assertions against `System.Data.SqlClient`/`Microsoft.Data.SqlClient`/`Microsoft.AspNetCore`,
       plus the Cecil assembly-reference scan, plus the IL `DateTime.Now`/`UtcNow` call-site scan).
-- [ ] 1.3 Confirm 1.2 passes trivially against the empty project (nothing to violate yet) —
-      same empty-baseline discipline as item #2's task 2.3.
-- [ ] 1.4 RED: `CuentaContable` record shape test — construction/equality, `EsHojaImputable =>
-      Nivel is null`.
-- [ ] 1.5 GREEN: `CuentaContable` record (design.md's exact shape: `Cuenta`, `Descripcion`, `Nivel`,
-      `CtaReflejaCodigo`, `CtaPuenteCodigo`).
-- [ ] 1.6 RED: `ParsearPrefijos` tests — comma-split, trim, discard empty tokens, ordinal dedup;
-      `null`/`""` input → empty list.
-- [ ] 1.7 GREEN: `ResolucionDePrefijos.ParsearPrefijos`.
-- [ ] 1.8 RED: `ResolverCandidatas` unit tests (in-memory plan, no DB) — leaf vs hierarchy-node
+- [x] 1.3 Confirm 1.2 passes trivially against the empty project (nothing to violate yet) —
+      same empty-baseline discipline as item #2's task 2.3. **Confirmed: 5/5 green.**
+- [x] 1.4 RED: `CuentaContable` record shape test — construction/equality, `EsHojaImputable =>
+      Nivel is null`. **Confirmed RED: CS0246, type does not exist.**
+- [x] 1.5 GREEN: `CuentaContable` record (design.md's exact shape: `Cuenta`, `Descripcion`, `Nivel`,
+      `CtaReflejaCodigo`, `CtaPuenteCodigo`). **Confirmed GREEN: 4/4.**
+- [x] 1.6 RED: `ParsearPrefijos` tests — comma-split, trim, discard empty tokens, ordinal dedup;
+      `null`/`""` input → empty list. **Confirmed RED: CS0103, member does not exist.**
+- [x] 1.7 GREEN: `ResolucionDePrefijos.ParsearPrefijos`. **Confirmed GREEN: 7/7.**
+- [x] 1.8 RED: `ResolverCandidatas` unit tests (in-memory plan, no DB) — leaf vs hierarchy-node
       exclusion, multi-prefix union without duplicates, overlapping prefixes, deterministic ordinal
       ascending order, `null`/no-match prefix → empty result, a `cuenta` value with `NULL` `Nivel`
-      handling.
-- [ ] 1.9 GREEN: `ResolucionDePrefijos.ResolverCandidatas` — `StartsWith` ordinal matching over the
-      full flat chart, filtering leaves internally (design.md Decision 1).
-- [ ] 1.10 RED: `EsCandidata` tests — true for a leaf matching a declared prefix, false for a
-      hierarchy node or non-matching leaf.
-- [ ] 1.11 GREEN: `ResolucionDePrefijos.EsCandidata`.
-- [ ] 1.12 GATE CHECK: confirm task 0.2/0.3 closed with matching counts (or an explicit
-      user-answered discrepancy) before writing golden tests below.
-- [ ] 1.13 RED: golden tests against `SmartNet/db/fixtures/data/CuentaContable.csv` as a linked
+      handling. **Confirmed RED: CS0117, method does not exist.**
+- [x] 1.9 GREEN: `ResolucionDePrefijos.ResolverCandidatas` — `StartsWith` ordinal matching over the
+      full flat chart, filtering leaves internally (design.md Decision 1). **Confirmed GREEN: 7/7.**
+- [x] 1.10 RED: `EsCandidata` tests — true for a leaf matching a declared prefix, false for a
+      hierarchy node or non-matching leaf. **Confirmed RED: CS0117, method does not exist.**
+- [x] 1.11 GREEN: `ResolucionDePrefijos.EsCandidata`. **Confirmed GREEN: 3/3.**
+- [x] 1.12 GATE CHECK: confirm task 0.2/0.3 closed with matching counts (or an explicit
+      user-answered discrepancy) before writing golden tests below. **Confirmed: WU0 gate closed,
+      all 5 counts and the 1650/907 totals matched exactly — no discrepancy to resolve.**
+- [x] 1.13 RED: golden tests against `SmartNet/db/fixtures/data/CuentaContable.csv` as a linked
       test-project resource (pure, no DB) — REGLAS.md §3's 5 worked examples: motivo 22→1, 48→6,
       6→20, 70→34, 8→22 candidates, using the exact prefix strings and counts confirmed in Phase 0.
-- [ ] 1.14 GREEN/confirm 1.13 against the implementation from 1.7/1.9 — no further production code
-      expected; record if any gap surfaces.
-- [ ] 1.15 GREEN: define the 8 repository port interfaces exactly per design.md's Interfaces/
+      **The fixture loader was new test-support code (no prior file loaded the real CSV); the
+      resolution logic itself (1.7/1.9) already existed and was proven correct in isolation. Ran
+      immediately after being written — passed on first execution (6/6, including the 1650/907
+      fixture-shape assertion), no RED→GREEN gap to close.**
+- [x] 1.14 GREEN/confirm 1.13 against the implementation from 1.7/1.9 — no further production code
+      expected; record if any gap surfaces. **Confirmed: no gap. All 5 golden counts matched
+      exactly against the real fixture on first run; no production code changed.**
+- [x] 1.15 GREEN: define the 8 repository port interfaces exactly per design.md's Interfaces/
       Contracts table (`ICuentaContableRepository`, `IMotivoRepository`, `IProveedorRepository`,
       `IOrigenRepository`, `IDocumentoIdentidadRepository`, `IProveedorAtributoRepository`,
       `IMotivoAtributoRepository`, `ISugerenciaCuentaRepository`) — compile-time contracts, no
       meaningful RED for an interface declaration; compression acknowledged explicitly, same class
-      as item #2's task 2.16.
-- [ ] 1.16 Re-run 1.2's purity scan against the complete `SmartNet.Catalogos.Core` (all of
+      as item #2's task 2.16. **Also defined the 7 supporting domain records these ports reference
+      (`Motivo`, `Proveedor`, `Origen`, `DocumentoIdentidad`, `ProveedorAtributo`, `MotivoAtributo`,
+      `SugerenciaCuenta`) — design.md fixed only `CuentaContable`'s exact shape; these were modeled
+      1:1 on the real DDL columns (`SmartNet/db/fixtures/010_dbo_catalogos_ddl.sql`,
+      `SmartNet/db/schema/004_satelites_datos_maestros.sql`) since the 8 interfaces cannot compile
+      without them. Noted as a deviation in the apply-progress artifact, not a silent addition.**
+- [x] 1.16 Re-run 1.2's purity scan against the complete `SmartNet.Catalogos.Core` (all of
       1.4–1.15) — confirm still GREEN before Phase 2 starts building against these ports.
+      **Confirmed: full suite 32/32 green, including all 5 PurityScanTests against the complete
+      assembly (records + interfaces added, still zero infrastructure references).**
 
 ## Phase 2: `SmartNet.Catalogos.Infrastructure` — external catalog adapters (read-only)
 
