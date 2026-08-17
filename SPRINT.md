@@ -11,9 +11,9 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | **2 de 17 cerrados**, ninguno en curso |
-| Ciclo SDD activo | ninguno — a la espera de arrancar el siguiente ítem |
-| Última fase cerrada | Ítem #2 COMPLETO — las siete fases cerradas |
+| Ítems del backlog | **2 de 17 cerrados**, ítem #3 en curso |
+| Ciclo SDD activo | Ítem #3 — Catálogos y satélites (`openspec/changes/catalogos-y-satelites/`) |
+| Última fase cerrada | Tareas del ítem #3 (`tasks.md`) — pendiente decisión de estrategia de PRs encadenados antes de aplicar |
 
 ---
 
@@ -304,14 +304,48 @@ reabre el ítem #1. La secuencia **15 → 30 → 60 → 120 minutos con techo** 
 
 ---
 
-## ⬜ Ítems 3 a 17 — sin ciclo SDD abierto
+## 🔄 3. Catálogos y satélites
+
+Repositorios de solo lectura sobre los 5 catálogos externos `dbo.*` (ADR 0003 Rev.5) y
+repositorios de lectura/escritura sobre los 3 satélites propios `fact.*`, más la función pura
+`ResolverCandidatas` (REGLAS.md §3). Sin DDL nuevo: el esquema y los `GRANT` ya existen (ítem #1).
+Depende del ítem #1 (completo).
+
+**Ciclo SDD:** `openspec/changes/catalogos-y-satelites/` · **3 de 47 tareas cerradas (compuerta WU0)**
+
+| Fase | Unidad | Alcance | Tareas | Estado |
+|---|---|---|---|---|
+| 0 | 1 | Compuerta: verificación de conteos de `CuentaContable.csv` contra REGLAS.md §3 | 3/3 | ✅ |
+| 1 | 2 | `SmartNet.Catalogos.Core` — dominio puro, `ResolucionDePrefijos`, pruebas golden y de pureza | 0/16 | ⬜ |
+| 2 | 3 | `SmartNet.Catalogos.Infrastructure` — 5 adaptadores externos de solo lectura | 0/12 | ⬜ |
+| 3 | 4 | `SmartNet.Catalogos.Infrastructure` — 3 adaptadores de satélites + suficiencia de permisos | 0/12 | ⬜ |
+| 4 | 5 | `SmartNet.sln`, CI y suite completa end-to-end | 0/4 | ⬜ |
+
+Pronóstico de revisión: alto riesgo de presupuesto de 400 líneas (Unidades 1 y 2 lo superan
+individualmente); PRs encadenados recomendados, estrategia de cadena pendiente de decisión del
+usuario antes de aplicar (`ask-on-risk`). Detalle completo en `tasks.md`.
+
+**Unidad 1 (compuerta WU0) cerrada** — los 5 conteos de REGLAS.md §3 se reprodujeron exactamente
+contra el fixture real `SmartNet/db/fixtures/data/CuentaContable.csv` (1650 filas): motivo 22→1,
+48→6, 6→20, 70→34, 8→22 candidatas. Los prefijos exactos se leyeron de
+`SmartNet/db/fixtures/data/Motivo.csv` (no re-tecleados de la prosa de REGLAS.md); motivo 8 resultó
+tener 7 prefijos reales (`4011,4017,4018,403,417,167101,1674`), no los 5 que muestra el ejemplo
+abreviado de REGLAS.md §3 (`…`) — el conteo total sigue coincidiendo, así que es prosa ilustrativa,
+no una discrepancia real. También se confirmó el total (1650) y las hojas (`nivel` vacío, 907)
+contra REGLAS.md §2. Sin `dotnet-script`/LINQPad disponibles en este entorno, la verificación se
+hizo con un `awk` desechable de semántica equivalente (`StartsWith` ordinal, filtro de hoja,
+unión sin duplicados) — documentado íntegro en `tasks.md` tarea 0.1. Compuerta **PASS**: WU1 puede
+escribir sus pruebas golden (tarea 1.13) usando estos conteos y prefijos como dados.
+
+---
+
+## ⬜ Ítems 4 a 17 — sin ciclo SDD abierto
 
 Las fases de cada ítem **se definen cuando arranca su ciclo SDD**, no antes. Ponerlas aquí ahora
 sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ítem, y ninguno existe.
 
 | # | Ítem | Depende de | Contexto obligatorio | Estado |
 |---|---|---|---|---|
-| 3 | Catálogos y satélites | #1 | ⚠ `Cuentas.xlsx` | ⬜ |
 | 4 | Tipos de cambio | #1 | — | ⬜ |
 | 5 | Ingesta Gmail | #1 | — | ⬜ |
 | 6 | Extracción y asociación | #5 | — | ⬜ |
