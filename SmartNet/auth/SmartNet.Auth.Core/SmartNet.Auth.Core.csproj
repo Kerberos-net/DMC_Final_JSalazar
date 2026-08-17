@@ -1,0 +1,13 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- ADR 0019 / design.md Decision 5: ZERO infrastructure PackageReferences here, ever.
+       No Microsoft.Data.SqlClient, no Microsoft.AspNetCore.*, no ambient clock. The purity
+       scan in SmartNet.Auth.Core.Tests (task 2.2) enforces this in CI, not just this comment. -->
+
+</Project>

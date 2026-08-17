@@ -169,6 +169,19 @@ para confirmar que no quedaran bases de prueba colgadas, y lo declaró explícit
 en vez de callárselo — la regla que compró el incidente de `master` del ítem #1 sigue viva.
 `master`/`BDSmartNet`/bases huérfanas: limpio, intacta, 0.
 
+**Unidad 3 (`SmartNet.Auth.Core`) cerrada** — 33/33 pruebas en verde, ejecutadas por mí en 131 ms:
+coherente con cero dependencia de base de datos, HTTP o reloj real, verificado con un escaneo de
+pureza doble (`NetArchTest.Rules` más una lectura de IL con `Mono.Cecil` que atrapa llamadas
+directas a `DateTime.Now`/`UtcNow` a nivel de bytes compilados, no de texto). Cero
+`PackageReference` en el `.csproj`, confirmado.
+
+**El agente encontró un error en mi propia instrucción y lo corrigió contra las fuentes
+normativas, no contra mi paráfrasis.** Le di la fórmula como `base × factor^min(NivelBloqueo,
+NivelMaximo-1)`; la correcta —verificada a mano contra la tabla de ADR 0007 Revisión 4 y contra
+`design.md`— es sin el `-1`. Con mi versión, el fallo 20 habría llegado al techo un nivel antes de
+tiempo (60 min en vez de 120). Comprobé el código fuente: `Math.Min(estado.NivelBloqueo,
+politica.NivelMaximo)`, sin resta — coincide con la tabla normativa fallo por fallo.
+
 **Decisión de arquitectura que salió de spec y diseño trabajando en paralelo.** El bloqueo por
 intentos necesitó una columna nueva, `fact.Usuario.NivelBloqueo`, porque `IntentosFallidos` no
 podía cargar dos preguntas con ciclos de vida distintos — cuántos fallos faltan para el próximo

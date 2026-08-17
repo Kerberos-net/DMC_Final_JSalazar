@@ -179,56 +179,103 @@ their first commit until the corresponding gate below is closed.
 
 ## Phase 2: `SmartNet.Auth.Core` — pure domain (ADR 0019 level 1)
 
-- [ ] 2.1 Scaffold `SmartNet/auth/SmartNet.Auth.Core` (classlib, `net10.0`, zero infrastructure
+- [x] 2.1 Scaffold `SmartNet/auth/SmartNet.Auth.Core` (classlib, `net10.0`, zero infrastructure
       `PackageReference`s) and `SmartNet/auth/SmartNet.Auth.Core.Tests` (xUnit +
-      `Microsoft.Extensions.TimeProvider.Testing`).
-- [ ] 2.2 RED: purity/architecture-scan test — scans the compiled `SmartNet.Auth.Core` assembly's
+      `Microsoft.Extensions.TimeProvider.Testing`). **Done 2026-08-16.** Core project has zero
+      `PackageReference`s (verified against nuget.org-resolved package list). Test project pulled
+      `Microsoft.Extensions.TimeProvider.Testing` 10.9.0, `NetArchTest.Rules` 1.3.2, `Mono.Cecil`
+      0.11.6 (for task 2.2), plus the same xUnit/coverlet/Test.Sdk versions
+      `SmartNet.Db.Runner.Tests` already pins. `dotnet build` green on the empty scaffold.
+- [x] 2.2 RED: purity/architecture-scan test — scans the compiled `SmartNet.Auth.Core` assembly's
       referenced assemblies and type usages, failing if it references `System.Data.SqlClient`,
       `Microsoft.Data.SqlClient`, or any `Microsoft.AspNetCore.*` type, and failing if IL/decompiled
       source calls `DateTime.Now`/`DateTime.UtcNow` directly. **Mechanism is an implementation
       decision** (e.g. `NetArchTest.Rules` for assembly-reference checks plus a targeted
       `Mono.Cecil`/reflection scan for the `DateTime.*` call sites, or an equivalent automated
       approach) — it must be a test that runs in CI, not a code-review promise, per spec's scenario
-      "The domain-core assembly does not reference infrastructure types directly."
-- [ ] 2.3 Confirm 2.2 passes trivially against the still-empty project (nothing to violate yet) — this
+      "The domain-core assembly does not reference infrastructure types directly." **Written
+      2026-08-16, `PurityScanTests.cs`, 5 tests**: `NetArchTest.Rules` for the three
+      not-have-dependency-on assertions (`System.Data.SqlClient`, `Microsoft.Data.SqlClient`,
+      `Microsoft.AspNetCore`) plus a redundant direct `Mono.Cecil` `AssemblyReferences` scan as a
+      belt-and-braces check against the same three prefixes (NetArchTest already wraps Cecil
+      internally, so this second test proves the mechanism doesn't depend solely on NetArchTest's
+      own correctness); a fifth test walks every method body's IL instructions
+      (`OpCodes.Call`/`Callvirt`) looking for a `MethodReference` whose declaring type is
+      `System.DateTime` and whose name is `get_Now`/`get_UtcNow` — a real compiled-bytes scan, not a
+      source-text grep (which a comment or string literal would falsely trip and an aliased call
+      would falsely miss).
+- [x] 2.3 Confirm 2.2 passes trivially against the still-empty project (nothing to violate yet) — this
       is the RED-before-anything-exists baseline the same way item #1's 2.1 established an empty-schema
-      baseline.
-- [ ] 2.4 RED: `LockoutPolicy.Adr0007` test — `UmbralFallos=5`, `DuracionBase=15min`, `Factor=2`,
-      `NivelMaximo=3`.
-- [ ] 2.5 GREEN: `LockoutPolicy` record.
-- [ ] 2.6 RED: `UsuarioCredentialState` shape test — `UsuarioId`, `NombreUsuario`, `ClaveHash`,
+      baseline. **Confirmed 2026-08-16**: 5/5 pass against the empty core (nothing to violate yet).
+- [x] 2.4 RED: `LockoutPolicy.Adr0007` test — `UmbralFallos=5`, `DuracionBase=15min`, `Factor=2`,
+      `NivelMaximo=3`. **RED confirmed 2026-08-16**: `LockoutPolicyTests.cs` — CS0234, `LockoutPolicy`
+      does not exist.
+- [x] 2.5 GREEN: `LockoutPolicy` record. **GREEN confirmed 2026-08-16**, 1/1 pass.
+- [x] 2.6 RED: `UsuarioCredentialState` shape test — `UsuarioId`, `NombreUsuario`, `ClaveHash`,
       `IntentosFallidos`, `NivelBloqueo`, `BloqueadoHasta`, `Activo`; a construction/equality test is
-      sufficient since this is a data record, not logic.
-- [ ] 2.7 GREEN: `UsuarioCredentialState` record.
-- [ ] 2.8 RED: `AccessPolicy.Evaluate` tests — `BloqueadoHasta` in the future ⇒ `Locked`;
+      sufficient since this is a data record, not logic. **RED confirmed 2026-08-16**:
+      `UsuarioCredentialStateTests.cs` — CS0234, type does not exist.
+- [x] 2.7 GREEN: `UsuarioCredentialState` record. **GREEN confirmed 2026-08-16**, 2/2 pass.
+- [x] 2.8 RED: `AccessPolicy.Evaluate` tests — `BloqueadoHasta` in the future ⇒ `Locked`;
       `BloqueadoHasta` `null` or in the past ⇒ not locked; exercised with `FakeTimeProvider`-supplied
-      `ahora`.
-- [ ] 2.9 GREEN: `AccessPolicy.Evaluate`.
-- [ ] 2.10 RED: `AccessPolicy.ApplyFailure` — the full worked sequence from design.md Decision 8,
+      `ahora`. **RED confirmed 2026-08-16**: `AccessPolicyEvaluateTests.cs` (4 cases incl. the
+      exactly-equal-to-`ahora` boundary) — CS0234, `AccessPolicy`/`AccessDecision` do not exist.
+- [x] 2.9 GREEN: `AccessPolicy.Evaluate`. **GREEN confirmed 2026-08-16**, 4/4 pass.
+- [x] 2.10 RED: `AccessPolicy.ApplyFailure` — the full worked sequence from design.md Decision 8,
       table-driven: failures 1–4 (no arm), failure 5 (arm at 15 min, `NivelBloqueo→1`,
       `IntentosFallidos→0`), the post-expiry margin (failure 6 does not re-lock, `NivelBloqueo`
       unchanged), failure 10 (arm at 30 min, `NivelBloqueo→2`), failure 15 (60 min, `→3`), failure 20
       (120 min, `NivelBloqueo` stays `3`, saturated), failure 25 (still 120 min, cap holds). Assert the
       duration formula reads `NivelBloqueo` **before** the saturating increment (`min(NivelBloqueo+1,
-      NivelMaximo)`).
-- [ ] 2.11 GREEN: `AccessPolicy.ApplyFailure(estado, politica, ahora)`.
-- [ ] 2.12 RED: `AccessPolicy.ApplySuccess` — clears all three fields: `IntentosFallidos=0`,
-      `BloqueadoHasta=null`, `NivelBloqueo=0`.
-- [ ] 2.13 GREEN: `AccessPolicy.ApplySuccess`.
-- [ ] 2.14 RED: PHC codec round-trip tests — encode/parse `$argon2id$v=19$m=19456,t=2,p=1$<salt>$<hash>`;
+      NivelMaximo)`). **RED confirmed 2026-08-16**: `AccessPolicyApplyFailureTests.cs`, 5 tests
+      written (CS0117, `ApplyFailure` does not exist) — one continuous stateful 1–25 walk
+      (`FullLifetimeSequence_1Through25_MatchesAdr0007Revision4WorkedTableExactly`) plus four isolated
+      tests: failures-1-4-no-arm, failure-5-arms, the read-before-increment boundary (hand-set
+      `NivelBloqueo=2` must yield a 60-min lock, not 120), and cap-holds-under-repeated-pressure.
+      **Formula correction found against design.md while writing this test, not pre-decided:**
+      design.md Decision 8's own worked-table section states the duration formula as
+      `DuracionBase × Factor^min(NivelBloqueo, NivelMaximo)` (not `NivelMaximo-1`) — verified by
+      hand-tracing every row of both design.md's and ADR 0007 Revisión 4's worked tables (15→30→60→
+      120→120…) against that exact formula; `min(NivelBloqueo, NivelMaximo-1)` does not reproduce the
+      documented sequence (it would put the 120-min ceiling one failure early). Implemented and tested
+      against the formula that actually matches the two normative tables.
+- [x] 2.11 GREEN: `AccessPolicy.ApplyFailure(estado, politica, ahora)`. **GREEN confirmed
+      2026-08-16**, 5/5 pass, including the full 25-failure sequence and the off-by-one guard.
+- [x] 2.12 RED: `AccessPolicy.ApplySuccess` — clears all three fields: `IntentosFallidos=0`,
+      `BloqueadoHasta=null`, `NivelBloqueo=0`. **RED confirmed 2026-08-16**:
+      `AccessPolicyApplySuccessTests.cs` — CS0117, `ApplySuccess` does not exist.
+- [x] 2.13 GREEN: `AccessPolicy.ApplySuccess`. **GREEN confirmed 2026-08-16**, 3/3 pass (clears all
+      three fields; preserves identity fields; idempotent on an already-clean account).
+- [x] 2.14 RED: PHC codec round-trip tests — encode/parse `$argon2id$v=19$m=19456,t=2,p=1$<salt>$<hash>`;
       a malformed PHC string; an unknown-algorithm PHC string (e.g. a legacy/foreign format) — both
       must be handled as a typed failure, never an unhandled exception, since this runs on every login
-      attempt including against attacker-uncontrolled but potentially corrupted rows.
-- [ ] 2.15 GREEN: PHC codec (pure, in `SmartNet.Auth.Core` — the "missing PHC codec is a benefit"
-      framing from design.md Decision 1).
-- [ ] 2.16 GREEN: define port interfaces exactly per design.md Decision 5 —
+      attempt including against attacker-uncontrolled but potentially corrupted rows. **RED confirmed
+      2026-08-16**: `PhcCodecTests.cs`, 13 cases — CS0246/CS0103, `PhcHash`/`PhcCodec`/`PhcParseError`
+      do not exist.
+- [x] 2.15 GREEN: PHC codec (pure, in `SmartNet.Auth.Core` — the "missing PHC codec is a benefit"
+      framing from design.md Decision 1). **GREEN confirmed 2026-08-16**, 13/13 pass.
+      `PhcParseResult` (typed success/`PhcHash` or failure/`PhcParseError`, never an exception) —
+      malformed structure (wrong `$`-segment count, non-numeric `v=`/`m=,t=,p=`, unparsable base64)
+      returns `PhcParseError.Malformed`; a well-formed-but-different algorithm segment (`bcrypt`,
+      `pbkdf2-sha256`, even the legacy sibling `argon2i`) returns `PhcParseError.UnknownAlgorithm`.
+      Neither case throws.
+- [x] 2.16 GREEN: define port interfaces exactly per design.md Decision 5 —
       `IUsuarioRepository`, `ISesionRepository`, `IPasswordHasher`, `ISessionTokenFactory`. These are
       compile-time contracts with no logic of their own; there is no meaningful RED for an interface
       declaration, so this task is recorded as a direct GREEN rather than manufacturing a hollow RED —
       noted explicitly as a compression, per the hard constraint that compression must be
-      acknowledged, not silently taken.
-- [ ] 2.17 Re-run 2.2's purity scan against the complete `SmartNet.Auth.Core` (all of 2.4–2.16) —
-      confirm still GREEN before Phase 3 starts building against these ports.
+      acknowledged, not silently taken. **Done 2026-08-16**, compression taken as pre-authorized.
+      Also added the small supporting types the interfaces reference:
+      `MotivoRevocacion`/`SesionActiva` (ports over `fact.Sesion`) and `PasswordVerification`
+      (`IPasswordHasher.Verify`'s typed result — `Correct`/`Incorrect`/`StoredHashUnreadable`, so a
+      corrupted stored hash is distinguishable from a genuine wrong password without throwing, same
+      typed-failure discipline as the PHC codec). `dotnet build` green.
+- [x] 2.17 Re-run 2.2's purity scan against the complete `SmartNet.Auth.Core` (all of 2.4–2.16) —
+      confirm still GREEN before Phase 3 starts building against these ports. **Re-run 2026-08-16**:
+      5/5 purity-scan tests pass against the complete core (16 source files: `LockoutPolicy`,
+      `UsuarioCredentialState`, `AccessDecision`, `AccessPolicy`, `PhcHash`/`PhcParseError`/
+      `PhcParseResult`/`PhcCodec`, `MotivoRevocacion`, `SesionActiva`, `PasswordVerification`, and the
+      four port interfaces). Full suite: `dotnet test` → 33/33 pass, 0 failures, 0 skipped.
 
 ## Phase 3: `SmartNet.Auth.Infrastructure` — adapters
 
