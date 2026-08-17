@@ -13,7 +13,7 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 |---|---|
 | Ítems del backlog | **2 de 17 cerrados**, ítem #3 en curso |
 | Ciclo SDD activo | Ítem #3 — Catálogos y satélites (`openspec/changes/catalogos-y-satelites/`) |
-| Última fase cerrada | Tareas del ítem #3 (`tasks.md`) — pendiente decisión de estrategia de PRs encadenados antes de aplicar |
+| Última fase cerrada | Ítem #3, WU3 (Fase 3 — 3 adaptadores de satélites + suficiencia de permisos), 43/47 tareas del ítem cerradas — falta WU4 (`SmartNet.sln`, CI, suite completa) |
 
 ---
 
@@ -311,14 +311,14 @@ repositorios de lectura/escritura sobre los 3 satélites propios `fact.*`, más 
 `ResolverCandidatas` (REGLAS.md §3). Sin DDL nuevo: el esquema y los `GRANT` ya existen (ítem #1).
 Depende del ítem #1 (completo).
 
-**Ciclo SDD:** `openspec/changes/catalogos-y-satelites/` · **31 de 47 tareas cerradas (WU0 + WU1 + WU2)**
+**Ciclo SDD:** `openspec/changes/catalogos-y-satelites/` · **43 de 47 tareas cerradas (WU0 + WU1 + WU2 + WU3)**
 
 | Fase | Unidad | Alcance | Tareas | Estado |
 |---|---|---|---|---|
 | 0 | 1 | Compuerta: verificación de conteos de `CuentaContable.csv` contra REGLAS.md §3 | 3/3 | ✅ |
 | 1 | 2 | `SmartNet.Catalogos.Core` — dominio puro, `ResolucionDePrefijos`, pruebas golden y de pureza | 16/16 | ✅ |
 | 2 | 3 | `SmartNet.Catalogos.Infrastructure` — 5 adaptadores externos de solo lectura | 12/12 | ✅ |
-| 3 | 4 | `SmartNet.Catalogos.Infrastructure` — 3 adaptadores de satélites + suficiencia de permisos | 0/12 | ⬜ |
+| 3 | 4 | `SmartNet.Catalogos.Infrastructure` — 3 adaptadores de satélites + suficiencia de permisos | 12/12 | ✅ |
 | 4 | 5 | `SmartNet.sln`, CI y suite completa end-to-end | 0/4 | ⬜ |
 
 Pronóstico de revisión: alto riesgo de presupuesto de 400 líneas (Unidades 1 y 2 lo superan
@@ -375,6 +375,32 @@ que **ambos** `fact_api` y `fact_worker` tienen `GRANT SELECT` en los 5 catálog
 denegación real es solo de escritura (ya cubierta por el escaneo estructural). La suite quedó con
 14 casos: 12 confirmando que ambos usuarios pueden ejecutar cada `SELECT` de los 5 adaptadores, 2
 confirmando que ambos siguen denegados en un `UPDATE`.
+
+**Unidad 4 (`SmartNet.Catalogos.Infrastructure` — 3 adaptadores de satélites) cerrada** — 56/56
+pruebas en verde en el proyecto completo (30 previas + 26 nuevas), sin regresiones, cero bases
+`fact_test_*` huérfanas al terminar. Ciclo RED→GREEN estricto en cada adaptador de escritura:
+`SqlProveedorAtributoRepository` (3/3), `SqlMotivoAtributoRepository` (5/5),
+`SqlSugerenciaCuentaRepository` (7/7, incluye las 3 listas de solo lectura y `RegistrarUsoAsync`).
+Ningún adaptador valida existencia contra `dbo.*` al escribir — Decisión 2 de `design.md`: sería
+una regla más débil que la real (candidatura por motivo, no existencia cruda) y un riesgo TOCTOU
+entre sistemas; probado explícitamente sembrando códigos nunca insertados en `dbo.Proveedor`/
+`dbo.Motivo` y confirmando que `GuardarAsync`/`RegistrarUsoAsync` igual escriben. `RegistrarUsoAsync`
+es una sola sentencia (`UPDATE … SET Veces = Veces + 1, UltimoUso = @instante; IF @@ROWCOUNT = 0
+INSERT …`), el instante siempre llega como parámetro `DateTimeOffset`, nunca `SYSUTCDATETIME()`
+dentro del adaptador. `NoRankingStructuralTests` (1/1) confirma por reflexión que
+`ISugerenciaCuentaRepository` no tiene ningún método que rankee, ordene o elija una sugerencia
+"mejor" — eso es el ítem #9, no este. `PermissionSufficiencyTests` sumó 10 casos nuevos a los 14 de
+la Unidad 3 (24/24 en total): `usr_api` ejecuta cada SELECT/INSERT/UPDATE de los 3 satélites bajo
+sus `GRANT` reales de `008_usuarios_y_permisos.sql`; `usr_worker` queda denegado en lectura y
+escritura en los 3 (su `DENY` real); ambos usuarios quedan denegados en `DELETE` sobre los 3
+satélites — confirma la restricción de diseño "nunca DELETE" también a nivel de permisos, no solo
+por la forma de los métodos del adaptador.
+
+Cubre además el "bug class" ya conocido en este proyecto: una sola desviación documentada, no
+silenciosa — igual que en la Unidad 3 con `dbo.Motivo`, la migración `010_motivo_atributo_demo.sql`
+inserta 23 filas de demo en `fact.MotivoAtributo` de forma incondicional al migrar; las pruebas de
+`SqlMotivoAtributoRepository` vacían la tabla después de migrar, antes de sembrar sus propios casos,
+para partir de un estado limpio.
 
 ---
 

@@ -224,36 +224,63 @@ before any Core code exists, and is a hard gate: WU1's golden-test task cannot s
 
 ## Phase 3: `SmartNet.Catalogos.Infrastructure` — satellite adapters (read/write) + permissions
 
-- [ ] 3.1 RED: `SqlProveedorAtributoRepository` tests — `ObtenerAsync` returns empty/absent for an
+- [x] 3.1 RED: `SqlProveedorAtributoRepository` tests — `ObtenerAsync` returns empty/absent for an
       unseeded code, no exception; `GuardarAsync` upserts a new `EsRelacionada` value for a
-      `ProveedorCodigo` not yet present.
-- [ ] 3.2 GREEN: `SqlProveedorAtributoRepository`.
-- [ ] 3.3 RED: `SqlMotivoAtributoRepository` tests — `ObtenerAsync`, `ListarAsync`, `GuardarAsync`
+      `ProveedorCodigo` not yet present. **Confirmed RED: CS0246, type does not exist (5 call
+      sites).**
+- [x] 3.2 GREEN: `SqlProveedorAtributoRepository`. **Confirmed GREEN: 3/3.** No `EXISTS` guard
+      against `dbo.Proveedor` (design.md Decision 2) — `GuardarAsync` succeeds for a code never
+      seeded into `dbo.Proveedor`, proven by the test itself never seeding it.
+- [x] 3.3 RED: `SqlMotivoAtributoRepository` tests — `ObtenerAsync`, `ListarAsync`, `GuardarAsync`
       upsert; confirm `activo`/`origen '02'` filtering stays out of the adapter's SQL (design.md:
-      filtered in Core, not SQL) — adapter returns raw rows only.
-- [ ] 3.4 GREEN: `SqlMotivoAtributoRepository`.
-- [ ] 3.5 RED: `SqlSugerenciaCuentaRepository` read tests —
+      filtered in Core, not SQL) — adapter returns raw rows only. **Confirmed RED: CS0246 (5 call
+      sites).**
+- [x] 3.4 GREEN: `SqlMotivoAtributoRepository`. **Confirmed GREEN: 5/5 — one fix needed during
+      GREEN, same class as task 2.6's: migration `010_motivo_atributo_demo.sql` unconditionally
+      inserts 23 demo rows into `fact.MotivoAtributo` when it runs; `InitializeAsync` now deletes
+      them post-migration so every test starts from a clean table (mirrors `SqlMotivoRepositoryTests`'
+      pattern for `dbo.Motivo`).**
+- [x] 3.5 RED: `SqlSugerenciaCuentaRepository` read tests —
       `ListarPorProveedorYMotivoAsync`/`ListarPorMotivoAsync`/`ListarPorProveedorAsync` return raw
-      rows, no ranking/sorting by frequency.
-- [ ] 3.6 GREEN: the three list methods on `SqlSugerenciaCuentaRepository`.
-- [ ] 3.7 RED: `RegistrarUsoAsync` tests — inserts a new row the first time for a
+      rows, no ranking/sorting by frequency. **Confirmed RED: CS0246 (6 call sites).**
+- [x] 3.6 GREEN: the three list methods on `SqlSugerenciaCuentaRepository`. **Confirmed GREEN as
+      part of the same 7/7 run as 3.7/3.8 below (one repository, one test file).**
+- [x] 3.7 RED: `RegistrarUsoAsync` tests — inserts a new row the first time for a
       (`ProveedorCodigo`,`Motivo`,`CuentaCodigo`) combination; increments `Veces` and updates
       `UltimoUso` on the second call for the same combination, leaving other rows untouched; the
       instant is passed as a parameter, never computed with `SYSUTCDATETIME()` inside the adapter.
-- [ ] 3.8 GREEN: `RegistrarUsoAsync` — single `UPDATE … IF @@ROWCOUNT = 0 INSERT …` statement per
-      design.md.
-- [ ] 3.9 RED: structural test — `ISugerenciaCuentaRepository` has no method that ranks, sorts, or
+      **Confirmed RED (same compile failure as 3.5, single test file).**
+- [x] 3.8 GREEN: `RegistrarUsoAsync` — single `UPDATE … IF @@ROWCOUNT = 0 INSERT …` statement per
+      design.md, `@instante` passed as a `DateTimeOffset` parameter (mapped to UTC
+      `DATETIME2(3)`), never `SYSUTCDATETIME()`. **Confirmed GREEN: 7/7 for
+      `SqlSugerenciaCuentaRepositoryTests`** (4 read cases + 3 `RegistrarUsoAsync` cases including
+      "leaves other combinations untouched").
+- [x] 3.9 RED: structural test — `ISugerenciaCuentaRepository` has no method that ranks, sorts, or
       selects one preferred candidate (spec's "no single best suggestion" scenario) — reflection over
-      interface members.
-- [ ] 3.10 GREEN/confirm 3.9 — passes by construction; record confirmation.
-- [ ] 3.11 RED: `PermissionSufficiencyTests` — replay every SQL statement from the 3 satellite
+      interface members. **Not a RED-first task, same class as 2.11 vs the already-existing
+      interface: `ISugerenciaCuentaRepository` was fully defined in WU1 (Phase 1) with exactly the
+      4 storage-only methods design.md specifies — nothing to change, only to confirm. Compression
+      acknowledged explicitly.**
+- [x] 3.10 GREEN/confirm 3.9 — passes by construction; record confirmation. **Confirmed:
+      `NoRankingStructuralTests` 1/1 green on first run — 4 members, none ranking/sorting/selection
+      shaped.**
+- [x] 3.11 RED: `PermissionSufficiencyTests` — replay every SQL statement from the 3 satellite
       adapters (2.x's 5 external adapters are read-only `SELECT`s, already covered by existing
       `fact_api`/`fact_worker` catalog grants from item #1) through
       `ExecuteAsUserAsync("usr_api", …)`, confirming each succeeds under `usr_api`'s real grants;
-      confirm `usr_worker` remains denied write access to the 3 satellites.
-- [ ] 3.12 Confirm 3.11 is GREEN with no schema changes. If a statement fails under real grants,
+      confirm `usr_worker` remains denied write access to the 3 satellites. **Not RED-first: added
+      10 new `[Fact]`/`[Theory]` cases to the existing `PermissionSufficiencyTests.cs` (2.13),
+      replaying each satellite adapter's exact SQL text — these confirm real grants, they do not
+      exercise not-yet-written production code, same class as 2.13/3.9.**
+- [x] 3.12 Confirm 3.11 is GREEN with no schema changes. If a statement fails under real grants,
       record the gap explicitly — item #1's `fact_api` grants on the 3 satellites are the only
-      source of truth; do not relax the test to route around a real gap.
+      source of truth; do not relax the test to route around a real gap. **Confirmed GREEN: all 24
+      `PermissionSufficiencyTests` cases (14 from WU2 + 10 new) pass — `usr_api` succeeds on every
+      satellite SELECT/INSERT/UPDATE (`008_usuarios_y_permisos.sql`'s real `GRANT` list), `usr_worker`
+      is denied both read and write on all 3 satellites (real `DENY`), and both users are denied
+      `DELETE` on all 3 (no `DELETE` grant to either principal — confirms the "never DELETE" design
+      constraint at the permission layer, not just by adapter method shape). No schema changes
+      needed; no gap found.**
 
 ## Phase 4: Solution wiring, CI, and full integration
 

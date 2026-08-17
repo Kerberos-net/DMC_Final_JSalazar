@@ -249,4 +249,210 @@ public sealed class PermissionSufficiencyTests : IAsyncLifetime
 
         Assert.NotNull(exception);
     }
+
+    // ---------------------------------------------------------------------------------------
+    // Task 3.11/3.12 -- the 3 satellite adapters (fact.ProveedorAtributo/MotivoAtributo/
+    // SugerenciaCuenta). 008_usuarios_y_permisos.sql grants fact_api SELECT/INSERT/UPDATE (no
+    // DELETE) on all 3 and DENYs fact_worker everything -- unlike the 5 read-only external
+    // catalogs above, here usr_api and usr_worker are NOT expected to behave the same.
+    // Replays the exact SQL text each satellite adapter issues (design.md's single
+    // UPDATE .. IF @@ROWCOUNT = 0 INSERT .. shape for the two upserts/RegistrarUsoAsync).
+    // ---------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task UsrApi_CanExecute_ProveedorAtributoGuardarAsyncUpsert()
+    {
+        var rowsAffected = await _db.ExecuteAsUserAsync(UsrApi, async connection =>
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                UPDATE fact.ProveedorAtributo
+                SET EsRelacionada = @esRelacionada
+                WHERE ProveedorCodigo = @proveedorCodigo;
+
+                IF @@ROWCOUNT = 0
+                    INSERT INTO fact.ProveedorAtributo (ProveedorCodigo, EsRelacionada)
+                    VALUES (@proveedorCodigo, @esRelacionada);
+                """;
+            command.Parameters.AddWithValue("@proveedorCodigo", "P00001");
+            command.Parameters.AddWithValue("@esRelacionada", true);
+            return await command.ExecuteNonQueryAsync();
+        });
+
+        Assert.True(rowsAffected >= 1);
+    }
+
+    [Fact]
+    public async Task UsrApi_CanExecute_ProveedorAtributoObtenerAsyncSelect()
+    {
+        var rowsRead = await _db.ExecuteAsUserAsync(UsrApi, async connection =>
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                SELECT ProveedorCodigo, EsRelacionada
+                FROM fact.ProveedorAtributo
+                WHERE ProveedorCodigo = @proveedorCodigo;
+                """;
+            command.Parameters.AddWithValue("@proveedorCodigo", "P00001");
+            await using var reader = await command.ExecuteReaderAsync();
+            var read = 0;
+            while (await reader.ReadAsync())
+            {
+                read++;
+            }
+            return read;
+        });
+
+        Assert.True(rowsRead >= 0);
+    }
+
+    [Fact]
+    public async Task UsrWorker_IsDenied_ProveedorAtributoWriteAndReadAccess()
+    {
+        var writeException = await Record.ExceptionAsync(() => _db.ExecuteAsUserAsync(UsrWorker, async connection =>
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                "INSERT INTO fact.ProveedorAtributo (ProveedorCodigo, EsRelacionada) VALUES ('P99999', 0);";
+            return await command.ExecuteNonQueryAsync();
+        }));
+        Assert.NotNull(writeException);
+
+        var readException = await Record.ExceptionAsync(() => _db.ExecuteAsUserAsync(UsrWorker, async connection =>
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = "SELECT ProveedorCodigo FROM fact.ProveedorAtributo;";
+            await using var reader = await command.ExecuteReaderAsync();
+            return await reader.ReadAsync();
+        }));
+        Assert.NotNull(readException);
+    }
+
+    [Fact]
+    public async Task UsrApi_CanExecute_MotivoAtributoGuardarAsyncUpsert()
+    {
+        var rowsAffected = await _db.ExecuteAsUserAsync(UsrApi, async connection =>
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                UPDATE fact.MotivoAtributo
+                SET Activo = @activo, OrigenLibro = @origenLibro
+                WHERE Motivo = @motivo;
+
+                IF @@ROWCOUNT = 0
+                    INSERT INTO fact.MotivoAtributo (Motivo, Activo, OrigenLibro)
+                    VALUES (@motivo, @activo, @origenLibro);
+                """;
+            command.Parameters.AddWithValue("@motivo", 22);
+            command.Parameters.AddWithValue("@activo", true);
+            command.Parameters.AddWithValue("@origenLibro", "02");
+            return await command.ExecuteNonQueryAsync();
+        });
+
+        Assert.True(rowsAffected >= 1);
+    }
+
+    [Fact]
+    public async Task UsrWorker_IsDenied_MotivoAtributoWriteAccess()
+    {
+        var exception = await Record.ExceptionAsync(() => _db.ExecuteAsUserAsync(UsrWorker, async connection =>
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText = "INSERT INTO fact.MotivoAtributo (Motivo, Activo, OrigenLibro) VALUES (999, 1, '02');";
+            return await command.ExecuteNonQueryAsync();
+        }));
+
+        Assert.NotNull(exception);
+    }
+
+    [Fact]
+    public async Task UsrApi_CanExecute_SugerenciaCuentaRegistrarUsoAsyncUpsert()
+    {
+        var rowsAffected = await _db.ExecuteAsUserAsync(UsrApi, async connection =>
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                UPDATE fact.SugerenciaCuenta
+                SET Veces = Veces + 1, UltimoUso = @instante
+                WHERE ProveedorCodigo = @proveedorCodigo AND Motivo = @motivo AND CuentaCodigo = @cuentaCodigo;
+
+                IF @@ROWCOUNT = 0
+                    INSERT INTO fact.SugerenciaCuenta (ProveedorCodigo, Motivo, CuentaCodigo, Veces, UltimoUso)
+                    VALUES (@proveedorCodigo, @motivo, @cuentaCodigo, 1, @instante);
+                """;
+            command.Parameters.AddWithValue("@proveedorCodigo", "P00001");
+            command.Parameters.AddWithValue("@motivo", 22);
+            command.Parameters.AddWithValue("@cuentaCodigo", "631111");
+            command.Parameters.AddWithValue("@instante", new DateTime(2026, 1, 1, 0, 0, 0, DateTimeKind.Utc));
+            return await command.ExecuteNonQueryAsync();
+        });
+
+        Assert.True(rowsAffected >= 1);
+    }
+
+    [Fact]
+    public async Task UsrApi_CanExecute_SugerenciaCuentaListarPorProveedorYMotivoAsyncSelect()
+    {
+        var rowsRead = await _db.ExecuteAsUserAsync(UsrApi, async connection =>
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                """
+                SELECT ProveedorCodigo, Motivo, CuentaCodigo, Veces, UltimoUso
+                FROM fact.SugerenciaCuenta
+                WHERE ProveedorCodigo = @proveedorCodigo AND Motivo = @motivo;
+                """;
+            command.Parameters.AddWithValue("@proveedorCodigo", "P00001");
+            command.Parameters.AddWithValue("@motivo", 22);
+            await using var reader = await command.ExecuteReaderAsync();
+            var read = 0;
+            while (await reader.ReadAsync())
+            {
+                read++;
+            }
+            return read;
+        });
+
+        Assert.True(rowsRead >= 0);
+    }
+
+    [Fact]
+    public async Task UsrWorker_IsDenied_SugerenciaCuentaWriteAndReadAccess()
+    {
+        var writeException = await Record.ExceptionAsync(() => _db.ExecuteAsUserAsync(UsrWorker, async connection =>
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                "INSERT INTO fact.SugerenciaCuenta (ProveedorCodigo, Motivo, CuentaCodigo, Veces, UltimoUso) " +
+                "VALUES ('P99999', 999, '999999', 1, SYSUTCDATETIME());";
+            return await command.ExecuteNonQueryAsync();
+        }));
+        Assert.NotNull(writeException);
+    }
+
+    // Neither fact_api nor fact_worker is granted DELETE on any of the 3 satellites
+    // (008_usuarios_y_permisos.sql) -- confirms the "never DELETE" design constraint at the
+    // permission layer, not just by the adapters' method shapes (NoWriteToDboStructuralTests only
+    // covers the 5 external dbo.* catalogs).
+    [Theory]
+    [InlineData(UsrApi)]
+    [InlineData(UsrWorker)]
+    public async Task BothUsers_AreDenied_DeleteAccess_ToAllThreeSatellites(string user)
+    {
+        foreach (var table in new[] { "fact.ProveedorAtributo", "fact.MotivoAtributo", "fact.SugerenciaCuenta" })
+        {
+            var exception = await Record.ExceptionAsync(() => _db.ExecuteAsUserAsync(user, async connection =>
+            {
+                await using var command = connection.CreateCommand();
+                command.CommandText = $"DELETE FROM {table} WHERE 1 = 0;";
+                return await command.ExecuteNonQueryAsync();
+            }));
+
+            Assert.True(exception is not null, $"Expected {user} to be denied DELETE on {table}.");
+        }
+    }
 }
