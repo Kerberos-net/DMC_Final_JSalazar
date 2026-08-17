@@ -12,8 +12,8 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 | Estado global | Valor |
 |---|---|
 | Ítems del backlog | **3 de 17 cerrados** |
-| Ciclo SDD activo | Ninguno — ítem #3 cerrado, ítem #4 sin abrir |
-| Última fase cerrada | Ítem #3, WU4 (Fase 4 — `SmartNet.sln`, CI, suite completa end-to-end), 47/47 tareas del ítem cerradas — ítem #3 completo |
+| Ciclo SDD activo | Ninguno — ítems #1, #2, #3 cerrados; ítem #4 sin abrir |
+| Última fase cerrada | Ítem #3, WU4 (Fase 4 — `SmartNet.sln`, CI, suite completa end-to-end), 47/47 tareas del ítem cerradas — ítem #3 cerrado 2026-08-17 |
 
 ---
 
@@ -311,7 +311,7 @@ repositorios de lectura/escritura sobre los 3 satélites propios `fact.*`, más 
 `ResolverCandidatas` (REGLAS.md §3). Sin DDL nuevo: el esquema y los `GRANT` ya existen (ítem #1).
 Depende del ítem #1 (completo).
 
-**Ciclo SDD:** `openspec/changes/catalogos-y-satelites/` · **47 de 47 tareas cerradas**
+**Ciclo SDD:** `openspec/changes/catalogos-y-satelites/` · **47 de 47 tareas cerradas** — **✅ CERRADO 2026-08-17**
 
 | Fase | Unidad | Alcance | Tareas | Estado |
 |---|---|---|---|---|
