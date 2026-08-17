@@ -513,37 +513,75 @@ their first commit until the corresponding gate below is closed.
 
 ## Phase 5: `SmartNet.Admin` — reset/create/purge CLI
 
-- [ ] 5.1 Scaffold `SmartNet/admin/SmartNet.Admin` (console, `net10.0`, `OutputType=Exe`), referencing
+- [x] 5.1 Scaffold `SmartNet/admin/SmartNet.Admin` (console, `net10.0`, `OutputType=Exe`), referencing
       `SmartNet.Auth.Core` + `SmartNet.Auth.Infrastructure`; connects via
       `SMARTNET_API_DB_CONNECTION` (runs with `usr_api`'s grants, per design.md Decision 7 — "un
-      comando de la propia aplicación").
-- [ ] 5.2 RED: no-echo password prompt test — the argument parser accepts no password-bearing
+      comando de la propia aplicación"). `AdminConnectionOptions.Resolve()` reads the env var
+      directly (no `IConfiguration` needed for a plain console app), no default, fail-fast with a
+      usage message if absent — same discipline as `RunnerOptions`/`ApiConnectionOptions`.
+- [x] 5.2 RED: no-echo password prompt test — the argument parser accepts no password-bearing
       argv token for any verb; the password is read only from an interactive, no-echo stdin prompt
       (e.g. `Console.ReadKey(intercept: true)` or equivalent) — argv/shell-history/process-audit
-      exposure is exactly what this guards against.
-- [ ] 5.3 GREEN: no-echo prompt implementation, shared across verbs.
-- [ ] 5.4 RED: `usuario crear --nombre <u>` — creates a `fact.Usuario` row with an Argon2id-derived,
-      PHC-encoded `ClaveHash` from the prompted password.
-- [ ] 5.5 GREEN: `usuario crear` verb.
-- [ ] 5.6 RED: `usuario restablecer-clave --nombre <u>` — updates `ClaveHash` via the same Argon2id
+      exposure is exactly what this guards against. Implemented as
+      `AdminArguments.RecognizedFlagsByVerb`, a single source-of-truth flag registry per verb, plus
+      `AdminArgumentsTests.NoVerb_HasAPasswordBearingFlag` enumerating it and asserting no flag name
+      is password-shaped (`clave`/`password`/`contrase`/`secret`/`pwd`).
+- [x] 5.3 GREEN: no-echo prompt implementation, shared across verbs — `IPasswordPrompt` port +
+      `ConsolePasswordPrompt` adapter (`Console.ReadKey(intercept: true)`, backspace-aware, never
+      echoes a character). Verb dispatch (`AdminOperations`) calls it, never argv, for every
+      password-consuming verb.
+- [x] 5.4 RED: `usuario crear --nombre <u>` — creates a `fact.Usuario` row with an Argon2id-derived,
+      PHC-encoded `ClaveHash` from the prompted password. Required adding `IUsuarioRepository.
+      CreateAsync`/`SqlUsuarioRepository.CreateAsync` (no INSERT port existed — 002_seguridad.sql's
+      own header says the first user is created by "the application's administration command", and
+      that command didn't exist yet before this Work Unit). Covered at two levels: a real-database
+      `SqlUsuarioRepositoryTests.CreateAsync_...` test in `SmartNet.Auth.Infrastructure.Tests`, and
+      `UsuarioCrearTests` in `SmartNet.Admin.Tests` proving the CLI's dispatch path end to end with
+      the real `Argon2idPasswordHasher` (not a fake) — the same code the API's own login path uses.
+- [x] 5.5 GREEN: `usuario crear` verb — `AdminOperations.UsuarioCrearAsync`.
+- [x] 5.6 RED: `usuario restablecer-clave --nombre <u>` — updates `ClaveHash` via the same Argon2id
       derivation; clears all three lockout fields (`IntentosFallidos=0`, `BloqueadoHasta=NULL`,
       `NivelBloqueo=0`); calls `RevokeAllForUsuarioAsync(…, RESTABLECIMIENTO)` so every existing
-      session for that user stops authenticating.
-- [ ] 5.7 GREEN: `usuario restablecer-clave` verb.
-- [ ] 5.8 RED: `sesion purgar --retencion-dias <n>` — deletes `fact.Sesion` rows older than the
-      retention window and leaves rows within the window untouched. **Open question, carried forward
-      rather than decided here:** design.md flags the default retention value itself (suggested 90
-      days, as a `fact.Configuracion` key) as an operational decision, not a design one — this task
-      implements the verb's mechanics against a caller-supplied `--retencion-dias`, and does not fix a
-      default; if a default is required for the CLI to run with no argument, that default is a
-      task-level open question to resolve at implementation time, not pre-decided here.
-- [ ] 5.9 GREEN: `sesion purgar` verb (the sole `DELETE` caller in the whole permission matrix, per
-      design.md Decision 3).
-- [ ] 5.10 RED (spec scenario, regression guard): static scan of every `SmartNet/db/schema/*.sql`
+      session for that user stops authenticating. `UsuarioRestablecerClaveTests` seeds a locked-out
+      user with a live session and asserts all three lockout columns clear, the hash verifies
+      against the new password, the prior session's `MotivoRevocacion` is `RESTABLECIMIENTO`, and an
+      unknown username returns a non-zero exit code without ever reaching the password prompt.
+- [x] 5.7 GREEN: `usuario restablecer-clave` verb — `AdminOperations.UsuarioRestablecerClaveAsync`,
+      reusing the already-shipped `SaveCredentialStateAsync` (state-shaped, Decision 8) and
+      `RevokeAllForUsuarioAsync` — no new domain logic, pure composition.
+- [x] 5.8 RED: `sesion purgar --retencion-dias <n>` — deletes `fact.Sesion` rows older than the
+      retention window and leaves rows within the window untouched. **Decision made explicitly for
+      this Work Unit (per the coordinator's instruction, not left to the implementer to invent):
+      `--retencion-dias` is a REQUIRED argument with no hardcoded default.** `AdminArguments.Parse`
+      returns `null` (usage message, exit 1) when it is absent, zero, or non-numeric — the same
+      "no default, no committed fallback" discipline as `SMARTNET_API_DB_CONNECTION`. No `90` is
+      coded anywhere in `SmartNet.Admin`. Required adding `ISesionRepository.DeleteOlderThanAsync`/
+      `SqlSesionRepository.DeleteOlderThanAsync` (no DELETE port existed), anchored on `CreadaEn`
+      per design.md's own framing ("scans a table that grows by ~1-2k rows a year"). Covered at two
+      levels: `SqlSesionRepositoryTests.DeleteOlderThanAsync_...` (2 tests) in
+      `SmartNet.Auth.Infrastructure.Tests`, and `SesionPurgarTests` in `SmartNet.Admin.Tests` proving
+      the CLI's dispatch path with a `FakeTimeProvider` and confirming the verb never prompts for a
+      password.
+      **Still open, not decided here (unchanged from before this Work Unit):** whether a
+      `fact.Configuracion`-backed default retention value is genuinely needed operationally is
+      design.md's own flagged open question (suggested 90 days) — this Work Unit deliberately does
+      NOT add a `Configuracion` key or touch `SmartNet/db/schema/*`; see "Open questions" below.
+- [x] 5.9 GREEN: `sesion purgar` verb (the sole `DELETE` caller in the whole permission matrix, per
+      design.md Decision 3) — `AdminOperations.SesionPurgarAsync`. The `GRANT DELETE ON
+      OBJECT::fact.Sesion TO fact_api` this verb relies on was already shipped in `011_sesion.sql`
+      (Work Unit 1) — no schema change needed here.
+- [x] 5.10 RED (spec scenario, regression guard): static scan of every `SmartNet/db/schema/*.sql`
       script for an `UPDATE` statement targeting `ClaveHash` — none exists in versioned SQL.
-- [ ] 5.11 Confirm 5.10 GREEN against `011`/`012` (neither touches `ClaveHash`) — this test's job is
+      `ClaveHashNeverUpdatedInVersionedSqlTests` splits each script on `GO` (this project's own
+      batch separator) so an unrelated `UPDATE` elsewhere in the same file can never be conflated
+      with one that actually touches `ClaveHash`, then regex-matches
+      `UPDATE fact.Usuario ... SET ... ClaveHash =` per batch.
+- [x] 5.11 Confirm 5.10 GREEN against `011`/`012` (neither touches `ClaveHash`) — this test's job is
       to catch future drift, not to change anything now; record that explicitly, mirroring item #1's
-      4.7 "not duplicated, it's a regression guard" note.
+      4.7 "not duplicated, it's a regression guard" note. Confirmed: `002_seguridad.sql` only ever
+      `CREATE TABLE`s the column, and no other script in `SmartNet/db/schema/` (`001`–`012`, verified
+      against the actual shipped tree, not assumed) mentions `ClaveHash` at all — the test passes
+      today for exactly that reason, not by accident of a narrow scan.
 
 ## Phase 6: Integration and CI
 
@@ -574,8 +612,13 @@ their first commit until the corresponding gate below is closed.
 
 ## Open questions surfaced during task decomposition (not resolved here)
 
-- **5.8** — the default `--retencion-dias` value for `sesion purgar` (design.md suggests 90 days as an
-  operational `fact.Configuracion` key but does not fix it).
+- **5.8** — whether a `fact.Configuracion`-backed default retention value for `sesion purgar` is
+  genuinely needed operationally (design.md suggests 90 days as an operational key but does not fix
+  it). **Resolved for THIS Work Unit only, not for that broader question:** `--retencion-dias` is a
+  required CLI argument with no hardcoded/coded default (see 5.8's note above) — the CLI fails fast
+  with a usage message if it is omitted, rather than inventing an unsourced `90`. If an operator
+  wants a zero-argument default, that still requires a `fact.Configuracion` key, which is explicitly
+  out of scope for `SmartNet.Admin` and untouched by this Work Unit.
 - **4.14** — the exact mechanism for asserting "does not complete measurably faster" (spec's timing
   requirement); this task list requires an automatable, non-flaky proxy (decoy-path invocation count)
   rather than a raw wall-clock comparison, but the precise assertion is left to implementation.

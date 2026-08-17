@@ -43,6 +43,28 @@ public sealed class SqlUsuarioRepository : IUsuarioRepository
             Activo: reader.GetBoolean(6));
     }
 
+    // The sole INSERT: 002_seguridad.sql's own header — "the first user is created later by the
+    // application's administration command, never by migration" — this is that command's write
+    // path (SmartNet.Admin's `usuario crear`, tasks.md 5.4/5.5). OUTPUT INSERTED.UsuarioId reads
+    // the generated identity back on the same round-trip.
+    public async Task<long> CreateAsync(string nombreUsuario, string claveHash, CancellationToken ct)
+    {
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync(ct);
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            INSERT INTO fact.Usuario (NombreUsuario, ClaveHash)
+            OUTPUT INSERTED.UsuarioId
+            VALUES (@nombreUsuario, @claveHash);
+            """;
+        command.Parameters.AddWithValue("@nombreUsuario", nombreUsuario);
+        command.Parameters.AddWithValue("@claveHash", claveHash);
+
+        var usuarioId = await command.ExecuteScalarAsync(ct);
+        return (long)usuarioId!;
+    }
+
     // Widens to THREE columns per design.md Decision 8 -- the exact "state field the UPDATE
     // forgets to write" bug class this signature (state-shaped, not field-shaped) exists to guard
     // against. Deliberately does NOT touch ClaveHash: that column has exactly one writer,

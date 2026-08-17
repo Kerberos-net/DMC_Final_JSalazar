@@ -192,4 +192,50 @@ public sealed class SqlSesionRepositoryTests : IAsyncLifetime
         var activaAjena = await sut.FindActiveAsync(tokenHashAjeno, ahora, CancellationToken.None);
         Assert.NotNull(activaAjena);
     }
+
+    // tasks.md 5.8/5.9 (SmartNet.Admin `sesion purgar`): the sole DELETE caller in the whole
+    // permission matrix (design.md Decision 3). Anchored on CreadaEn -- rows older than the
+    // retention window are removed, rows within it are left untouched, regardless of revocation
+    // or expiry state.
+    [Fact]
+    public async Task DeleteOlderThanAsync_DeletesOnlyRowsOlderThanTheCutoff()
+    {
+        var sut = new SqlSesionRepository(_db.ConnectionString);
+        var ahora = DateTimeOffset.UtcNow;
+        var tokenHashVieja = "6".PadLeft(64, '0');
+        var tokenHashNueva = "7".PadLeft(64, '0');
+        await sut.CreateAsync(_usuarioId, tokenHashVieja, ahora.AddHours(8), "ticket-viejo", CancellationToken.None);
+        await sut.CreateAsync(_usuarioId, tokenHashNueva, ahora.AddHours(8), "ticket-nuevo", CancellationToken.None);
+        // CreadaEn defaults to SYSUTCDATETIME() at INSERT time; back-date only the "old" row
+        // directly, the same way other tests here reach columns CreateAsync itself never exposes.
+        await _db.ExecuteNonQueryAsync(
+            $"UPDATE fact.Sesion SET CreadaEn = DATEADD(DAY, -100, SYSUTCDATETIME()) WHERE TokenHash = '{tokenHashVieja}';");
+
+        var corte = ahora.AddDays(-90);
+        var eliminadas = await sut.DeleteOlderThanAsync(corte, CancellationToken.None);
+
+        Assert.Equal(1, eliminadas);
+        var cuentaVieja = await _db.ExecuteScalarAsync<int>(
+            $"SELECT COUNT(*) FROM fact.Sesion WHERE TokenHash = '{tokenHashVieja}';");
+        var cuentaNueva = await _db.ExecuteScalarAsync<int>(
+            $"SELECT COUNT(*) FROM fact.Sesion WHERE TokenHash = '{tokenHashNueva}';");
+        Assert.Equal(0, cuentaVieja);
+        Assert.Equal(1, cuentaNueva);
+    }
+
+    [Fact]
+    public async Task DeleteOlderThanAsync_ReturnsZero_WhenNoRowIsOlderThanTheCutoff()
+    {
+        var sut = new SqlSesionRepository(_db.ConnectionString);
+        var ahora = DateTimeOffset.UtcNow;
+        var tokenHash = "8".PadLeft(64, '0');
+        await sut.CreateAsync(_usuarioId, tokenHash, ahora.AddHours(8), "ticket-reciente", CancellationToken.None);
+
+        var eliminadas = await sut.DeleteOlderThanAsync(ahora.AddDays(-90), CancellationToken.None);
+
+        Assert.Equal(0, eliminadas);
+        var cuenta = await _db.ExecuteScalarAsync<int>(
+            $"SELECT COUNT(*) FROM fact.Sesion WHERE TokenHash = '{tokenHash}';");
+        Assert.Equal(1, cuenta);
+    }
 }

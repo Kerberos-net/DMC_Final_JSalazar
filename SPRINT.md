@@ -12,8 +12,8 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 | Estado global | Valor |
 |---|---|
 | Ítems del backlog | 1 de 17 cerrado, **1 en curso** (#2) |
-| Ciclo SDD activo | `openspec/changes/autenticacion-y-sesion/` — 72/88 tareas, fases 0–4 cerradas |
-| Última fase cerrada | Ítem #2, fase 4 — `SmartNet.Api` |
+| Ciclo SDD activo | `openspec/changes/autenticacion-y-sesion/` — 83/88 tareas, fases 0–5 cerradas |
+| Última fase cerrada | Ítem #2, fase 5 — `SmartNet.Admin` |
 
 ---
 
@@ -138,7 +138,7 @@ Host mínimo de API, cookie `__Host-session` con `SameSite=Lax`, tabla `fact.Ses
 sesión revocable en servidor, bloqueo por intentos sobre las columnas ya existentes, y el comando de
 restablecimiento de ADR 0007. Depende del ítem #1 (completo).
 
-**Ciclo SDD:** `openspec/changes/autenticacion-y-sesion/` · **72 de 88 tareas cerradas**
+**Ciclo SDD:** `openspec/changes/autenticacion-y-sesion/` · **83 de 88 tareas cerradas**
 
 | Fase | Unidad | Alcance | Tareas | Estado |
 |---|---|---|---|---|
@@ -147,7 +147,7 @@ restablecimiento de ADR 0007. Depende del ítem #1 (completo).
 | 2 | 3 | `SmartNet.Auth.Core` — dominio puro (ADR 0019 nivel 1) | 17/17 | ✅ |
 | 3 | 4 | `SmartNet.Auth.Infrastructure` — adaptadores Argon2id y SQL | 14/14 | ✅ |
 | 4 | 5 | `SmartNet.Api` — host mínimo, cookie de autenticación | 27/27 | ✅ |
-| 5 | 6 | `SmartNet.Admin` — CLI de restablecimiento | 0/11 | ⬜ |
+| 5 | 6 | `SmartNet.Admin` — CLI de restablecimiento | 11/11 | ✅ |
 | 6 | 7 | Integración, CI y suite completa end-to-end | 0/5 | ⬜ |
 
 **Tres decisiones ya tomadas, no reabrir:** Argon2id como algoritmo de *hash*; `fact.Sesion` como
@@ -220,6 +220,25 @@ confirmado por ausencia de `app.UseCors`.
 milisegundo al guardar. La propia unidad 4 ya había resuelto el mismo problema en otras dos
 pruebas del mismo archivo con una tolerancia de 1 ms; esta se quedó atrás. Apliqué la convención ya
 establecida en vez de inventar una nueva — 8/8 en corridas repetidas tras el ajuste.
+
+**Unidad 6 (`SmartNet.Admin`) cerrada** — 17/17 pruebas en verde, ejecutadas por mí. Sin
+regresión: las tres unidades anteriores siguen en verde (33/44/22). Sin referencia a
+`SmartNet.Db.Runner`, confirmado en el `.csproj`, misma disciplina que `SmartNet.Api`. Ninguna
+bandera del CLI transporta contraseña —verificado sobre `RecognizedFlagsByVerb`, la única fuente
+de verdad para el conjunto de argumentos—: la contraseña solo se lee de forma interactiva y sin
+eco.
+
+**`--retencion-dias` quedó obligatorio, tal como fijé antes de lanzar la unidad**: verifiqué el
+código y no hay ningún `90` escondido — ausente, cero, negativo o no numérico caen todos a
+`Usage` y salida distinta de cero. El diseño dejó ese número como decisión operativa, no de
+código, y este proyecto trata un número sin fuente citada como inventado.
+
+Dos huecos de fontanería reales, no lógica de negocio nueva: `IUsuarioRepository` no tenía
+`CreateAsync` ni `ISesionRepository` tenía `DeleteOlderThanAsync` — los necesitaba `usuario crear`
+y `sesion purgar` respectivamente. Los atrapó un fallo de compilación real (`CS0535`), no se
+anticiparon; el propio comentario de `002_seguridad.sql` ya decía que el primer usuario "se crea
+después, por el comando de administración de la aplicación" — este es exactamente ese camino de
+escritura.
 
 ### Decisión de arquitectura que no estaba en ningún documento inicial
 

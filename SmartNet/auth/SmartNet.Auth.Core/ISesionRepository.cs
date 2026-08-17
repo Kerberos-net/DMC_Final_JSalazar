@@ -20,4 +20,12 @@ public interface ISesionRepository
 
     Task RevokeAllForUsuarioAsync(
         long usuarioId, MotivoRevocacion motivo, DateTimeOffset ahora, CancellationToken ct);
+
+    // Added for SmartNet.Admin's `sesion purgar` verb (design.md Decision 3/7, tasks.md 5.8/5.9):
+    // the sole DELETE caller in the whole permission matrix. Anchored on CreadaEn (the row's own
+    // birth date), not ExpiraEn or UltimaActividadEn — "older than the retention window" is a
+    // statement about how long the record has existed, matching design.md's "it scans a table
+    // that grows by ~1-2k rows a year" framing. Returns the number of rows deleted, for the CLI to
+    // report back to the operator.
+    Task<int> DeleteOlderThanAsync(DateTimeOffset corte, CancellationToken ct);
 }

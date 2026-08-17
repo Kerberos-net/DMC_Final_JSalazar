@@ -122,6 +122,25 @@ public sealed class SqlSesionRepository : ISesionRepository
         await command.ExecuteNonQueryAsync(ct);
     }
 
+    // The sole DELETE caller in the whole permission matrix (design.md Decision 3): SmartNet.Admin's
+    // `sesion purgar` verb (tasks.md 5.8/5.9). Anchored on CreadaEn, not ExpiraEn/RevocadaEn --
+    // "older than the retention window" is about how long the row has existed, independent of
+    // whether it was ever revoked. No index for this scan, deliberately (design.md, top of file).
+    public async Task<int> DeleteOlderThanAsync(DateTimeOffset corte, CancellationToken ct)
+    {
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync(ct);
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            DELETE FROM fact.Sesion
+            WHERE CreadaEn < @corte;
+            """;
+        command.Parameters.AddWithValue("@corte", corte.UtcDateTime);
+
+        return await command.ExecuteNonQueryAsync(ct);
+    }
+
     private static DateTimeOffset AsUtcOffset(DateTime value) =>
         new(DateTime.SpecifyKind(value, DateTimeKind.Utc));
 }

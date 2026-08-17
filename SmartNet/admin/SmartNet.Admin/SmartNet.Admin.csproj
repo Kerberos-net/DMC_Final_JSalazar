@@ -1,0 +1,28 @@
+﻿<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <RootNamespace>SmartNet.Admin</RootNamespace>
+    <AssemblyName>smartnet-admin</AssemblyName>
+  </PropertyGroup>
+
+  <!-- design.md Decision 7: a thin composition root over the already-shipped ports/adapters.
+       References ONLY SmartNet.Auth.Core / .Infrastructure, same discipline as SmartNet.Api
+       (Decision 6), never SmartNet.Db.Runner: this is a command of the application itself,
+       running with usr_api's own grants (SMARTNET_API_DB_CONNECTION), not the deploy principal's. -->
+  <ItemGroup>
+    <ProjectReference Include="..\..\auth\SmartNet.Auth.Core\SmartNet.Auth.Core.csproj" />
+    <ProjectReference Include="..\..\auth\SmartNet.Auth.Infrastructure\SmartNet.Auth.Infrastructure.csproj" />
+  </ItemGroup>
+
+  <!-- Exposes the top-level Program class to SmartNet.Admin.Tests (same pattern as SmartNet.Api's
+       InternalsVisibleTo for WebApplicationFactory<Program>), and lets tests reach internal
+       command-dispatch/argument-parsing types directly rather than only through argv/Main. -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="SmartNet.Admin.Tests" />
+  </ItemGroup>
+
+</Project>

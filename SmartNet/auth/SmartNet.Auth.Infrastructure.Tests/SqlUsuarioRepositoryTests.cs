@@ -147,6 +147,28 @@ public sealed class SqlUsuarioRepositoryTests : IAsyncLifetime
         Assert.True(bloqueadoHastaEsNulo);
     }
 
+    // tasks.md 5.4/5.5 (SmartNet.Admin `usuario crear`): the port method this project needed but
+    // did not yet have -- 002_seguridad.sql's own header says "the first user is created later by
+    // the application's administration command", and this is that command's write path.
+    [Fact]
+    public async Task CreateAsync_InsertsARow_AndReturnsTheGeneratedUsuarioId()
+    {
+        const string claveHash = "$argon2id$v=19$m=19456,t=2,p=1$AAAAAAAAAAAAAAAAAAAAAA$AAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAAA";
+        var sut = new SqlUsuarioRepository(_db.ConnectionString);
+
+        var usuarioId = await sut.CreateAsync("usr_admin_crear", claveHash, CancellationToken.None);
+
+        var estado = await sut.FindByNameAsync("usr_admin_crear", CancellationToken.None);
+        Assert.NotNull(estado);
+        Assert.Equal(usuarioId, estado!.UsuarioId);
+        Assert.Equal(claveHash, estado.ClaveHash);
+        // A freshly created user is a first offender: default lockout state, active.
+        Assert.Equal(0, estado.IntentosFallidos);
+        Assert.Equal(0, estado.NivelBloqueo);
+        Assert.Null(estado.BloqueadoHasta);
+        Assert.True(estado.Activo);
+    }
+
     [Fact]
     public async Task UpdateClaveHashAsync_UpdatesOnlyClaveHash()
     {
