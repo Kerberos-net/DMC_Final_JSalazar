@@ -28,11 +28,13 @@ env:
   # so only its two file-only suites are filtered in.
   TESTS_RUNNER: SmartNet/db/runner/SmartNet.Db.Runner.Tests
   TESTS_AUTH_CORE: SmartNet/auth/SmartNet.Auth.Core.Tests
+  TESTS_CATALOGOS_CORE: SmartNet/catalogos/SmartNet.Catalogos.Core.Tests
   # pruebas-de-base-de-datos: every project whose tests use TestDatabaseFixture (throwaway
   # `fact_test_<guid>` databases) or WebApplicationFactory against a real SQL Server.
   TESTS_AUTH_INFRA: SmartNet/auth/SmartNet.Auth.Infrastructure.Tests
   TESTS_API: SmartNet/api/SmartNet.Api.Tests
   TESTS_ADMIN: SmartNet/admin/SmartNet.Admin.Tests
+  TESTS_CATALOGOS_INFRA: SmartNet/catalogos/SmartNet.Catalogos.Infrastructure.Tests
 
 jobs:
   verificaciones-estaticas:
@@ -60,6 +62,14 @@ jobs:
       - name: Nucleo de dominio de autenticacion (sin infraestructura)
         run: >
           dotnet test ${{ env.TESTS_AUTH_CORE }}
+          --configuration Release --no-build --logger "console;verbosity=normal"
+
+      # Pure domain logic (prefix-based candidate account resolution). No DB, no HTTP, no wall
+      # clock -- PurityScanTests enforces this at build time for the whole project, same as
+      # SmartNet.Auth.Core.Tests above.
+      - name: Nucleo de dominio de catalogos y satelites (sin infraestructura)
+        run: >
+          dotnet test ${{ env.TESTS_CATALOGOS_CORE }}
           --configuration Release --no-build --logger "console;verbosity=normal"
 
   pruebas-de-base-de-datos:
@@ -126,4 +136,9 @@ jobs:
       - name: Admin
         run: >
           dotnet test ${{ env.TESTS_ADMIN }}
+          --configuration Release --no-build --logger "console;verbosity=normal"
+
+      - name: Catalogos.Infrastructure
+        run: >
+          dotnet test ${{ env.TESTS_CATALOGOS_INFRA }}
           --configuration Release --no-build --logger "console;verbosity=normal"

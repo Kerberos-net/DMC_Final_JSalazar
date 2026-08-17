@@ -284,16 +284,31 @@ before any Core code exists, and is a hard gate: WU1's golden-test task cannot s
 
 ## Phase 4: Solution wiring, CI, and full integration
 
-- [ ] 4.1 Modify `SmartNet/SmartNet.sln` — add a `catalogos` solution folder and the 4 new projects
+- [x] 4.1 Modify `SmartNet/SmartNet.sln` — add a `catalogos` solution folder and the 4 new projects
       (`SmartNet.Catalogos.Core`, `.Core.Tests`, `.Infrastructure`, `.Infrastructure.Tests`).
-- [ ] 4.2 Modify `.github/workflows/ci.yml` — wire `SmartNet.Catalogos.Core.Tests` into the
+      **Done via `dotnet sln add ... -s catalogos`, exactly mirroring the `auth` folder's format
+      (same GUID scheme, same `FAE04EC0-301F-11D3-BF4B-00C04F79EFBC` project-type GUID, same
+      `NestedProjects` wiring under a `2150E333-8FDC-42A3-9474-1A3956D46DE8` folder node).**
+- [x] 4.2 Modify `.github/workflows/ci.yml` — wire `SmartNet.Catalogos.Core.Tests` into the
       `verificaciones-estaticas` (no-DB) job and `SmartNet.Catalogos.Infrastructure.Tests` into the
       `pruebas-de-base-de-datos` job, mirroring item #2's WU7 wiring for `Auth.Core.Tests`/
-      `Auth.Infrastructure.Tests`.
-- [ ] 4.3 Run the full solution test suite (`dotnet test SmartNet.sln`) — confirm no regression in
+      `Auth.Infrastructure.Tests`. **Done: added `TESTS_CATALOGOS_CORE`/`TESTS_CATALOGOS_INFRA` env
+      vars and one step per project in each job, same pattern (whole-project run, no `--filter`,
+      since `PurityScanTests` already proves `Catalogos.Core.Tests` is DB/HTTP/clock-free).**
+- [x] 4.3 Run the full solution test suite (`dotnet test SmartNet.sln`) — confirm no regression in
       the existing 6 projects' test counts (104 `Db.Runner` extended to 127, 33 `Auth.Core`, 41
       `Auth.Infrastructure`, 22 `Api`, 17 `Admin`) alongside the new `Catalogos.Core.Tests`/
-      `Catalogos.Infrastructure.Tests` counts.
-- [ ] 4.4 Confirm `master`/`BDSmartNet` have zero orphaned `fact_test_*` databases after the full
+      `Catalogos.Infrastructure.Tests` counts. **Done. Solution-wide `dotnet test SmartNet.sln`
+      showed 2 transient failures per run (different tests each time — once in `Db.Runner.Tests`,
+      once in `Admin.Tests` — both real SQL Server connection errors: "session is in the kill
+      state" / "Could not find server 'esta' in sys.servers"), caused by MSBuild/VSTest running all
+      7 test projects concurrently against the same local SQL Server instance, not by this item's
+      code. Re-ran every project sequentially (matching exactly how `ci.yml`'s two jobs invoke them,
+      one `dotnet test <project>` step at a time): 127+33+44+22+17+32+56 = 331/331 green, zero
+      failures, zero regressions. `Auth.Infrastructure` is 44 (not 41 as originally estimated in
+      this task's own text — pre-existing count from item #2, not from this item).**
+- [x] 4.4 Confirm `master`/`BDSmartNet` have zero orphaned `fact_test_*` databases after the full
       run, per the standing rule from item #1's Fase 3 incident — every test uses
-      `TestDatabaseFixture`, never a direct connection.
+      `TestDatabaseFixture`, never a direct connection. **Confirmed via
+      `sqlcmd -Q "SELECT name FROM sys.databases WHERE name LIKE 'fact\_test\_%' ESCAPE '\';"` —
+      0 rows.**

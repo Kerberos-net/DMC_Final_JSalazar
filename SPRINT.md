@@ -11,9 +11,9 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | **2 de 17 cerrados**, ítem #3 en curso |
-| Ciclo SDD activo | Ítem #3 — Catálogos y satélites (`openspec/changes/catalogos-y-satelites/`) |
-| Última fase cerrada | Ítem #3, WU3 (Fase 3 — 3 adaptadores de satélites + suficiencia de permisos), 43/47 tareas del ítem cerradas — falta WU4 (`SmartNet.sln`, CI, suite completa) |
+| Ítems del backlog | **3 de 17 cerrados** |
+| Ciclo SDD activo | Ninguno — ítem #3 cerrado, ítem #4 sin abrir |
+| Última fase cerrada | Ítem #3, WU4 (Fase 4 — `SmartNet.sln`, CI, suite completa end-to-end), 47/47 tareas del ítem cerradas — ítem #3 completo |
 
 ---
 
@@ -304,14 +304,14 @@ reabre el ítem #1. La secuencia **15 → 30 → 60 → 120 minutos con techo** 
 
 ---
 
-## 🔄 3. Catálogos y satélites
+## ✅ 3. Catálogos y satélites
 
 Repositorios de solo lectura sobre los 5 catálogos externos `dbo.*` (ADR 0003 Rev.5) y
 repositorios de lectura/escritura sobre los 3 satélites propios `fact.*`, más la función pura
 `ResolverCandidatas` (REGLAS.md §3). Sin DDL nuevo: el esquema y los `GRANT` ya existen (ítem #1).
 Depende del ítem #1 (completo).
 
-**Ciclo SDD:** `openspec/changes/catalogos-y-satelites/` · **43 de 47 tareas cerradas (WU0 + WU1 + WU2 + WU3)**
+**Ciclo SDD:** `openspec/changes/catalogos-y-satelites/` · **47 de 47 tareas cerradas**
 
 | Fase | Unidad | Alcance | Tareas | Estado |
 |---|---|---|---|---|
@@ -319,11 +319,37 @@ Depende del ítem #1 (completo).
 | 1 | 2 | `SmartNet.Catalogos.Core` — dominio puro, `ResolucionDePrefijos`, pruebas golden y de pureza | 16/16 | ✅ |
 | 2 | 3 | `SmartNet.Catalogos.Infrastructure` — 5 adaptadores externos de solo lectura | 12/12 | ✅ |
 | 3 | 4 | `SmartNet.Catalogos.Infrastructure` — 3 adaptadores de satélites + suficiencia de permisos | 12/12 | ✅ |
-| 4 | 5 | `SmartNet.sln`, CI y suite completa end-to-end | 0/4 | ⬜ |
+| 4 | 5 | `SmartNet.sln`, CI y suite completa end-to-end | 4/4 | ✅ |
 
 Pronóstico de revisión: alto riesgo de presupuesto de 400 líneas (Unidades 1 y 2 lo superan
 individualmente); PRs encadenados recomendados, estrategia de cadena pendiente de decisión del
 usuario antes de aplicar (`ask-on-risk`). Detalle completo en `tasks.md`.
+
+### Pruebas
+
+Dos proyectos nuevos, no uno solo — `SmartNet.Catalogos.Core.Tests` (dominio puro) y
+`SmartNet.Catalogos.Infrastructure.Tests` (adaptadores SQL). Estado final, verificado por el
+orquestador en la unidad 5, ejecutando cada suite del ítem completo por separado, incluyendo las
+seis heredadas de los ítems #1/#2.
+
+| Proyecto | Unidad que lo creó | Pruebas | Qué cubre |
+|---|---|---|---|
+| `SmartNet.Catalogos.Core.Tests` | 2 | 32 | `CuentaContable`, `ResolucionDePrefijos`, 5 pruebas golden de REGLAS.md §3, `PurityScanTests` |
+| `SmartNet.Catalogos.Infrastructure.Tests` | 3 (+26 en la unidad 4) | 56 | 8 adaptadores `Sql*Repository` (5 externos + 3 satélites), lint de no-escritura a `dbo`, `PermissionSufficiencyTests` (24 casos) |
+| **Total del ítem #3** | | **88** | |
+
+| Proyecto (heredado) | Ítem que lo creó | Pruebas |
+|---|---|---|
+| `SmartNet.Db.Runner.Tests` | #1 (extendido en #2) | 127 |
+| `SmartNet.Auth.Core.Tests` | #2 | 33 |
+| `SmartNet.Auth.Infrastructure.Tests` | #2 | 44 |
+| `SmartNet.Api.Tests` | #2 | 22 |
+| `SmartNet.Admin.Tests` | #2 | 17 |
+| **Total de la solución (`SmartNet.sln`, 11 proyectos)** | | **331** |
+
+**331/331 verificadas al cerrar el ítem**, cada proyecto ejecutado por separado (misma invocación
+que usa `ci.yml`, un paso por proyecto) — ver el hallazgo de la Unidad 5 sobre por qué correr
+`dotnet test SmartNet.sln` de un tirón no es la medida fiable en este entorno.
 
 **Unidad 1 (compuerta WU0) cerrada** — los 5 conteos de REGLAS.md §3 se reprodujeron exactamente
 contra el fixture real `SmartNet/db/fixtures/data/CuentaContable.csv` (1650 filas): motivo 22→1,
@@ -401,6 +427,25 @@ silenciosa — igual que en la Unidad 3 con `dbo.Motivo`, la migración `010_mot
 inserta 23 filas de demo en `fact.MotivoAtributo` de forma incondicional al migrar; las pruebas de
 `SqlMotivoAtributoRepository` vacían la tabla después de migrar, antes de sembrar sus propios casos,
 para partir de un estado limpio.
+
+**Unidad 5 (`SmartNet.sln`, CI, integración) cerrada — última del ítem.** Los 4 proyectos nuevos
+entraron a `SmartNet.sln` con `dotnet sln add ... -s catalogos`, mismo esquema de GUID de tipo de
+proyecto y misma estructura de carpeta anidada que `auth` (ítem #2) — verificado línea por línea
+contra el `.sln` resultante, no solo asumido porque el comando no dio error. `ci.yml` sumó
+`SmartNet.Catalogos.Core.Tests` al trabajo rápido (`verificaciones-estaticas`, sin base de datos —
+`PurityScanTests` ya prueba que el proyecto no toca BD/HTTP/reloj) y `SmartNet.Catalogos.Infrastructure.Tests`
+al trabajo con SQL Server real, mismo patrón de un paso por proyecto que ya usaba `Auth.Core.Tests`/
+`Auth.Infrastructure.Tests`.
+
+**Hallazgo real de esta unidad, no anticipado.** `dotnet test SmartNet.sln` sobre los 7 proyectos a
+la vez mostró 2 fallos por corrida — pero **no siempre los mismos**: una corrida falló en
+`Db.Runner.Tests` (`PermissionMatrixTests`, `PermissionReproducibilityTests`, con "session is in
+the kill state" y "Could not find server 'esta' in sys.servers"), otra falló en `Admin.Tests`
+(`SesionPurgarTests`, `UsuarioCrearTests`). Eso descarta una regresión real: un fallo de producto
+falla siempre en el mismo punto, no en puntos distintos según qué otros procesos compiten por la
+misma instancia de SQL Server. Confirmado corriendo cada proyecto por separado, exactamente como
+invoca cada paso de `ci.yml`: **331/331 en verde, cero fallos, cero regresiones.** `sqlcmd` contra
+`fact_test_%` confirma 0 bases huérfanas al cierre.
 
 ---
 
