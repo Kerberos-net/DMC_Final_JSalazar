@@ -11,9 +11,9 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | 1 de 17 cerrado, **1 en curso** (#2) |
-| Ciclo SDD activo | `openspec/changes/autenticacion-y-sesion/` — 83/88 tareas, fases 0–5 cerradas |
-| Última fase cerrada | Ítem #2, fase 5 — `SmartNet.Admin` |
+| Ítems del backlog | **2 de 17 cerrados**, ninguno en curso |
+| Ciclo SDD activo | ninguno — a la espera de arrancar el siguiente ítem |
+| Última fase cerrada | Ítem #2 COMPLETO — las siete fases cerradas |
 
 ---
 
@@ -132,13 +132,13 @@ construido; queda anotado así en vez de disfrazarse de RED primero.
 
 ---
 
-## 🔄 2. Autenticación y sesión
+## ✅ 2. Autenticación y sesión
 
 Host mínimo de API, cookie `__Host-session` con `SameSite=Lax`, tabla `fact.Sesion` como almacén de
 sesión revocable en servidor, bloqueo por intentos sobre las columnas ya existentes, y el comando de
 restablecimiento de ADR 0007. Depende del ítem #1 (completo).
 
-**Ciclo SDD:** `openspec/changes/autenticacion-y-sesion/` · **83 de 88 tareas cerradas**
+**Ciclo SDD:** `openspec/changes/autenticacion-y-sesion/` · **88 de 88 tareas cerradas**
 
 | Fase | Unidad | Alcance | Tareas | Estado |
 |---|---|---|---|---|
@@ -148,7 +148,7 @@ restablecimiento de ADR 0007. Depende del ítem #1 (completo).
 | 3 | 4 | `SmartNet.Auth.Infrastructure` — adaptadores Argon2id y SQL | 14/14 | ✅ |
 | 4 | 5 | `SmartNet.Api` — host mínimo, cookie de autenticación | 27/27 | ✅ |
 | 5 | 6 | `SmartNet.Admin` — CLI de restablecimiento | 11/11 | ✅ |
-| 6 | 7 | Integración, CI y suite completa end-to-end | 0/5 | ⬜ |
+| 6 | 7 | Integración, CI y suite completa end-to-end | 5/5 | ✅ |
 
 **Tres decisiones ya tomadas, no reabrir:** Argon2id como algoritmo de *hash*; `fact.Sesion` como
 tabla versionada con sus propios `GRANT`/`DENY`, no caché distribuida; el ítem #2 levanta también el
@@ -239,6 +239,26 @@ y `sesion purgar` respectivamente. Los atrapó un fallo de compilación real (`C
 anticiparon; el propio comentario de `002_seguridad.sql` ya decía que el primer usuario "se crea
 después, por el comando de administración de la aplicación" — este es exactamente ese camino de
 escritura.
+
+**Unidad 7 (integración y CI) cerrada — última del ítem.** 243/243 pruebas en verde en las cinco
+suites, ejecutadas por mí una a una: `Auth.Core` 33, `Auth.Infrastructure` 44, `Api` 22, `Admin`
+17, `Db.Runner` 127. `SmartNet.sln` con los 11 proyectos, compila limpio.
+
+**El hallazgo real de esta unidad**: el flujo de CI del ítem #1 apuntaba a **una sola ruta fija**
+(`SmartNet/db/runner/SmartNet.Db.Runner.Tests`) en ambos trabajos — verifiqué el `diff` yo mismo:
+los cuatro proyectos nuevos de este ítem **no corrían en ninguna CI** hasta esta unidad. Quedó
+corregido con pasos explícitos por proyecto en el trabajo que corresponde a cada uno: `Auth.Core`
+—puro, sin base de datos— al trabajo rápido; `Auth.Infrastructure`, `Api` y `Admin` al trabajo con
+SQL Server.
+
+Escaneo de credenciales repetido por mí, no solo aceptado del reporte: los únicos *hashes* PHC en
+el código fuente son los de patrón sintético ya establecido (`AAAA...`); las coincidencias
+adicionales están en binarios compilados de `bin`/`obj`, confirmado que git los ignora y no rastrea
+ninguno. Compuerta final —`DboWriteLintTests` + `ChecksumManifestTests` contra el árbol
+`001`–`012` completo— en **16/16**, verificada por mí.
+
+`master`/`BDSmartNet`/bases huérfanas al cierre del ítem completo: limpio, intacta (0 tablas
+`fact`, 5 `dbo`), 0.
 
 ### Decisión de arquitectura que no estaba en ningún documento inicial
 

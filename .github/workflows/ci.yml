@@ -21,7 +21,18 @@ on:
 env:
   DOTNET_NOLOGO: 'true'
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
-  TESTS: SmartNet/db/runner/SmartNet.Db.Runner.Tests
+  SOLUTION: SmartNet/SmartNet.sln
+  # verificaciones-estaticas: no-database projects. SmartNet.Auth.Core.Tests is pure by
+  # construction (PurityScanTests proves zero DB/HTTP/clock) -- the whole project belongs here,
+  # no filter needed. SmartNet.Db.Runner.Tests mixes pure and DB-dependent tests in one project,
+  # so only its two file-only suites are filtered in.
+  TESTS_RUNNER: SmartNet/db/runner/SmartNet.Db.Runner.Tests
+  TESTS_AUTH_CORE: SmartNet/auth/SmartNet.Auth.Core.Tests
+  # pruebas-de-base-de-datos: every project whose tests use TestDatabaseFixture (throwaway
+  # `fact_test_<guid>` databases) or WebApplicationFactory against a real SQL Server.
+  TESTS_AUTH_INFRA: SmartNet/auth/SmartNet.Auth.Infrastructure.Tests
+  TESTS_API: SmartNet/api/SmartNet.Api.Tests
+  TESTS_ADMIN: SmartNet/admin/SmartNet.Admin.Tests
 
 jobs:
   verificaciones-estaticas:
@@ -35,14 +46,21 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Restaurar y compilar
-        run: dotnet build ${{ env.TESTS }} --configuration Release
+        run: dotnet build ${{ env.SOLUTION }} --configuration Release
 
       # These two suites read files only -- no database, no service container.
       - name: Lint de escritura sobre dbo y verificacion del manifiesto
         run: >
-          dotnet test ${{ env.TESTS }}
+          dotnet test ${{ env.TESTS_RUNNER }}
           --configuration Release --no-build --logger "console;verbosity=normal"
           --filter "FullyQualifiedName~DboWriteLintTests|FullyQualifiedName~ChecksumManifestTests"
+
+      # Pure domain logic (auth escalation state machine, PHC codec, lockout policy). No DB, no
+      # HTTP, no wall clock -- PurityScanTests enforces this at build time for the whole project.
+      - name: Nucleo de dominio de autenticacion (sin infraestructura)
+        run: >
+          dotnet test ${{ env.TESTS_AUTH_CORE }}
+          --configuration Release --no-build --logger "console;verbosity=normal"
 
   pruebas-de-base-de-datos:
     name: Suite completa contra SQL Server
@@ -79,11 +97,33 @@ jobs:
           dotnet-version: '10.0.x'
 
       - name: Restaurar y compilar
-        run: dotnet build ${{ env.TESTS }} --configuration Release
+        run: dotnet build ${{ env.SOLUTION }} --configuration Release
 
       # Every test creates its own throwaway `fact_test_<guid>` database and drops it. Nothing
       # here touches a shared or persistent database -- the container itself is discarded.
-      - name: Suite completa
+      #
+      # Four separate `dotnet test` invocations, not one `--filter` across the solution: each
+      # project needs a different inclusion rule (SmartNet.Db.Runner.Tests runs whole-project here
+      # too -- its DB-dependent suites, e.g. the permission matrix under EXECUTE AS, live outside
+      # the two names already filtered into verificaciones-estaticas; the other three run
+      # whole-project with no filter at all). A single shared `--filter` expression across projects
+      # with different inclusion needs would be more fragile than four explicit, reviewable lines.
+      - name: Runner (suites dependientes de base de datos)
         run: >
-          dotnet test ${{ env.TESTS }}
+          dotnet test ${{ env.TESTS_RUNNER }}
+          --configuration Release --no-build --logger "console;verbosity=normal"
+
+      - name: Auth.Infrastructure
+        run: >
+          dotnet test ${{ env.TESTS_AUTH_INFRA }}
+          --configuration Release --no-build --logger "console;verbosity=normal"
+
+      - name: Api
+        run: >
+          dotnet test ${{ env.TESTS_API }}
+          --configuration Release --no-build --logger "console;verbosity=normal"
+
+      - name: Admin
+        run: >
+          dotnet test ${{ env.TESTS_ADMIN }}
           --configuration Release --no-build --logger "console;verbosity=normal"

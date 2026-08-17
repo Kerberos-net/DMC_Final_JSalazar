@@ -585,28 +585,80 @@ their first commit until the corresponding gate below is closed.
 
 ## Phase 6: Integration and CI
 
-- [ ] 6.1 Create `SmartNet.sln` referencing all projects: `SmartNet.Db.Runner`,
-      `SmartNet.Db.Runner.Tests`, `SmartNet.Db.TestBootstrap`, `SmartNet.Auth.Core`,
-      `SmartNet.Auth.Core.Tests`, `SmartNet.Auth.Infrastructure`, `SmartNet.Auth.Infrastructure.Tests`,
-      `SmartNet.Api`, `SmartNet.Api.Tests`, `SmartNet.Admin`, `SmartNet.Admin.Tests` — the repo has no
-      solution file today.
-- [ ] 6.2 Confirm `.github/workflows/ci.yml`'s existing two-job split
-      (`verificaciones-estaticas` / `pruebas-de-base-de-datos`) picks up every new test project. Do
-      not assume `dotnet test` at solution/directory level enumerates them automatically — check
-      whether the workflow references projects by explicit path; if it does, add the new test projects
-      explicitly rather than trusting silent inclusion.
-- [ ] 6.3 Run the full suite (`SmartNet.Auth.Core.Tests` + `SmartNet.Auth.Infrastructure.Tests` +
-      `SmartNet.Api.Tests` + `SmartNet.Admin.Tests` + the extended `SmartNet.Db.Runner.Tests`) end to
-      end against fresh `fact_test_<guid>` databases. Verify afterward: 0 orphaned test databases,
-      `BDSmartNet`/`master` unchanged, no `fact.Sesion`/`fact.Usuario.NivelBloqueo` artifacts left
-      outside throwaway databases.
-- [ ] 6.4 Verify no credential, secret, or password hash is committed anywhere in the new projects,
-      fixtures, or test data — grep for literal `ClaveHash`/PHC-string values, embedded connection
-      strings with passwords, and committed key-ring files.
-- [ ] 6.5 Final gate: re-run `DboWriteLintTests` and `ChecksumManifestTests` against the complete,
-      final `SmartNet/db/schema/` tree (`011`, `012`, both rollbacks) as the closing check before this
-      change is considered done — the same two tests item #1 shipped specifically so this step is
-      mechanical, not a review promise.
+- [x] 6.1 Created `SmartNet/SmartNet.sln` (classic `.sln` format, explicit `-f sln` — `dotnet new sln`
+      defaults to the new `.slnx` XML format on this SDK, 10.0.302, which is not what was asked for)
+      referencing all 11 projects via `dotnet sln add`: `SmartNet.Db.Runner`, `SmartNet.Db.Runner.Tests`,
+      `SmartNet.Db.TestBootstrap`, `SmartNet.Auth.Core`, `SmartNet.Auth.Core.Tests`,
+      `SmartNet.Auth.Infrastructure`, `SmartNet.Auth.Infrastructure.Tests`, `SmartNet.Api`,
+      `SmartNet.Api.Tests`, `SmartNet.Admin`, `SmartNet.Admin.Tests`. Verified, not assumed: `dotnet sln
+      list` shows exactly 11 entries, and `dotnet build SmartNet.sln --configuration Release` compiles
+      all 11 (0 warnings, 0 errors) — confirmed by reading the per-project output lines, not just the
+      summary. `.sln` file is UTF-8 with BOM, CRLF line terminators (dotnet CLI's own default on this
+      platform, verified with `file`).
+- [x] 6.2 Confirmed, not assumed: before this unit, `.github/workflows/ci.yml` referenced exactly ONE
+      project by hardcoded path (`TESTS: SmartNet/db/runner/SmartNet.Db.Runner.Tests`) in both jobs —
+      `SmartNet.Auth.Core.Tests`, `SmartNet.Auth.Infrastructure.Tests`, `SmartNet.Api.Tests`, and
+      `SmartNet.Admin.Tests` were NOT referenced anywhere. Fixed by keeping explicit per-project paths
+      (not switching to a single solution-wide `--filter`): each project needs a different inclusion
+      rule (`SmartNet.Db.Runner.Tests` needs a name filter in the static job but runs whole-project in
+      the DB job; the others run whole-project, no filter, in exactly one job each), so one shared
+      cross-project filter expression would be more fragile than explicit lines, and a missed project
+      would be a silent, hard-to-spot filter-string bug instead of an obviously-absent step in the diff.
+      Routing, by job:
+      - `verificaciones-estaticas` (no DB): `SmartNet.Db.Runner.Tests` filtered to
+        `DboWriteLintTests`/`ChecksumManifestTests` only (unchanged from before), PLUS new step running
+        the whole `SmartNet.Auth.Core.Tests` project (pure by construction — `PurityScanTests` enforces
+        zero DB/HTTP/clock at build time — so no filter needed).
+      - `pruebas-de-base-de-datos` (real SQL Server): `SmartNet.Db.Runner.Tests` whole-project
+        (unchanged, now its own step), PLUS three new steps: `SmartNet.Auth.Infrastructure.Tests`
+        (`TestDatabaseFixture`-based), `SmartNet.Api.Tests` (`WebApplicationFactory` + real DB),
+        `SmartNet.Admin.Tests` (`TestDatabaseFixture`-based). No new test project is silently
+        unreferenced by either job.
+      Both jobs' build step now targets `SmartNet.sln` instead of the single hardcoded project path, so
+      a future project addition to the `.sln` at least compiles in CI even before someone wires its test
+      step in explicitly.
+- [x] 6.3 Ran the full suite end to end against local SQL Server 2025 (Integrated Security, mirroring
+      what the DB job does against its ephemeral container): `SmartNet.Auth.Core.Tests` 33/33,
+      `SmartNet.Auth.Infrastructure.Tests` 44/44, `SmartNet.Api.Tests` 22/22, `SmartNet.Admin.Tests`
+      17/17, `SmartNet.Db.Runner.Tests` 127/127 — **243/243 total, all green**. First solution-wide run
+      showed 2 `SmartNet.Api.Tests` failures and 1 `SmartNet.Auth.Infrastructure.Tests` failure, all
+      three the exact same symptom (`ALTER DATABASE`/`DROP DATABASE` transient lock contention plus a
+      spurious "Login failed" on retry) under heavy cross-project xUnit parallelism against a single
+      local instance — confirmed genuinely flaky, not a real regression, by rerunning each failing test
+      class in isolation: all three passed cleanly (`FifthFailureLockoutTests` +
+      `EscalationEndToEndTests` 2/2, `SmartNet.Auth.Infrastructure.Tests` 44/44). No source or test code
+      changed to "fix" this — `TestDatabaseFixture.DisposeAsync`'s own doc comment already names this
+      exact contention class of failure and its retry-with-backoff mitigation as "defense in depth, not
+      the fix," so treating a rare miss under full-suite parallel load as expected is consistent with
+      that design, not a new gap. Verified afterward: 0 orphaned `fact_test_*` databases (checked via
+      `sqlcmd` against `sys.databases`, both before and after — 3 pre-existing orphans from before this
+      unit started were also gone by the end); `BDSmartNet` unchanged (`fact` schema: 0 tables, `dbo`
+      schema: 5 tables, both confirmed via `sys.tables`/`sys.schemas` query); `master` unchanged
+      (`SCHEMA_ID('fact')` returns `NULL`); no `fact.Sesion`/`fact.Usuario.NivelBloqueo` artifact exists
+      outside a throwaway database (implied directly by `BDSmartNet.fact` having 0 tables).
+- [x] 6.4 Ran the credential/secret scan across the full surface (`SmartNet/auth/`, `SmartNet/api/`,
+      `SmartNet/admin/`, `SmartNet/db/schema/011_sesion.sql` + `012_usuario_nivel_bloqueo.sql` + both
+      rollbacks under `SmartNet/db/schema/rollback/`) via `grep`, not assumed clean from memory. Result:
+      clean. Every PHC-shaped string found (`$argon2id$v=19$...`) is the project's established synthetic
+      pattern — base64-decodable placeholders like `AAAA...`/`c2FsdA`/`aGFzaA`, never anything that
+      decodes to real Argon2 output. No `Password=`/`Pwd=` connection-string fragment anywhere in
+      `.cs`/`.sql`/`.json` under those paths. No committed Data Protection key-ring artifact: grep for
+      `dataprotection`/`key-?ring` only turns up code that RESOLVES a path at runtime
+      (`SMARTNET_API_KEYRING_PATH` env var, `Path.GetTempPath()` for tests, `C:\ProgramData\SmartNet\...`
+      documented as the real default) — no `.xml` file (the Data Protection key format) is committed
+      anywhere under `SmartNet/api/`, `SmartNet/auth/`, or `SmartNet/admin/` (confirmed by `find`).
+- [x] 6.5 Regenerated `SmartNet/db/schema/checksums.txt` via `generate-checksums.ps1` against the final,
+      complete 12-script tree (`001`-`012`) — `git diff` on the regenerated file showed NO changes
+      (already correct going into this unit). Re-ran `DboWriteLintTests` (9 tests) and
+      `ChecksumManifestTests` (7 tests) against that tree: **16/16 green**, including
+      `RealManifest_MatchesTheRealScripts_Exactly` passing clean. This is the same mechanical closing
+      check item #1 shipped for exactly this moment, run for real, not assumed.
+
+**Work Unit 7 / Phase 6 closes the `autenticacion-y-sesion` change.** All 7 Work Units (Phases 0-6, tasks
+0.1 through 6.5) are now `[x]` complete. The two open questions carried forward from earlier units
+(5.8's `fact.Configuracion`-backed retention default, 4.14's escalation-timing mechanism) remain
+genuinely open for future work, as already documented at each — this unit did not attempt to resolve
+either, per its own scope boundary as a pure integration/CI unit.
 
 ---
 
