@@ -51,6 +51,36 @@ because the parameters travel in the string.
 MIT, and that no first-party `System.Security.Cryptography` Argon2 shipped in .NET 10 — if one did, it
 wins and this decision is reversed in writing. Carried into `tasks.md` as a gate, not left implicit.
 
+**Gate closed (task 0.1, verified 2026-08-16, with network access).**
+
+- **Version pinned:** `1.3.1` (published 2024-06-19T14:48:43Z) — current published version on
+  nuget.org at verification time; no newer version exists.
+- **License:** confirmed `MIT` (nuspec `<license type="expression">MIT</license>`, matching
+  `licenses.nuget.org/MIT`) — unchanged from the assumption above.
+- **Maintenance — confirmed but flagged, not simply "clean".** The GitHub repo
+  (`kmaragon/Konscious.Security.Cryptography`) is **not archived and not disabled**, 277 stars, 20
+  open issues, no closed-as-abandoned signal. However: the `master` branch's last commit is
+  **2024-06-18** — over two years stale as of this verification — and there is an **open, unmerged PR
+  ("Add .NET 10 target", #66, last activity 2026-06-17)** that has not been reviewed or merged by the
+  maintainer. No GitHub Releases are published (versions ship straight to NuGet from tags). Read
+  plainly: the package still installs and runs correctly on `net10.0` today via its `net8.0`
+  dependency group (NuGet resolves the nearest compatible TFM; there is no `net10.0`-specific asset,
+  and none is required for correctness), but the project shows weak maintainer responsiveness. This is
+  a real but non-blocking risk, not a reason to reverse Decision 1: pure managed C#, MIT, no native
+  binary, and — see below — no first-party alternative exists. **Recorded, not hidden**, because
+  `SmartNet.Auth.Infrastructure` (Work Unit 4) inherits this dependency and a future re-evaluation
+  should re-check this repo's activity before assuming it is still the best option.
+- **First-party .NET 10 Argon2id — confirmed it did NOT ship.** Checked
+  `dotnet/core` release notes and `docs/core/whats-new/dotnet-10/libraries.md` (Cryptography section):
+  .NET 10's cryptography additions are certificate-thumbprint lookup by non-SHA-1 algorithms, PEM/PKCS#12
+  changes, AES KeyWrap with padding, and post-quantum cryptography (ML-DSA, CNG support). **No Argon2
+  of any kind.** Cross-checked against `dotnet/runtime` issue **#19933** ("Add Argon2 support to
+  System.Security.Cryptography"), which is **still open**, sitting in the generic "Future" milestone
+  with no shipped-release attached. Decision 1 stands **unreversed**.
+
+Paper trail for Work Unit 4's `PackageReference`:
+`<PackageReference Include="Konscious.Security.Cryptography.Argon2" Version="1.3.1" />`.
+
 ---
 
 ## Decision 2 — `fact.Sesion`: new script `011_sesion.sql`, never an edit to `008`
@@ -167,6 +197,40 @@ restart invalidates every cookie — which would quietly defeat the entire reaso
 over an in-memory store. Therefore: `PersistKeysToFileSystem(<path from configuration>)`, on a
 directory that must be added to ADR 0014's backup set. Stated here because nothing else in the design
 would surface it.
+
+**Gate closed (task 0.2).** The path itself is deployment scoping, not code — Work Unit 5 is where
+`PersistKeysToFileSystem` is actually called (task 4.10 / 4.8's gate check). What is fixed here:
+
+- **Resolution pattern matches `SMARTNET_API_DB_CONNECTION` (Decision 6) and ADR 0012/0013's "raíz
+  configurable" for the document volume**: an environment variable, `SMARTNET_API_KEYRING_PATH`, read
+  exactly like the connection string — no default, no committed fallback, startup failure with a usage
+  message if absent. A hardcoded path in `Program.cs` was rejected for the same reason
+  `SMARTNET_API_DB_CONNECTION` is not hardcoded: the value differs per environment (ADR 0012's separate
+  test/production environments), and a committed path invites the same "works on my machine, fails in
+  prod" class of bug a committed connection string would.
+- **Recommended concrete value for this project's single-instance Windows deployment** (ADR 0012: one
+  host, reverse proxy in front of Kestrel, no container orchestrator):
+  `C:\ProgramData\SmartNet\dataprotection-keys`. `ProgramData` is the standard Windows location for
+  machine-wide application state that must outlive a user profile or service-account login session —
+  the same property the key ring needs, since Kestrel may run under a dedicated service account whose
+  profile is not guaranteed to persist. This mirrors the project's existing naming discipline: a
+  `SmartNet` root followed by a component-scoped subfolder, the same shape `SmartNet/db/schema/` and
+  `SmartNet/db/fixtures/` already use inside the repo — except this directory lives on the deployment
+  host's filesystem, **never inside the Git checkout**, because (a) key material must never be
+  committed and (b) a `git pull`/redeploy that replaces the working tree must not be able to delete or
+  rotate the keys out from under a running host.
+- **Directory must exist and be writable by the account Kestrel runs as before first startup** —
+  `PersistKeysToFileSystem` does not create parent directories reliably across all deployment
+  scripts, so provisioning this path is a deployment-checklist item, not an assumption the API host
+  makes silently.
+- **Why this does not need code yet.** Fixing the *value* of `SMARTNET_API_KEYRING_PATH` and its
+  filesystem location is independent of the `PersistKeysToFileSystem(...)` call site; task 4.10 wires
+  the call, this gate only removes the "someone will figure out a path in production" open question
+  Decision 4 originally left implicit.
+- **ADR 0014 addition.** Recorded directly in ADR 0014's backup set (see that ADR's Revisión 4) with
+  the justification: losing this directory invalidates every live session cookie on restart, silently
+  defeating the reason `fact.Sesion` was chosen over an in-memory store (the same failure mode this
+  paragraph opened with).
 
 ---
 
@@ -654,10 +718,13 @@ data can be involved.
       invent.
 - [ ] **Session retention window** for `sesion purgar`. Suggested default 90 days as a
       `fact.Configuracion` key; the number is an operational decision, not a design one.
-- [ ] **Konscious package verification** (version, licence, and whether .NET 10 shipped a first-party
-      Argon2) before the `PackageReference` is added — a gate in `tasks.md`, not an assumption here.
-- [ ] **Data-protection key-ring path** must be added to ADR 0014's backup set. Losing it invalidates
-      every cookie on restart, which silently defeats the reason a table was chosen over memory.
+- [x] **RESOLVED (task 0.1, 2026-08-16) — Konscious package verification.** `1.3.1`, MIT, no
+      first-party .NET 10 Argon2id (confirmed against `dotnet/core` release notes and
+      `dotnet/runtime#19933`, still open). Maintenance flagged as stale (last commit 2024-06-18) but
+      not archived/disabled — non-blocking risk, recorded above under Decision 1.
+- [x] **RESOLVED (task 0.2) — Data-protection key-ring path.** `SMARTNET_API_KEYRING_PATH` env var,
+      recommended value `C:\ProgramData\SmartNet\dataprotection-keys`, added to ADR 0014's backup set.
+      Recorded above under Decision 4.
 - [ ] **ADR 0008 has no authentication endpoints.** This design adds `POST`/`DELETE`/`GET
       /api/sesion`. Worth carrying into ADR 0008 as a revision so the contract has one owner.
 - [ ] **ADR 0007 needs a revision for Decision 8.** Its sketch shows two lockout columns

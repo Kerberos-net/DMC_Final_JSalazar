@@ -146,6 +146,15 @@ inventarlas.
 tabla versionada con sus propios `GRANT`/`DENY`, no caché distribuida; el ítem #2 levanta también el
 host mínimo de API en `SmartNet/api/` (`net10.0`), ya que ningún otro ítem del backlog lo hace.
 
+**Unidad 1 (compuertas) cerrada** — verificada de forma independiente, no solo por el reporte del
+agente. Consulté directamente `dotnet/runtime#19933` (issue en el hito «Future», sin fecha) y la
+página de NuGet de Konscious: versión `1.3.1`, MIT, publicado 2024-06-19 — coincide exactamente con
+lo reportado. **.NET 10 no trae Argon2id de fábrica**, así que la Decisión 1 (Konscious) se mantiene
+sin revertir. El anillo de claves de Data Protection queda en `C:\ProgramData\SmartNet\dataprotection-keys`
+(`SMARTNET_API_KEYRING_PATH`), añadido a **ADR 0014 Revisión 4** con el motivo escrito: si se pierde,
+`fact.Sesion` sobrevive un reinicio pero el ticket cifrado no descifra — la tabla dejaría de servir
+para lo que se eligió.
+
 **Decisión de arquitectura que salió de spec y diseño trabajando en paralelo.** El bloqueo por
 intentos necesitó una columna nueva, `fact.Usuario.NivelBloqueo`, porque `IntentosFallidos` no
 podía cargar dos preguntas con ciclos de vida distintos — cuántos fallos faltan para el próximo

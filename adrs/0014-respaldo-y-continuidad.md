@@ -2,7 +2,11 @@
 
 ## Estado
 
-Aceptado. Revisión 3. **El plan se diseña para producción y no se ejecuta en el entorno actual**, que
+Aceptado. Revisión 4. Añade el anillo de claves de Data Protection de `SmartNet.Api` al conjunto de
+elementos con respaldo propio, cerrando el gate 0.2 de `openspec/changes/autenticacion-y-sesion` — no
+reabre ninguna decisión de la revisión 3.
+
+Revisión 3. **El plan se diseña para producción y no se ejecuta en el entorno actual**, que
 es una demostración académica sin contabilidad real de ninguna compañía. Las tres verificaciones que
 la revisión 2 dejaba condicionando este ADR pasan de **bloqueantes** a **condiciones de puesta en
 producción**.
@@ -79,6 +83,22 @@ la compañía corre a una hora fija, la copia del volumen debe terminar antes.
 
 El respaldo del almacén de secretos (ADR 0015) es **responsabilidad propia y completa**: no vive en
 la base compartida. Si se pierde, se pierde el acceso a Gmail, Drive, Sheets y Telegram.
+
+### El anillo de claves de Data Protection (añadido — item #2, `autenticacion-y-sesion`, gate 0.2)
+
+`SmartNet.Api` persiste el anillo de claves de ASP.NET Core Data Protection en
+`C:\ProgramData\SmartNet\dataprotection-keys` (ruta configurable vía `SMARTNET_API_KEYRING_PATH`,
+nunca dentro del checkout de Git). Es **responsabilidad propia y completa**, igual que el almacén de
+secretos: no vive en la base compartida ni en `fact.Sesion`.
+
+**Por qué importa.** El anillo de claves protege el ticket cifrado dentro de la cookie
+`__Host-session`. Si se pierde — o se sobrescribe en un despliegue que reemplaza el árbol de trabajo
+sin preservar esta carpeta — **toda cookie de sesión viva deja de descifrar en el próximo reinicio del
+host**, aunque las filas de `fact.Sesion` sigan intactas en la base de datos. Eso anula en silencio la
+razón por la que `fact.Sesion` se eligió sobre un almacén en memoria (item #2, Decision 4): el estado
+de sesión sobreviviría un reinicio en la tabla, pero no podría usarse porque el descifrado del ticket
+falla. No es un respaldo redundante: es la pieza que hace que el respaldo de `fact.Sesion` sirva de
+algo.
 
 ### Restauración
 
