@@ -33,6 +33,23 @@ de base de datos. Sin dependencias.
 | 5 | 5 | Manifiesto de *checksums* + *rollback* consultivo + CI | 5/5 | ✅ |
 | 6 | 5 | Integración: suite completa end-to-end sobre base nueva | 2/2 | ✅ |
 
+### Pruebas
+
+Un solo proyecto, `SmartNet.Db.Runner.Tests`, crece fase a fase. Todas ejecutadas y verificadas
+por el orquestador, no solo reportadas por el agente que las escribió.
+
+| Fase | Qué se añadió | Nuevas | Acumulado |
+|---|---|---|---|
+| 1 | Runner DbUp + arnés de pruebas | 6 | 6 |
+| 2 | Estructura del esquema `001`–`007` | 25 | 31 |
+| 3 | Matriz de permisos `008` | 26 | 57 |
+| 4 | Datos base `009`–`010` | 36 | 93 |
+| 5 | *Checksums* + *rollback* + lint de `dbo` | 9 | 102 |
+| 6 | Integración (verifica el contrato ya construido, sin código nuevo) | 2 | 104 |
+
+**104/104 al cerrar el ítem.** Ese número volvió a crecer dentro del ítem #2 —a 127—, porque `011`
+y `012` extendieron este mismo proyecto; ver la tabla de pruebas del ítem #2.
+
 ### Lo verificado al cerrar cada fase
 
 **Fase 1** — el journal de DbUp aterriza en `fact.SchemaVersions`, no en `dbo.SchemaVersions`.
@@ -149,6 +166,21 @@ restablecimiento de ADR 0007. Depende del ítem #1 (completo).
 | 4 | 5 | `SmartNet.Api` — host mínimo, cookie de autenticación | 27/27 | ✅ |
 | 5 | 6 | `SmartNet.Admin` — CLI de restablecimiento | 11/11 | ✅ |
 | 6 | 7 | Integración, CI y suite completa end-to-end | 5/5 | ✅ |
+
+### Pruebas
+
+Cinco proyectos, no uno solo — `SmartNet.Db.Runner.Tests` es el mismo del ítem #1, extendido aquí
+por `011`/`012`. Estado final, verificado por el orquestador en la unidad 7, ejecutando cada suite
+por separado.
+
+| Proyecto | Unidad que lo creó | Pruebas | Qué cubre |
+|---|---|---|---|
+| `SmartNet.Db.Runner.Tests` | 2 (extiende el ítem #1) | 127 | Esquema `011`/`012`, permisos de `fact.Sesion`, lint de `dbo`, *checksums* |
+| `SmartNet.Auth.Core.Tests` | 3 | 33 | Dominio puro: escalada de bloqueo, códec PHC, escaneo de pureza (cero BD/HTTP/reloj) |
+| `SmartNet.Auth.Infrastructure.Tests` | 4 (+3 en la unidad 6) | 44 | Adaptadores Argon2id/SQL, suficiencia de permisos bajo `usr_api` real |
+| `SmartNet.Api.Tests` | 5 | 22 | Host HTTP, cookie de autenticación, endpoints de sesión |
+| `SmartNet.Admin.Tests` | 6 | 17 | CLI de creación, restablecimiento y purga |
+| **Total** | | **243** | |
 
 **Tres decisiones ya tomadas, no reabrir:** Argon2id como algoritmo de *hash*; `fact.Sesion` como
 tabla versionada con sus propios `GRANT`/`DENY`, no caché distribuida; el ítem #2 levanta también el
