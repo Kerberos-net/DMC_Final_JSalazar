@@ -98,39 +98,82 @@ Chain strategy: pending
 
 ## Phase 3 (WU3): `SmartNet/worker/` — Python SBS scraper (first Python in repo)
 
-- [ ] 3.1 Scaffold `SmartNet/worker/pyproject.toml` (PEP 621, `requires-python = ">=3.13"`, deps
+- [x] 3.1 Scaffold `SmartNet/worker/pyproject.toml` (PEP 621, `requires-python = ">=3.13"`, deps
       `requests`, `beautifulsoup4`, `pyodbc`; dev deps `pytest`, `ruff`; `[tool.pytest.ini_options]`
-      markers `integracion`, `externa`) + src layout `src/smartnet_worker/`.
-- [ ] 3.2 RED (pytest): `parse_tipo_cambio` unit test against a saved real SBS HTML fixture
+      markers `integracion`, `externa`) + src layout `src/smartnet_worker/`. **Environment note**:
+      this sandbox initially had no Python interpreter (only the Windows Store stub alias) — Python
+      3.13.15 was installed via `winget install Python.Python.3.13` during implementation (deviation
+      from assuming a preinstalled interpreter, flagged here rather than silently downgrading or
+      skipping execution). `pip install -e .[dev]` succeeded cleanly (requests 2.34.2,
+      beautifulsoup4 4.15.0, pyodbc 5.3.0, pytest 9.1.1, ruff 0.16.3).
+- [x] 3.2 RED (pytest): `parse_tipo_cambio` unit test against a saved real SBS HTML fixture
       (`tests/fixtures/sbs_tipo_cambio.html`) — returns `TipoCambioSbs` with exact `Decimal` compra/venta;
-      malformed/mutilated HTML raises `ParseoSbsError`.
-- [ ] 3.3 GREEN: `sbs.py` — `parse_tipo_cambio(html: str) -> TipoCambioSbs`, pure, `beautifulsoup4` on
-      `html.parser`, `Decimal(str(...))` never `float`.
-- [ ] 3.4 RED (pytest): `insertar_sbs` unit test with a fake cursor recording statement/params — no
+      malformed/mutilated HTML raises `ParseoSbsError`. **Confirmed RED**: temporarily removed
+      `sbs.py` and ran `pytest tests/unit/test_sbs.py` → `ModuleNotFoundError: No module named
+      'smartnet_worker.sbs'` (collection error, all 6 tests unrunnable). **Fixture note**: the real
+      `sbs.gob.pe` page is behind an Incapsula WAF that blocked the automated `curl` fetch used
+      during implementation (challenge script only, no table markup) — the fixture is a
+      documented, clearly-labeled **synthetic** structure (`tests/fixtures/README.md`), not a
+      captured real page.
+- [x] 3.3 GREEN: `sbs.py` — `parse_tipo_cambio(html: str) -> TipoCambioSbs`, pure, `beautifulsoup4` on
+      `html.parser`, `Decimal(str(...))` never `float`. **Confirmed GREEN**: restored `sbs.py`,
+      `pytest tests/unit/test_sbs.py` → 6/6 passed.
+- [x] 3.4 RED (pytest): `insertar_sbs` unit test with a fake cursor recording statement/params — no
       `dbo.` in the emitted SQL; `IntegrityError` on the fake cursor is caught and returns `False`.
-- [ ] 3.5 GREEN: `tipo_cambio_repo.py` — `insertar_sbs(cursor, tc) -> bool`, hardcoded `Origen='SBS'`
+      **Confirmed RED**: temporarily removed `tipo_cambio_repo.py` → `ModuleNotFoundError: No
+      module named 'smartnet_worker.tipo_cambio_repo'` (collection error, all 4 tests unrunnable).
+- [x] 3.5 GREEN: `tipo_cambio_repo.py` — `insertar_sbs(cursor, tc) -> bool`, hardcoded `Origen='SBS'`
       (design.md Decision 4, symmetric with .NET's `CargarManualAsync`), catches `IntegrityError`.
-- [ ] 3.6 RED (pytest): `registrar_exito`/`registrar_fallo` unit tests with a fake cursor — `UPDATE …
+      **Confirmed GREEN**: restored the module, `pytest tests/unit/test_tipo_cambio_repo.py` → 4/4
+      passed.
+- [x] 3.6 RED (pytest): `registrar_exito`/`registrar_fallo` unit tests with a fake cursor — `UPDATE …
       WHERE Nombre='SBS'` issued; raises if fake cursor reports `rowcount != 1`; `instante` passed as a
-      parameter, never `datetime.now()`.
-- [ ] 3.7 GREEN: `estado_integracion.py` — `registrar_exito(cursor, instante)`,
+      parameter, never `datetime.now()`. **Confirmed RED**: temporarily removed
+      `estado_integracion.py` → `ModuleNotFoundError: No module named
+      'smartnet_worker.estado_integracion'` (collection error, all 6 tests unrunnable).
+- [x] 3.7 GREEN: `estado_integracion.py` — `registrar_exito(cursor, instante)`,
       `registrar_fallo(cursor, instante, error)` with `UPDATE`+rowcount guard, `UltimoError` truncated
-      to 2000 chars, `FallosSeguidos` incremented on failure (design.md Decision 6).
-- [ ] 3.8 GREEN: `cli_tipo_cambio.py` — sole IO entry point; `requests.get` with explicit timeout,
+      to 2000 chars, `FallosSeguidos` incremented on failure (design.md Decision 6). **Confirmed
+      GREEN**: restored the module, `pytest tests/unit/test_estado_integracion.py` → 6/6 passed.
+- [x] 3.8 GREEN: `cli_tipo_cambio.py` — sole IO entry point; `requests.get` with explicit timeout,
       reads `SMARTNET_WORKER_ODBC_CONNECTION` (no committed default), orchestrates
       parse→insertar_sbs→registrar_exito on success, registrar_fallo on any failure inside its own
       transaction after rollback (no test — thin orchestration wired to already-tested pure units,
-      compression acknowledged).
-- [ ] 3.9 RED (pytest, marker `integracion`): real `pyodbc` test against an ephemeral
+      compression acknowledged). Also added `config.py` (env var + URL + timeout constants,
+      `ConfiguracionError`), matching design.md's File Changes table.
+- [x] 3.9 RED (pytest, marker `integracion`): real `pyodbc` test against an ephemeral
       `CREATE LOGIN usr_worker` — successful run inserts the SBS row for today; duplicate insert for
       the same date returns `False`; `UPDATE` of `EstadoIntegracion` affects exactly 1 row; the
       scraper never issues a `dbo.*` statement (assert via connection-level query log or grant denial).
-- [ ] 3.10 GREEN/confirm 3.9 against 3.5/3.7/3.8 wired together; no production code expected to
-      change — record if a gap surfaces.
-- [ ] 3.11 `SmartNet/worker/README.md` — install steps (`pip install -e .[dev]`), required env var,
+      **Confirmed RED, then GREEN against real infra**: `tests/integration/conftest.py` provisions
+      an ephemeral `fact_test_worker_<id>` database, applies the full versioned schema via a real
+      `dotnet run --project SmartNet.Db.Runner` invocation (never a Python reimplementation of the
+      schema — ADR 0016), and creates a real ephemeral `CREATE LOGIN usr_worker`. A local SQL
+      Server 2025 (Developer) instance + the .NET SDK were both reachable in this sandbox, so these
+      tests were actually run, not just written: first run failed loudly with real, informative
+      errors while the harness was built (ADO.NET vs ODBC connection-string dialect mismatch for
+      `SmartNet.Db.Runner`; missing `dbo.*` external-catalog fixture tables/seed rows that
+      `008_usuarios_y_permisos.sql`/`010_motivo_atributo_demo.sql` require — same dependency WU2
+      hit) — each fixed for real, never worked around by weakening the test. "No `dbo.*` statement"
+      is covered separately by the structural test in 3.10, not by a live query-log assertion.
+      The "no `dbo.*` statement" requirement is verified structurally (test_no_dbo_structural.py,
+      comment-stripped source scan), matching the .NET side's `NoWriteToDboStructuralTests`
+      pattern — the design.md Testing Strategy table lists this as a separate "Structural" row, not
+      part of the pyodbc integration suite.
+- [x] 3.10 GREEN/confirm 3.9 against 3.5/3.7/3.8 wired together — **Confirmed GREEN: 3/3 real**
+      `pytest -m integracion` **passed** against the real ephemeral database: insert-today,
+      duplicate-returns-False (real PK violation via `pyodbc.IntegrityError`), and
+      `EstadoIntegracion` rowcount=1. No production code needed to change once the test harness
+      itself was fixed (connection-string dialect + dbo fixture, see 3.9) — no gap in 3.5/3.7/3.8
+      surfaced. Verified zero orphaned `fact_test_worker_*` databases and zero orphaned
+      `usr_worker` logins after the run (`sqlcmd` query, 0 rows both).
+- [x] 3.11 `SmartNet/worker/README.md` — install steps (`pip install -e .[dev]`), required env var,
       `pytest` marker usage (`-m "not integracion and not externa"` for local unit-only runs), the
-      convention item #5 will reuse.
-- [ ] 3.12 `ruff check` clean pass over `src/` and `tests/`.
+      convention item #5 will reuse, plus a "Limitaciones conocidas" section documenting the
+      synthetic fixture and the environment bootstrap.
+- [x] 3.12 `ruff check` clean pass over `src/` and `tests/`. **Confirmed**: `ruff check src tests`
+      → `All checks passed!` (after fixing `UP017` datetime.UTC alias warnings via `--fix` and
+      manually wrapping 6 `E501` long lines).
 
 ## Phase 4 (WU4): Solution wiring, CI, full integration
 

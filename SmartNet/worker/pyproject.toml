@@ -1,0 +1,42 @@
+[project]
+name = "smartnet-worker"
+version = "0.1.0"
+description = "SmartNet worker Python — ingesta y publicacion (BACKLOG #4: scraper SBS de tipo de cambio)."
+readme = "README.md"
+requires-python = ">=3.13"
+dependencies = [
+    "requests>=2.32",
+    "beautifulsoup4>=4.12",
+    "pyodbc>=5.1",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=8.3",
+    "ruff>=0.6",
+]
+
+[project.scripts]
+smartnet-tipo-cambio = "smartnet_worker.cli_tipo_cambio:main"
+
+[build-system]
+requires = ["setuptools>=68"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+where = ["src"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "integracion: pruebas que requieren una instancia SQL Server real y pyodbc funcional (design.md Decision 7)",
+    "externa: pruebas que hacen scraping real contra sbs.gob.pe, excluidas de CI por defecto",
+]
+
+[tool.ruff]
+line-length = 100
+target-version = "py313"
+src = ["src", "tests"]
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]
