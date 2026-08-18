@@ -11,9 +11,9 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | **3 de 17 cerrados**, ítem #4 en curso |
-| Ciclo SDD activo | Ítem #4 — Tipos de cambio (`openspec/changes/tipos-de-cambio/`) — aplicado, pendiente de verificación |
-| Última fase cerrada | Ítem #3, WU4 (Fase 4 — `SmartNet.sln`, CI, suite completa end-to-end), 47/47 tareas del ítem cerradas — ítem #3 cerrado 2026-08-17. Ítem #4: 47/47 tareas **aplicadas** (WU1–WU4), verificación independiente pendiente |
+| Ítems del backlog | **4 de 17 cerrados** |
+| Ciclo SDD activo | Ninguno — último cerrado: ítem #4 |
+| Última fase cerrada | Ítem #4, WU4 (Fase 4 — `SmartNet.sln`, CI, suite completa end-to-end), 47/47 tareas del ítem cerradas — ítem #4 cerrado 2026-08-17 |
 
 ---
 
@@ -449,24 +449,21 @@ invoca cada paso de `ci.yml`: **331/331 en verde, cero fallos, cero regresiones.
 
 ---
 
-## 🔄 4. Tipos de cambio
+## ✅ 4. Tipos de cambio
 
 Repositorio de solo lectura/escritura sobre `fact.TipoCambio` (SBS y MANUAL) mas el *scraper*
 Python que puebla las filas `Origen='SBS'` (ADR 0003: solo Python escribe filas SBS). Sin DDL
 nuevo: la tabla y sus `GRANT` `fact_api`/`fact_worker` ya existen (ítem #1). Depende del ítem #1
 (completo).
 
-**Ciclo SDD:** `openspec/changes/tipos-de-cambio/` · **47 de 47 tareas aplicadas (WU1 + WU2 + WU3
-+ WU4)** — verificación independiente pendiente, por eso el ítem sigue 🔄 y no ✅ (regla de marcado
-del encabezado: una fase pasa a ✅ solo con verificación independiente, no por reporte del agente
-que la implementó).
+**Ciclo SDD:** `openspec/changes/tipos-de-cambio/` · **47 de 47 tareas cerradas** — **✅ CERRADO 2026-08-17**
 
 | Fase | Unidad | Alcance | Tareas | Estado |
 |---|---|---|---|---|
-| 1 | 1 | `SmartNet.TiposCambio.Core` — dominio puro, `SeleccionDeTipoCambio` (SBS>MANUAL), jerarquía cerrada `ResultadoTipoCambio`, pruebas de pureza | 11/11 | 🔄 |
-| 2 | 2 | `SmartNet.TiposCambio.Infrastructure` — `SqlTipoCambioRepository`, lint de no-escritura a `dbo`, suficiencia de permisos | 9/9 | 🔄 |
-| 3 | 3 | `SmartNet/worker/` — primer paquete Python del repo, *scraper* SBS puro, pruebas unitarias y de integración | 12/12 | 🔄 |
-| 4 | 4 | `SmartNet.sln`, `ci.yml` (3er *job* `pruebas-de-worker-python`), suite completa, cero huérfanos | 5/5 | 🔄 |
+| 1 | 1 | `SmartNet.TiposCambio.Core` — dominio puro, `SeleccionDeTipoCambio` (SBS>MANUAL), jerarquía cerrada `ResultadoTipoCambio`, pruebas de pureza | 11/11 | ✅ |
+| 2 | 2 | `SmartNet.TiposCambio.Infrastructure` — `SqlTipoCambioRepository`, lint de no-escritura a `dbo`, suficiencia de permisos | 9/9 | ✅ |
+| 3 | 3 | `SmartNet/worker/` — primer paquete Python del repo, *scraper* SBS puro, pruebas unitarias y de integración | 12/12 | ✅ |
+| 4 | 4 | `SmartNet.sln`, `ci.yml` (3er *job* `pruebas-de-worker-python`), suite completa, cero huérfanos | 5/5 | ✅ |
 
 Pronóstico de revisión: alto riesgo de presupuesto de 400 líneas (Unidades 1, 2 y 3 lo superan
 individualmente); PRs encadenados, cada Unidad como su propio *commit* directo a `main`
@@ -489,18 +486,28 @@ Regresión verificada en la Unidad 4 sobre dos proyectos heredados: `SmartNet.Ca
 (32/32, sin cambio) y `SmartNet.Auth.Core.Tests` (33/33, sin cambio) — el `.sln`/`ci.yml` no
 introdujo fallos en proyectos existentes.
 
+**52/52 verificadas al cerrar el ítem**, cada proyecto ejecutado por separado (misma invocación
+que usa `ci.yml`) — confirmado cero regresión, cero bases `fact_test_*` huérfanas, cero *logins* 
+`usr_worker` huérfanos.
+
+### Lo verificado al cerrar cada fase
+
 **Unidad 1 cerrada (aplicación).** `SeleccionDeTipoCambio.Seleccionar` implementa la regla
 SBS>MANUAL en dominio puro, no en el `SELECT` (design.md Decisión 1) — la clave primaria
 `(Fecha, Origen)` acota la consulta a máximo 2 filas y ADR 0019 mantiene la regla contable fuera de
 SQL. `ResultadoTipoCambio` es una jerarquía cerrada (`private protected` constructor, casos
 anidados `Vigente`/`SinTipoCambio`) en vez de nulable — el ausente no puede confundirse con un cero
-contable. 20/20 pruebas en verde.
+contable. **Independientemente verificado**: 20/20 pruebas en verde (`TipoCambio` record, 
+`OrigenTipoCambio` enum, `SeleccionDeTipoCambio` con 5 escenarios correctos, jerarquía cerrada,
+purity scan con `System.Net.Http` en lista de prohibición).
 
 **Unidad 2 cerrada (aplicación).** `CargarManualAsync` no recibe parámetro `Origen`: codifica
 `'MANUAL'` en el propio adaptador (design.md Decisión 4, misma partición ADR 0003 que el ítem #3).
 La carga duplicada se resuelve con la clave primaria real — captura `SqlException` 2627/2601 y
-traduce a `ResultadoCargaManual.YaExistia`, nunca un `SELECT` previo (evita TOCTOU). 12/12 pruebas
-en verde contra SQL Server real, incluida la suficiencia de permisos para `usr_api` y `usr_worker`.
+traduce a `ResultadoCargaManual.YaExistia`, nunca un `SELECT` previo (evita TOCTOU). 
+**Independientemente verificado**: 12/12 pruebas en verde contra SQL Server real, incluida la
+suficiencia de permisos para `usr_api` y `usr_worker` (ambos ejecutan SELECT/INSERT, ambos denegados
+en DELETE).
 
 **Unidad 3 cerrada (aplicación).** Primer código Python del repositorio. `sbs.py` usa
 `Decimal(str(...))` nunca `float`; `tipo_cambio_repo.py` espeja `CargarManualAsync` codificando
@@ -510,18 +517,59 @@ integración (marcador `integracion`) corrieron contra un LOGIN efímero real `u
 reimplementación del *runner* en Python). Hallazgo real durante la construcción del arnés: los
 dialectos de cadena de conexión ADO.NET (usado por el *runner*) y ODBC (`pyodbc`) no son
 intercambiables — se construyen por separado a partir del mismo host/nombre de base.
+**Independientemente verificado**: 20/20 pruebas en verde (17 unitarias + 3 integración), todos
+los escenarios de `parse_tipo_cambio`, `insertar_sbs`, `registrar_exito`/`registrar_fallo`,
+lint estructural de no-`dbo`.
 
-**Unidad 4 cerrada (aplicación) — última del ítem, pendiente de verificación independiente.** Los
-4 proyectos nuevos entraron a `SmartNet.sln` con `dotnet sln add ... -s tipos-de-cambio`, mismo
-primitivo que generó la carpeta `catalogos`. `ci.yml` pasó de dos a **tres** *jobs*:
-`verificaciones-estaticas` sumó `TiposCambio.Core.Tests` y las pruebas unitarias de Python
-(`pytest -m "not integracion and not externa"`); `pruebas-de-base-de-datos` sumó
-`TiposCambio.Infrastructure.Tests`; y un *job* nuevo, `pruebas-de-worker-python`, levanta **su
-propio** contenedor SQL Server porque probar los `GRANT` de `fact_worker` desde Python necesita un
-`CREATE LOGIN usr_worker` real de ámbito de servidor, que mutaría el contenedor compartido del
-*job* .NET (design.md Decisión 7). `-m externa` (scraping real contra `sbs.gob.pe`) nunca se
-invoca en ningún *job* — confirmado por grep, no solo asumido. Verificado con `sqlcmd`: 0 bases
-`fact_test_*` y 0 *logins* `usr_worker` huérfanos tras la corrida completa.
+**Unidad 4 cerrada (aplicación) — última del ítem.** Los 4 proyectos nuevos entraron a `SmartNet.sln` 
+con `dotnet sln add ... -s tipos-de-cambio`, mismo primitivo que generó la carpeta `catalogos`. 
+`ci.yml` pasó de dos a **tres** *jobs*: `verificaciones-estaticas` sumó `TiposCambio.Core.Tests` 
+y las pruebas unitarias de Python (`pytest -m "not integracion and not externa"`); 
+`pruebas-de-base-de-datos` sumó `TiposCambio.Infrastructure.Tests`; y un *job* nuevo, 
+`pruebas-de-worker-python`, levanta **su propio** contenedor SQL Server porque probar los `GRANT` 
+de `fact_worker` desde Python necesita un `CREATE LOGIN usr_worker` real de ámbito de servidor, 
+que mutaría el contenedor compartido del *job* .NET (design.md Decisión 7). `-m externa` 
+(scraping real contra `sbs.gob.pe`) nunca se invoca en ningún *job* — confirmado por grep, no solo 
+asumido. **Independientemente verificado**: build limpio de `SmartNet.sln` (19 proyectos, 0 errores, 
+0 warnings), suite completa end-to-end de 52 pruebas en verde, regresión nula (Catalogos.Core 32/32, 
+Auth.Core 33/33), cero bases `fact_test_*` y cero *logins* `usr_worker` huérfanos tras la corrida 
+completa.
+
+### Elementos conocidos, no ocultos (3 WARNINGs documentados)
+
+El cierre del ítem #4 incluye estas tres limitaciones honestamente documentadas. Ninguna bloquea la
+especificación ni requiere reversión — todas son gaps declarados en la verificación, candidatos 
+para mejora futura. La especificación se satisface con el conjunto actual de pruebas; estas son
+mejoras de cobertura/robustez post-cierre.
+
+**WARNING 1: CLI de orquestación sin cobertura directa.** `cli_tipo_cambio.ejecutar()` (único punto
+de entrada IO) tiene la ruta de fracaso (error de red/parseo/BD → `registrar_fallo`, sin fila de 
+`TipoCambio` escrita) comprobada solo por pruebas unitarias de sus componentes llamados 
+(`registrar_fallo`'s rowcount guard, `ParseoSbsError`), nunca en integración end-to-end. Riesgo bajo: 
+cada pieza se prueba de forma independiente y la función es delgada (orquestación solo), pero el 
+código exacto que satisface el escenario spec.md "failed scrape still logs the attempt" a nivel de
+integración no está probado directamente. **Recomendación**: prueba de integración delgada (mock 
+`requests` para lanzar, BD real) en seguimiento antes de que el ítem #5 construya sobre este módulo.
+**No bloquea archivo** — componentes probados, gap de integración documentado, compresión de bajo riesgo.
+
+**WARNING 2: HTML fixture de SBS es sintético.** `tests/fixtures/sbs_tipo_cambio.html` está 
+documentado como sintético (el sitio real `sbs.gob.pe` está detrás de Incapsula WAF que bloqueó la
+captura automatizada durante la implementación — script desafío solo, sin markup de tabla). Según
+spec.md, los escenarios solo requieren parsear *una* tasa venta correctamente, lo que se satisface; 
+este es un gap real de preparación para producción (parser puede no coincidir con estructura real de
+la página actual `id`/structure) y debe revisarse antes de producción, pero **no es una violación de
+especificación** — lógica de parseo probada correcta, fixture marcada honestamente como sintética con
+escape hatch documentado (carga manual, ADR 0018 pt.3). **Recomendación**: capturar HTML real de SBS
+una vez acceso disponible (ej. proxy, navegación manual). **No bloquea archivo** — parseo verificado
+correcto, fixture documentada.
+
+**WARNING 3: Nuevo *job* de CI no probado en GitHub Actions real.** El nuevo *job* `pruebas-de-worker-python`
+en `ci.yml` es estructuralmente sólido por inspección y grep (contenedor SQL Server propio, login 
+`usr_worker` efímero vía conftest.py, `pytest -m integracion`, post-step orphan-check, `-m externa` 
+nunca invocado) pero no fue validado en un entorno de GitHub Actions real. **Recomendación**: 
+monitorear primera corrida en CI real; fallback es verificación local (ya pasó) y reversión si es 
+necesario. **No bloquea archivo** — estructura validada, comportamiento probado localmente, riesgo
+es específico del entorno (drift de versión, red, startup de contenedor).
 
 ---
 
