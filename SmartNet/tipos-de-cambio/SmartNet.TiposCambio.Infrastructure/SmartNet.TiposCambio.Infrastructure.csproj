@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- design.md "Two .NET projects, replicating SmartNet/catalogos/ exactly (item #3)":
+       Microsoft.Data.SqlClient 7.0.2, same pin as SmartNet.Catalogos.Infrastructure. No
+       FrameworkReference: single SQL adapter, no ASP.NET Core Identity/cookie type dependency. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SmartNet.TiposCambio.Core\SmartNet.TiposCambio.Core.csproj" />
+  </ItemGroup>
+
+</Project>

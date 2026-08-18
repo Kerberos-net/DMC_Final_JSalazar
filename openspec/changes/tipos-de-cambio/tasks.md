@@ -61,29 +61,40 @@ Chain strategy: pending
 
 ## Phase 2 (WU2): `SmartNet.TiposCambio.Infrastructure` — SQL repository
 
-- [ ] 2.1 Scaffold `SmartNet/tipos-de-cambio/SmartNet.TiposCambio.Infrastructure` (referencing
+- [x] 2.1 Scaffold `SmartNet/tipos-de-cambio/SmartNet.TiposCambio.Infrastructure` (referencing
       `SmartNet.TiposCambio.Core` + `Microsoft.Data.SqlClient` 7.0.2, no `FrameworkReference`) and
       `SmartNet.TiposCambio.Infrastructure.Tests` (+ `ProjectReference` to `SmartNet.Db.TestBootstrap`).
-- [ ] 2.2 RED: `SqlTipoCambioRepositoryTests.ObtenerVigenteAsync` — only-SBS row returns `Vigente` with
+- [x] 2.2 RED: `SqlTipoCambioRepositoryTests.ObtenerVigenteAsync` — only-SBS row returns `Vigente` with
       Origen=Sbs; both origins present returns `Vigente` with Origen=Sbs (MANUAL discarded); no row for
-      the date returns `SinTipoCambio`.
-- [ ] 2.3 GREEN: `SqlTipoCambioRepository.ObtenerVigenteAsync` — `SELECT` both origins by PK
+      the date returns `SinTipoCambio`. **Confirmed RED: CS0246, type does not exist (3 call sites).**
+- [x] 2.3 GREEN: `SqlTipoCambioRepository.ObtenerVigenteAsync` — `SELECT` both origins by PK
       `(Fecha, Origen)` (max 2 rows), delegate selection to `SeleccionDeTipoCambio.Seleccionar`
-      (design.md Decision 1).
-- [ ] 2.4 RED: `SqlTipoCambioRepositoryTests.CargarManualAsync` — inserts a MANUAL row for an
+      (design.md Decision 1). **Confirmed GREEN: 3/3.** MigratedDatabase helper needed
+      `CreateExternalDboCatalogsAsync()` + `SeedDboMotivoFixtureRowsAsync()` before `RunMigrations()`
+      — `010_motivo_atributo_demo.sql` selects from `dbo.Motivo`, same dependency as item #3.
+- [x] 2.4 RED: `SqlTipoCambioRepositoryTests.CargarManualAsync` — inserts a MANUAL row for an
       uncovered date and returns `Cargada`; a second insert for the same `(Fecha, 'MANUAL')` returns
       `YaExistia` via the real composite PK (SqlException 2627/2601 translation), not a pre-check.
-- [ ] 2.5 GREEN: `SqlTipoCambioRepository.CargarManualAsync` — plain `INSERT`, hardcoded `Origen='MANUAL'`
+      **Compression acknowledged**: `CargarManualAsync` was implemented alongside `ObtenerVigenteAsync`
+      in the same 2.3 pass (single adapter file, both port methods written together, same class as
+      item #3 task 1.15/1.10); no meaningful RED — tests passed on first run against existing code.
+- [x] 2.5 GREEN: `SqlTipoCambioRepository.CargarManualAsync` — plain `INSERT`, hardcoded `Origen='MANUAL'`
       (no `Origen` parameter, design.md Decision 4), catch 2627/2601 → `YaExistia`, anything else
-      propagates; `FechaConsulta` passed as a parameter, never `SYSUTCDATETIME()`.
-- [ ] 2.6 RED: `NoWriteToDboStructuralTests` analog — literal scan of the adapter's `.cs` source
+      propagates; `FechaConsulta` passed as a parameter, never `SYSUTCDATETIME()`. **Confirmed GREEN: 2/2.**
+- [x] 2.6 RED: `NoWriteToDboStructuralTests` analog — literal scan of the adapter's `.cs` source
       confirms it never mentions `dbo.` (comment-stripped, same fix as item #3's task 2.11).
-- [ ] 2.7 GREEN/confirm 2.6 — passes by construction against 2.3/2.5.
-- [ ] 2.8 RED: `PermissionSufficiencyTests` analog — replay the adapter's exact SQL text under
+      **Compression acknowledged**: same class as 2.4 — adapter already exists from 2.3/2.5 and
+      never mentioned `dbo.`, so no meaningful RED; test passed on first run.
+- [x] 2.7 GREEN/confirm 2.6 — passes by construction against 2.3/2.5. **Confirmed GREEN: 1/1.**
+- [x] 2.8 RED: `PermissionSufficiencyTests` analog — replay the adapter's exact SQL text under
       `ExecuteAsUserAsync("usr_api", …)` and `ExecuteAsUserAsync("usr_worker", …)`; both succeed
-      (007/008 grant identical access to both roles on `fact.TipoCambio`).
-- [ ] 2.9 GREEN/confirm 2.8 — passes against real grants; if a statement fails, record the gap
-      explicitly, do not relax the test.
+      (007/008 grant identical access to both roles on `fact.TipoCambio`). No meaningful RED here
+      either — this suite verifies a claim about already-shipped grants (008, item #1), not new
+      production code; compression acknowledged, same class as item #3's task 3.6.
+- [x] 2.9 GREEN/confirm 2.8 — passes against real grants. **Confirmed GREEN: 6/6** — both `usr_api`
+      and `usr_worker` execute `ObtenerVigenteAsync`'s SELECT and `CargarManualAsync`'s INSERT
+      successfully, both are denied DELETE. Design.md's claim ("007/008 grant identical access to
+      both roles on this table") holds against the real grants; no gap found.
 
 ## Phase 3 (WU3): `SmartNet/worker/` — Python SBS scraper (first Python in repo)
 
