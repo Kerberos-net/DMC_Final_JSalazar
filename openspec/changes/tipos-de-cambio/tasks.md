@@ -177,16 +177,66 @@ Chain strategy: pending
 
 ## Phase 4 (WU4): Solution wiring, CI, full integration
 
-- [ ] 4.1 Modify `SmartNet/SmartNet.sln` — add a `tipos-de-cambio` solution folder and the 4 new
-      .NET projects, mirroring the `catalogos` folder's GUID/nesting pattern.
-- [ ] 4.2 Modify `.github/workflows/ci.yml` — wire `SmartNet.TiposCambio.Core.Tests` and the Python
+- [x] 4.1 Modify `SmartNet/SmartNet.sln` — add a `tipos-de-cambio` solution folder and the 4 new
+      .NET projects, mirroring the `catalogos` folder's GUID/nesting pattern. **Done**: used
+      `dotnet sln SmartNet.sln add ... -s tipos-de-cambio` (same primitive that produced the
+      `catalogos` folder), which generates its own new project-type/nesting GUIDs — not hand-copied
+      from `catalogos`. Confirmed by a full `dotnet build SmartNet.sln --configuration Release`:
+      0 errors, 0 warnings, all 19 projects (15 pre-existing + 4 new) build clean.
+- [x] 4.2 Modify `.github/workflows/ci.yml` — wire `SmartNet.TiposCambio.Core.Tests` and the Python
       unit tests (`pytest -m "not integracion and not externa"`) into `verificaciones-estaticas`;
-      wire `SmartNet.TiposCambio.Infrastructure.Tests` into `pruebas-de-base-de-datos`.
-- [ ] 4.3 Add new CI job `pruebas-de-worker-python` — its own SQL Server container, ephemeral
+      wire `SmartNet.TiposCambio.Infrastructure.Tests` into `pruebas-de-base-de-datos`. **Done**:
+      added `TESTS_TIPOS_CAMBIO_CORE`/`TESTS_TIPOS_CAMBIO_INFRA`/`WORKER_DIR` env vars, a
+      `dotnet test` step for `TiposCambio.Core.Tests` (same pure-domain pattern as
+      `Auth.Core.Tests`/`Catalogos.Core.Tests`), an `actions/setup-python@v5` (3.13) step + `pip
+      install -e .[dev]` + `pytest -m "not integracion and not externa"` step in
+      `verificaciones-estaticas`, and a `dotnet test` step for `TiposCambio.Infrastructure.Tests`
+      at the end of `pruebas-de-base-de-datos`.
+- [x] 4.3 Add new CI job `pruebas-de-worker-python` — its own SQL Server container, ephemeral
       `CREATE LOGIN usr_worker WITH PASSWORD`, runs `pytest -m integracion` (design.md Decision 7);
-      confirm `-m externa` stays deselected by default.
-- [ ] 4.4 Run the full solution test suite (`dotnet test SmartNet.sln`, sequential per project) —
-      confirm no regression in existing project test counts alongside the new
-      `TiposCambio.Core.Tests`/`TiposCambio.Infrastructure.Tests` counts.
-- [ ] 4.5 Confirm zero orphaned `fact_test_*` databases and zero orphaned ephemeral `usr_worker`
-      logins after the full run (standing rule from item #1's Fase 3 incident).
+      confirm `-m externa` stays deselected by default. **Done**: new job with its own
+      `mcr.microsoft.com/mssql/server:2022-latest` service container (mirrors
+      `pruebas-de-base-de-datos`'s container config exactly, own throwaway `sa` password), installs
+      `mssql-tools18`/`unixodbc-dev` + Python 3.13, `pip install -e .[dev]`, runs `pytest -m
+      integracion` — the real `CREATE LOGIN usr_worker` is issued by
+      `tests/integration/conftest.py` itself (same fixture verified locally in WU3, task 3.9/3.10),
+      not by a separate CI step. Added an explicit post-run `sqlcmd` orphan check
+      (`sys.databases LIKE 'fact_test_%'` and `sys.server_principals = 'usr_worker'`, both must be
+      0) that fails the job (`::error::` + `exit 1`) if anything leaked, `if: always()` so it runs
+      even after a test failure. `-m externa` is never referenced anywhere in `ci.yml` — grepped to
+      confirm no `pytest -m externa` / `pytest -m "... externa"` invocation exists.
+- [x] 4.4 Run the full solution test suite (`dotnet test <ProjectName>`, sequential per project,
+      NOT `dotnet test SmartNet.sln` as a whole — known flaky per item #3's WU5 finding) — confirm
+      no regression in existing project test counts alongside the new `TiposCambio.Core.Tests`/
+      `TiposCambio.Infrastructure.Tests` counts. **Confirmed, all green**:
+      - `dotnet test SmartNet.TiposCambio.Core.Tests` → **20/20** (records, closed hierarchy,
+        `SeleccionDeTipoCambio`, purity scan).
+      - `dotnet test SmartNet.TiposCambio.Infrastructure.Tests` → **12/12** against a real local
+        SQL Server 2019 instance (`ObtenerVigenteAsync`, `CargarManualAsync`,
+        `NoWriteToDboStructuralTests`, `PermissionSufficiencyTests` for `usr_api`+`usr_worker`);
+        real migration ran `001`–`012` against a fresh `fact_test_<guid>` database.
+      - Regression spot-check: `dotnet test SmartNet.Catalogos.Core.Tests` → **32/32**;
+        `dotnet test SmartNet.Auth.Core.Tests` → **33/33** — both unchanged from item #3's closing
+        counts, zero regression from the `.sln`/`ci.yml` edits.
+      - Python: `pytest` (whole suite, `SmartNet/worker/`) → **20/20** (17 unit + 3 integration);
+        `pytest -m "not integracion and not externa"` → **17 passed, 3 deselected**; `pytest -m
+        integracion` → **3 passed, 17 deselected** — confirms marker filtering behaves exactly as
+        `ci.yml`'s two jobs invoke it.
+- [x] 4.5 Confirm zero orphaned `fact_test_*` databases and zero orphaned ephemeral `usr_worker`
+      logins after the full run (standing rule from item #1's Fase 3 incident). **Confirmed**: ran
+      `sqlcmd` against the local instance immediately after the full 4.4 run —
+      `SELECT COUNT(*) FROM sys.databases WHERE name LIKE 'fact_test_%'` → **0**;
+      `SELECT COUNT(*) FROM sys.server_principals WHERE name = 'usr_worker'` → **0**. Same check
+      WU3 already ran after its own integration pass; re-run here after the .sln/ci.yml edits and
+      the full WU4 regression pass to confirm nothing leaked across the combined run.
+
+### Work Unit Evidence (WU4)
+
+| Evidence | Value |
+|---|---|
+| Focused test command and exact result | `dotnet test SmartNet.TiposCambio.Core.Tests` → 20/20; `dotnet test SmartNet.TiposCambio.Infrastructure.Tests` → 12/12; `pytest` in `SmartNet/worker/` → 20/20 (17 unit + 3 integration) |
+| Runtime harness command/scenario and exact result | Real local SQL Server 2019 instance: `.NET Infrastructure.Tests` ran a real `SmartNet.Db.Runner` migration (`001`–`012`) against a fresh `fact_test_<guid>` database and exercised `usr_api`/`usr_worker` GRANTs; Python `pytest -m integracion` ran `tests/integration/conftest.py`'s own ephemeral `fact_test_worker_<id>` database + real `CREATE LOGIN usr_worker`, migrated the same way. Both harnesses independently confirmed zero orphaned `fact_test_*` databases/`usr_worker` logins after their runs. |
+| Rollback boundary | `git revert` this commit — reverts `SmartNet.sln`'s 4 new solution-folder entries and the `ci.yml` diff (3rd job removed, wiring lines removed) without touching WU1/WU2/WU3's already-committed project files |
+
+This closes all 47/47 tasks of `tipos-de-cambio` (item #4) at the **apply** stage. Independent
+verification (`sdd-verify`) is still pending before the item is marked closed in `SPRINT.md`.

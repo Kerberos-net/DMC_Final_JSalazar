@@ -1,14 +1,20 @@
-# Two jobs on purpose.
+# Three jobs on purpose.
 #
 # `verificaciones-estaticas` needs no database, so it answers in seconds and can never be skipped
 # for infrastructure reasons. It carries the two guardians this project cannot lose: the `dbo`
 # write lint (ADR 0003's strongest invariant -- nobody writes an external table) and the checksum
 # manifest (DbUp records a script NAME and never re-reads its content, so an edited applied script
-# drifts from the database in silence).
+# drifts from the database in silence). Every pure-domain .NET project and the worker's Python
+# unit tests also land here (no DB, no HTTP, no wall clock).
 #
-# `pruebas-de-base-de-datos` raises a real SQL Server and runs the whole suite, including the
+# `pruebas-de-base-de-datos` raises a real SQL Server and runs the whole .NET suite, including the
 # permission matrix under EXECUTE AS. That is the job that actually proves the schema and the
 # GRANT/DENY matrix, and it is why the fast job is not enough on its own.
+#
+# `pruebas-de-worker-python` raises its OWN SQL Server container and runs the worker's real
+# `pytest -m integracion` suite, which needs a server-scoped `CREATE LOGIN usr_worker` -- that
+# would mutate the container shared by the job above, so it gets a disposable one of its own
+# (design.md Decision 7). `-m externa` (live scraping against sbs.gob.pe) is never run in CI.
 
 name: CI
 
@@ -29,12 +35,17 @@ env:
   TESTS_RUNNER: SmartNet/db/runner/SmartNet.Db.Runner.Tests
   TESTS_AUTH_CORE: SmartNet/auth/SmartNet.Auth.Core.Tests
   TESTS_CATALOGOS_CORE: SmartNet/catalogos/SmartNet.Catalogos.Core.Tests
+  TESTS_TIPOS_CAMBIO_CORE: SmartNet/tipos-de-cambio/SmartNet.TiposCambio.Core.Tests
   # pruebas-de-base-de-datos: every project whose tests use TestDatabaseFixture (throwaway
   # `fact_test_<guid>` databases) or WebApplicationFactory against a real SQL Server.
   TESTS_AUTH_INFRA: SmartNet/auth/SmartNet.Auth.Infrastructure.Tests
   TESTS_API: SmartNet/api/SmartNet.Api.Tests
   TESTS_ADMIN: SmartNet/admin/SmartNet.Admin.Tests
   TESTS_CATALOGOS_INFRA: SmartNet/catalogos/SmartNet.Catalogos.Infrastructure.Tests
+  TESTS_TIPOS_CAMBIO_INFRA: SmartNet/tipos-de-cambio/SmartNet.TiposCambio.Infrastructure.Tests
+  # pruebas-de-worker-python: the worker's own SQL Server container (own ephemeral usr_worker
+  # server-scoped LOGIN, kept out of the .NET DB job's shared container).
+  WORKER_DIR: SmartNet/worker
 
 jobs:
   verificaciones-estaticas:
@@ -71,6 +82,27 @@ jobs:
         run: >
           dotnet test ${{ env.TESTS_CATALOGOS_CORE }}
           --configuration Release --no-build --logger "console;verbosity=normal"
+
+      # Pure domain logic (SBS>MANUAL selection rule). No DB, no HTTP, no wall clock --
+      # PurityScanTests enforces this at build time (adds System.Net.Http to the forbidden list,
+      # spec.md requirement) for the whole project, same as the two suites above.
+      - name: Nucleo de dominio de tipos de cambio (sin infraestructura)
+        run: >
+          dotnet test ${{ env.TESTS_TIPOS_CAMBIO_CORE }}
+          --configuration Release --no-build --logger "console;verbosity=normal"
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      # Unit tests only (marker exclusion) -- no database, no HTTP. `-m externa` (real scraping
+      # against sbs.gob.pe) is never selected here: a red build from SBS downtime carries no
+      # information about our change (design.md Decision 7 / Testing Strategy).
+      - name: Worker Python -- pruebas unitarias (sin base de datos)
+        working-directory: ${{ env.WORKER_DIR }}
+        run: |
+          pip install -e .[dev]
+          pytest -m "not integracion and not externa"
 
   pruebas-de-base-de-datos:
     name: Suite completa contra SQL Server
@@ -142,3 +174,80 @@ jobs:
         run: >
           dotnet test ${{ env.TESTS_CATALOGOS_INFRA }}
           --configuration Release --no-build --logger "console;verbosity=normal"
+
+      - name: TiposCambio.Infrastructure
+        run: >
+          dotnet test ${{ env.TESTS_TIPOS_CAMBIO_INFRA }}
+          --configuration Release --no-build --logger "console;verbosity=normal"
+
+  pruebas-de-worker-python:
+    name: Worker Python -- integracion contra SQL Server real (usr_worker)
+    runs-on: ubuntu-latest
+
+    # Own container, not the one above: proving fact_worker grants from Python needs a real
+    # server-scoped CREATE LOGIN usr_worker, which would mutate the container shared by the .NET
+    # harness (008's SUSER_ID guard premise, design.md Decision 7).
+    services:
+      sqlserver:
+        image: mcr.microsoft.com/mssql/server:2022-latest
+        env:
+          ACCEPT_EULA: 'Y'
+          # Throwaway CI credential for an ephemeral container destroyed with the job -- same note
+          # as the container above, this guards nothing and is never reused.
+          MSSQL_SA_PASSWORD: 'CiSoloEfimero_2026!'
+          MSSQL_PID: Developer
+        ports:
+          - 1433:1433
+        options: >-
+          --health-cmd "/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'CiSoloEfimero_2026!' -Q 'SELECT 1'"
+          --health-interval 10s
+          --health-timeout 5s
+          --health-retries 12
+          --health-start-period 30s
+
+    env:
+      SMARTNET_TEST_SQL_HOST: localhost
+      SMARTNET_WORKER_TEST_LOGIN_PASSWORD: 'CiSoloEfimero_2026!'
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - name: Instalar sqlcmd (verificacion de huerfanos)
+        run: |
+          curl -fsSL https://packages.microsoft.com/keys/microsoft.asc | sudo tee /etc/apt/trusted.gpg.d/microsoft.asc
+          curl -fsSL https://packages.microsoft.com/config/ubuntu/22.04/prod.list | sudo tee /etc/apt/sources.list.d/mssql-release.list
+          sudo apt-get update
+          sudo ACCEPT_EULA=Y apt-get install -y mssql-tools18 unixodbc-dev
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Instalar el worker (modo editable, con dependencias de dev)
+        working-directory: ${{ env.WORKER_DIR }}
+        run: pip install -e .[dev]
+
+      # tests/integration/conftest.py provisiona su propia base efimera `fact_test_worker_<id>`,
+      # aplica el esquema versionado real via `dotnet run --project SmartNet.Db.Runner` (nunca una
+      # reimplementacion en Python -- ADR 0016) y crea un LOGIN efimero real `usr_worker` contra
+      # ESTE contenedor, ejerciendo los GRANT reales de 008_usuarios_y_permisos.sql. `-m externa`
+      # nunca se selecciona aqui (scraping real contra sbs.gob.pe queda fuera de CI).
+      - name: Worker Python -- pruebas de integracion (marker integracion)
+        working-directory: ${{ env.WORKER_DIR }}
+        run: pytest -m integracion
+
+      - name: Confirmar cero bases y logins efimeros huerfanos
+        if: always()
+        run: |
+          ORPHAN_DBS=$(/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'CiSoloEfimero_2026!' -h -1 -Q "SET NOCOUNT ON; SELECT COUNT(*) FROM sys.databases WHERE name LIKE 'fact_test_%';" | tr -d '[:space:]')
+          ORPHAN_LOGINS=$(/opt/mssql-tools18/bin/sqlcmd -C -S localhost -U sa -P 'CiSoloEfimero_2026!' -h -1 -Q "SET NOCOUNT ON; SELECT COUNT(*) FROM sys.server_principals WHERE name = 'usr_worker';" | tr -d '[:space:]')
+          echo "Bases fact_test_* huerfanas: $ORPHAN_DBS"
+          echo "Logins usr_worker huerfanos: $ORPHAN_LOGINS"
+          if [ "$ORPHAN_DBS" != "0" ] || [ "$ORPHAN_LOGINS" != "0" ]; then
+            echo "::error::Quedaron recursos efimeros sin limpiar."
+            exit 1
+          fi
