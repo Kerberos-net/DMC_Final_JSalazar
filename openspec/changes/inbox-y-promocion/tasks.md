@@ -95,26 +95,26 @@ one PR is far past budget on its own.
 
 ## Phase 3 (WU3): `SmartNet.Inbox.Infrastructure`
 
-- [ ] 3.1 Scaffold `SmartNet/inbox/SmartNet.Inbox.Infrastructure` (+ `.Tests`, referencing
+- [x] 3.1 Scaffold `SmartNet/inbox/SmartNet.Inbox.Infrastructure` (+ `.Tests`, referencing
       `SmartNet.Inbox.Core` + `Microsoft.Data.SqlClient`).
-- [ ] 3.2 RED then GREEN: `PayloadInboxParser` — deserializes `InboxEvent.Payload` JSON into
+- [x] 3.2 RED then GREEN: `PayloadInboxParser` — deserializes `InboxEvent.Payload` JSON into
       `EventoInbox`; JSON parsing lives only here, never in Core (design D9).
-- [ ] 3.3 RED: `SqlEventoInboxRepository` — reads `EstadoConsumo='PENDIENTE'`, updates to
+- [x] 3.3 RED: `SqlEventoInboxRepository` — reads `EstadoConsumo='PENDIENTE'`, updates to
       `PROMOVIDO`/`DESCARTADO`; never reads `Procesamiento` (data-partition boundary).
-- [ ] 3.4 Confirm RED, then GREEN: `SqlEventoInboxRepository`.
-- [ ] 3.5 RED: `SqlPromocionRepository` — one `SqlTransaction`: INSERT `Factura`
+- [x] 3.4 Confirm RED, then GREEN: `SqlEventoInboxRepository`.
+- [x] 3.5 RED: `SqlPromocionRepository` — one `SqlTransaction`: INSERT `Factura`
       (`PENDIENTE_VALIDACION`) + `FacturaExtraccion` rows + indicators; on `UQ_Factura_Procesamiento`
       violation (SQL 2601/2627), catch and resolve existing `FacturaId`, mark `PROMOVIDO` (design D2)
       — never `SELECT`-before-`INSERT`.
-- [ ] 3.6 Confirm RED, then GREEN: `SqlPromocionRepository`, including the idempotent-catch path.
-- [ ] 3.7 RED then GREEN: `SqlBandejaRepository` — backs `GET /api/bandeja?estado=&orden=` (reuse
+- [x] 3.6 Confirm RED, then GREEN: `SqlPromocionRepository`, including the idempotent-catch path.
+- [x] 3.7 RED then GREEN: `SqlBandejaRepository` — backs `GET /api/bandeja?estado=&orden=` (reuse
       ADR 0008 contract, design D6): filter by `EstadoConsumo`, sort by fecha.
-- [ ] 3.8 Create `PromocionBackgroundService` — `BackgroundService` + `PeriodicTimer(1 min)` with
+- [x] 3.8 Create `PromocionBackgroundService` — `BackgroundService` + `PeriodicTimer(1 min)` with
       injected `TimeProvider` (design D7); writes no `fact.EstadoIntegracion` row (design D8).
-- [ ] 3.9 Integration tests (`TestDatabaseFixture`): double promotion of the same event → exactly 1
+- [x] 3.9 Integration tests (`TestDatabaseFixture`): double promotion of the same event → exactly 1
       `Factura`; insufficient payload → 0 `Factura` rows + `DESCARTADO` + `MotivoDescarte`; `usr_api`
       denied on `Procesamiento`; `usr_worker` denied on `Factura`.
-- [ ] 3.10 `NoWriteToDboStructuralTests`/`PermissionSufficiencyTests` — confirm no adapter touches
+- [x] 3.10 `NoWriteToDboStructuralTests`/`PermissionSufficiencyTests` — confirm no adapter touches
       `dbo.*` or a worker-private table.
 
 ## Phase 4 (WU4): API wiring + contract tests

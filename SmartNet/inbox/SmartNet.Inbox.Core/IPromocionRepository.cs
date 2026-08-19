@@ -8,6 +8,12 @@ namespace SmartNet.Inbox.Core;
 /// </summary>
 public sealed record ResultadoPromocion(long FacturaId, bool YaExistia);
 
+/// <summary>Outcome of <see cref="IPromocionRepository.ResolverProveedorAsync"/> — SELECT-only fact
+/// the caller needs BEFORE invoking <c>CalculoDeIndicadores.Calcular</c>/<c>ConstruccionDeFactura.Construir</c>
+/// (design.md Interfaces/Contracts: "proveedorResuelto ... resolved in Infrastructure and passed in
+/// as a fact"). <see cref="Codigo"/> is the DDL default <c>P00000</c> when no match exists.</summary>
+public sealed record ProveedorResuelto(bool Existe, string Codigo);
+
 /// <summary>
 /// Port over the write side of promotion (design.md data flow: one <c>SqlTransaction</c> per
 /// event). Implementation (<c>SqlPromocionRepository</c>, <c>usr_api</c> login) lives in
@@ -26,4 +32,13 @@ public interface IPromocionRepository
 
     /// <summary>Updates the source <c>InboxEvent</c> to <c>DESCARTADO</c> — creates zero <c>Factura</c> rows.</summary>
     Task DescartarAsync(long inboxEventId, string motivoDescarte, CancellationToken ct);
+
+    /// <summary>Read-only fact: resolves <c>dbo.Proveedor</c> by RUC (the one ADR 0003 "clase
+    /// externa" this project is granted SELECT on) — not a write, an orchestration-time input.</summary>
+    Task<ProveedorResuelto> ResolverProveedorAsync(string? rucProveedor, CancellationToken ct);
+
+    /// <summary>Read-only fact: whether a non-discarded <c>fact.Factura</c> already shares this
+    /// identity (RUC + tipo de comprobante + número) via <c>IX_Factura_Identidad</c>.</summary>
+    Task<bool> ExisteIdentidadPreviaAsync(
+        string? rucProveedor, string tipoComprobante, string? numero, CancellationToken ct);
 }

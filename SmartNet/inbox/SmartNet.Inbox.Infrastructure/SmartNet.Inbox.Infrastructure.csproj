@@ -1,0 +1,30 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- design.md "SmartNet.Inbox.Infrastructure" file-changes row, same pin as
+       SmartNet.TiposCambio.Infrastructure/SmartNet.Catalogos.Infrastructure. No FrameworkReference
+       to ASP.NET Core: PromocionBackgroundService only needs Microsoft.Extensions.Hosting.Abstractions
+       (BackgroundService/IHostedService), not the whole web framework: the host itself
+       (SmartNet.Api, Sdk.Web) is where AddHostedService of PromocionBackgroundService is called
+       (Phase 4/WU4), never here. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.2" />
+    <PackageReference Include="Microsoft.Extensions.Hosting.Abstractions" Version="10.0.0" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SmartNet.Inbox.Core\SmartNet.Inbox.Core.csproj" />
+  </ItemGroup>
+
+  <!-- PromocionBackgroundService.ProcesarPendientesAsync is internal: tests drive exactly one
+       poll cycle deterministically instead of racing the 1-minute PeriodicTimer (design D7). -->
+  <ItemGroup>
+    <InternalsVisibleTo Include="SmartNet.Inbox.Infrastructure.Tests" />
+  </ItemGroup>
+
+</Project>
