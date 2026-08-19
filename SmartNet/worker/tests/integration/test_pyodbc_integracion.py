@@ -20,6 +20,8 @@ import pytest
 from smartnet_worker.documento_repo import insertar_documento, insertar_email
 from smartnet_worker.estado_integracion import registrar_exito
 from smartnet_worker.gmail import AdjuntoGmail, MensajeGmail
+from smartnet_worker.inbox_event_repo import insertar_evento, listar_no_notificados
+from smartnet_worker.payload_inbox import construir_payload
 from smartnet_worker.procesamiento_repo import (
     DatosExtraidos,
     asociar_documentos,
@@ -336,5 +338,62 @@ def test_usr_worker_no_puede_insertar_en_facturaextraccion(worker_db):
                 "INSERT INTO fact.FacturaExtraccion "
                 "(FacturaId, CampoNombre, ValorExtraido, Fuente) "
                 "VALUES (1, 'ruc', '20123456789', 'XML')"
+            )
+            conexion.commit()
+
+
+# --- BACKLOG #7 (WU1): inbox event publishing (inbox_event_repo.py, cli_inbox.py) --------------
+
+
+def test_reintentar_el_scan_no_duplica_eventos(worker_db):
+    """Requirement 'Idempotent publishing' (spec.md, inbox-event-publishing) — un segundo
+    `insertar_evento` para el MISMO `ProcesamientoId` es un no-op por el
+    `INSERT...SELECT...WHERE NOT EXISTS` atomico (design.md, Decision D3), nunca una segunda
+    fila."""
+    instante = datetime.now(UTC)
+    with pyodbc.connect(worker_db["worker_connection_string"]) as conexion:
+        cursor = conexion.cursor()
+        documento_id = _email_y_documento_reales(cursor, "18d2f0a1b2c3eeee", "inbox.xml")
+        procesamiento_id = upsert_procesamiento(
+            cursor, documento_id, "COMPLETADO", instante, instante
+        )
+        insertar_datos_extraidos(
+            cursor, procesamiento_id, _datos_extraidos_minimos(afectacion_mixta=False)
+        )
+        conexion.commit()
+
+        no_notificados = listar_no_notificados(cursor)
+        fila = next(f for f in no_notificados if f.procesamiento_id == procesamiento_id)
+        payload = construir_payload(
+            estado_procesamiento=fila.estado,
+            documento_recibido_id=fila.documento_recibido_id,
+            tipo_documento=fila.tipo_documento,
+            documento_asociado_id=fila.documento_asociado_id,
+            comprobante=None,
+        )
+        insertar_evento(cursor, procesamiento_id, payload)
+        conexion.commit()
+
+        # Segundo intento del MISMO ProcesamientoId — no-op, ninguna fila nueva.
+        insertar_evento(cursor, procesamiento_id, payload)
+        conexion.commit()
+
+    with pyodbc.connect(worker_db["worker_connection_string"]) as conexion:
+        fila = conexion.cursor().execute(
+            "SELECT COUNT(*) FROM fact.InboxEvent WHERE ProcesamientoId = ?", procesamiento_id
+        ).fetchone()
+
+    assert fila[0] == 1
+
+
+def test_usr_worker_no_puede_escribir_en_factura(worker_db):
+    """Negativa (ADR 0003 particion de datos): `fact.Factura` es propiedad de .NET —
+    `usr_worker` no tiene GRANT sobre ella, el INSERT falla por DENY, nunca por FK."""
+    with pytest.raises(pyodbc.Error):
+        with pyodbc.connect(worker_db["worker_connection_string"]) as conexion:
+            conexion.cursor().execute(
+                "INSERT INTO fact.Factura "
+                "(TipoComprobante, TotalOrig, Moneda, FechaEmision) "
+                "VALUES ('01', 100.00, 'PEN', '2026-08-15')"
             )
             conexion.commit()

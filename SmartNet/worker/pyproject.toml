@@ -33,6 +33,7 @@ dev = [
 smartnet-tipo-cambio = "smartnet_worker.cli_tipo_cambio:main"
 smartnet-gmail = "smartnet_worker.cli_gmail:main"
 smartnet-procesamiento = "smartnet_worker.cli_procesamiento:main"
+smartnet-inbox = "smartnet_worker.cli_inbox:main"
 
 [build-system]
 requires = ["setuptools>=68"]
