@@ -4,13 +4,33 @@ Sin credencial ni cadena de conexion por defecto en el codigo (design.md, Decisi
 forma de obtener la cadena de conexion es la variable de entorno
 `SMARTNET_WORKER_ODBC_CONNECTION`, igual regla que `RunnerOptions.SMARTNET_DB_CONNECTION` del lado
 .NET (SmartNet.Db.Runner).
+
+Las credenciales de Gmail y la raiz del volumen compartido siguen la misma regla (BACKLOG #5,
+design.md Decision 2): un unico valor por variable de entorno, sin default en codigo — un
+`RefreshError` o un volumen mal montado deben fallar visiblemente, nunca escribir por accidente en
+un lugar no configurado.
 """
 
 from __future__ import annotations
 
+import json
 import os
 
 ODBC_CONNECTION_ENV_VAR = "SMARTNET_WORKER_ODBC_CONNECTION"
+
+# Nombre de la unica variable de entorno que porta el JSON completo `authorized_user`
+# (client_id, client_secret, refresh_token, token_uri) como un secreto atomico — tres variables
+# separadas podrian rotarse de forma mutuamente inconsistente (design.md, Decision 2).
+GMAIL_CREDENTIALS_ENV_VAR = "SMARTNET_WORKER_GMAIL_CREDENTIALS"
+
+# Raiz del volumen compartido donde el worker escribe los adjuntos descargados (ADR 0013). El lado
+# .NET la lee para servir la descarga; este proceso solo escribe.
+STORAGE_ROOT_ENV_VAR = "SMARTNET_WORKER_STORAGE_ROOT"
+
+# Alcance minimo que permite leer mensajes y aplicar la etiqueta de "procesado" (ADR 0015):
+# gmail.modify no habilita el flujo de consentimiento interactivo, que es responsabilidad del lado
+# .NET (POST /api/integraciones/google/reconectar), fuera de alcance de este item.
+GMAIL_SCOPES = ["https://www.googleapis.com/auth/gmail.modify"]
 
 # URL publica, no un secreto: sin este valor el CLI no sabria que pagina scrapear. La cadena de
 # conexion (la parte con credenciales) nunca vive aqui.
@@ -32,5 +52,34 @@ def obtener_connection_string() -> str:
     if not valor:
         raise ConfiguracionError(
             f"La variable de entorno {ODBC_CONNECTION_ENV_VAR} no esta definida."
+        )
+    return valor
+
+
+def obtener_credenciales_gmail_json() -> dict:
+    """Lee y parsea el JSON `authorized_user` (client_id, client_secret, refresh_token, token_uri)
+    desde `SMARTNET_WORKER_GMAIL_CREDENTIALS`. Lanza `ConfiguracionError` si la variable no esta
+    definida o si su contenido no es JSON valido — nunca antes de la primera llamada de red, y
+    nunca con un valor por defecto que pudiera esconder una credencial mal rotada."""
+    valor = os.environ.get(GMAIL_CREDENTIALS_ENV_VAR)
+    if not valor:
+        raise ConfiguracionError(
+            f"La variable de entorno {GMAIL_CREDENTIALS_ENV_VAR} no esta definida."
+        )
+    try:
+        return json.loads(valor)
+    except json.JSONDecodeError as error:
+        raise ConfiguracionError(
+            f"La variable de entorno {GMAIL_CREDENTIALS_ENV_VAR} no contiene JSON valido."
+        ) from error
+
+
+def obtener_raiz_almacenamiento() -> str:
+    """Lee la raiz del volumen compartido donde se escriben los adjuntos descargados. Lanza si no
+    esta definida — sin default en codigo, mismo principio que la cadena de conexion (ADR 0013)."""
+    valor = os.environ.get(STORAGE_ROOT_ENV_VAR)
+    if not valor:
+        raise ConfiguracionError(
+            f"La variable de entorno {STORAGE_ROOT_ENV_VAR} no esta definida."
         )
     return valor
