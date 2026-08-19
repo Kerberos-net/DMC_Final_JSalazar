@@ -1,0 +1,14 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- ADR 0019 / design.md "SmartNet.Inbox.Core: zero PackageReference". No
+       Microsoft.Data.SqlClient, no Microsoft.AspNetCore.*, no System.Net.Http, no ambient
+       clock, no JSON parsing (design D9 — that lives in SmartNet.Inbox.Infrastructure). The
+       purity scan in SmartNet.Inbox.Core.Tests enforces this in CI, not just this comment. -->
+
+</Project>

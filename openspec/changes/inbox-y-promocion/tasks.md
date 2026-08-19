@@ -69,28 +69,28 @@ one PR is far past budget on its own.
 
 ## Phase 2 (WU2): `SmartNet.Inbox.Core` — pure domain
 
-- [ ] 2.1 Scaffold `SmartNet/inbox/SmartNet.Inbox.Core` (classlib, zero `PackageReference`) and
+- [x] 2.1 Scaffold `SmartNet/inbox/SmartNet.Inbox.Core` (classlib, zero `PackageReference`) and
       `SmartNet/inbox/SmartNet.Inbox.Core.Tests` (xUnit + Cecil + NetArchTest), mirroring
       `SmartNet.Auth.Core.Tests`.
-- [ ] 2.2 RED then GREEN: copy `PurityScanTests`, retargeted at `SmartNet.Inbox.Core`; confirm green
+- [x] 2.2 RED then GREEN: copy `PurityScanTests`, retargeted at `SmartNet.Inbox.Core`; confirm green
       against the empty project.
-- [ ] 2.3 RED: `EventoInbox`, `ComprobanteExtraido`, `EvidenciaCampo` record-shape tests per design's
+- [x] 2.3 RED: `EventoInbox`, `ComprobanteExtraido`, `EvidenciaCampo` record-shape tests per design's
       Interfaces/Contracts and the confirmed payload shape.
-- [ ] 2.4 GREEN: the three records.
-- [ ] 2.5 RED: `PoliticaDePromocion.Decidir` — sufficiency = the four `NOT NULL` `Factura` columns
+- [x] 2.4 GREEN: the three records.
+- [x] 2.5 RED: `PoliticaDePromocion.Decidir` — sufficiency = the four `NOT NULL` `Factura` columns
       (`TipoComprobante`, `TotalOrig`, `Moneda`, `FechaEmision`) present + `Procesamiento.Estado='COMPLETADO'`
       (design D1); `Numero`/`RucProveedor` absence does NOT block; REGLAS.md §1-4 values are never
       weighed (spec scenario "Structural check does not weigh REGLAS.md business rules").
-- [ ] 2.6 Confirm RED, then GREEN: `PoliticaDePromocion.Decidir`.
-- [ ] 2.7 RED: `CalculoDeIndicadores.Calcular` — indicator count per confirmed D5 decision (5,
+- [x] 2.6 Confirm RED, then GREEN: `PoliticaDePromocion.Decidir`.
+- [x] 2.7 RED: `CalculoDeIndicadores.Calcular` — indicator count per confirmed D5 decision (5,
       `EsReferenciaExterna` fixed `0`, unless user overrides to 6); 3-state `AfectacionMixta`.
-- [ ] 2.8 Confirm RED, then GREEN: `CalculoDeIndicadores.Calcular`.
-- [ ] 2.9 RED then GREEN: `ConstruccionDeFactura.Construir` — builds `FacturaPromovida` from
+- [x] 2.8 Confirm RED, then GREEN: `CalculoDeIndicadores.Calcular`.
+- [x] 2.9 RED then GREEN: `ConstruccionDeFactura.Construir` — builds `FacturaPromovida` from
       `EventoInbox` + `proveedorCodigo` + `IndicadoresFactura`; `FechaEnDomingo` derives from
       `FechaEmision` only, never a clock.
-- [ ] 2.10 GREEN: define ports `IEventoInboxRepository`, `IPromocionRepository`,
+- [x] 2.10 GREEN: define ports `IEventoInboxRepository`, `IPromocionRepository`,
       `IBandejaRepository` exactly per design's Interfaces/Contracts.
-- [ ] 2.11 Re-run `PurityScanTests` against the complete Core assembly — confirm still green before
+- [x] 2.11 Re-run `PurityScanTests` against the complete Core assembly — confirm still green before
       Phase 3 builds against these ports.
 
 ## Phase 3 (WU3): `SmartNet.Inbox.Infrastructure`
