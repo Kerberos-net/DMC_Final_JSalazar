@@ -151,5 +151,5 @@ one PR is far past budget on its own.
 
 ## Phase 6 (WU6): Docs
 
-- [ ] 6.1 Modify `docs/adr/0005-*.md` — correct `Tipo` prose to the single as-built CHECK value;
+- [x] 6.1 Modify `docs/adr/0005-*.md` — correct `Tipo` prose to the single as-built CHECK value;
       correct indicator count to the confirmed decision (5 per D5, or 6 if the user overrides).

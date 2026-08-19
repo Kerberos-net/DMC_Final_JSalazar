@@ -29,12 +29,11 @@ permanece en la bandeja indefinidamente.
 
 ### Python notifica un hecho; .NET decide
 
-Al terminar el procesamiento, Python escribe un mensaje en `InboxEvent`:
-
-```
-PROCESAMIENTO_COMPLETADO
-PROCESAMIENTO_FALLIDO
-```
+Al terminar el procesamiento, Python escribe un mensaje en `InboxEvent`. `Tipo` es siempre el
+literal único `PROCESAMIENTO_FINALIZADO` de `CK_InboxEvent_Tipo`; el resultado —éxito o fallo— se
+lee de `Procesamiento.Estado` (`COMPLETADO`/`ERROR`), nunca de un segundo literal de `Tipo`.
+**Corregido en el ítem #7**: la versión anterior de este ADR declaraba dos literales
+(`PROCESAMIENTO_COMPLETADO`/`PROCESAMIENTO_FALLIDO`); el esquema construido usa uno solo.
 
 Un servicio alojado en la API consume ese inbox y, **dentro de una transacción propia**, decide si
 corresponde promover el resultado a una `Factura`.
@@ -111,6 +110,11 @@ Los dos últimos son de la revisión v2:
   sí puede mirar el documento (ADR 0017).
 - **Referencia externa** marca una nota de crédito contra una factura anterior al sistema, que no
   tiene `FacturaReferenciaId` y por tanto no entra en el tope acumulado (ADR 0006).
+
+**Corregido en el ítem #7:** al promover, `SmartNet.Inbox.Core` calcula **5** de estos seis
+indicadores. `EsReferenciaExterna` queda con su valor DDL por defecto (`0`), sin calcularse: notas de
+crédito es el ítem #10 del backlog, y `DatosExtraidos` no tiene columnas de referencia de las que
+derivarlo en este ítem. Calcularlo sin esa fuente sería inventar el dato.
 
 ### La evidencia de extracción se persiste al promover
 
