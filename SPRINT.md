@@ -11,9 +11,9 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | **4 de 17 cerrados** |
-| Ciclo SDD activo | Ninguno — último cerrado: ítem #4 |
-| Última fase cerrada | Ítem #4, WU4 (Fase 4 — `SmartNet.sln`, CI, suite completa end-to-end), 47/47 tareas del ítem cerradas — ítem #4 cerrado 2026-08-17 |
+| Ítems del backlog | **5 de 17 cerrados** |
+| Ciclo SDD activo | Ninguno — último cerrado: ítem #5 |
+| Última fase cerrada | Ítem #5, WU4 (Fase 4 — `cli_gmail.py`, integración, suite completa, README), 36/36 tareas del ítem cerradas — ítem #5 cerrado 2026-08-18 |
 
 ---
 
@@ -573,14 +573,144 @@ es específico del entorno (drift de versión, red, startup de contenedor).
 
 ---
 
-## ⬜ Ítems 5 a 17 — sin ciclo SDD abierto
+## ✅ 5. Ingesta Gmail
+
+Python worker extension que sondea un buzón de Gmail etiquetado, descarga adjuntos candidatos (PDF,
+XML), y los persiste como filas `fact.Email` + `fact.DocumentoRecibido` (`Estado='DESCARGADO'`).
+Single-run, sin daemon ni scheduler (eso es despliegue). Depende del ítem #1 (completo).
+
+**Ciclo SDD:** `openspec/changes/ingesta-gmail/` · **36 de 36 tareas cerradas** — ✅ **CERRADO 2026-08-18**
+
+| Fase | Unidad | Alcance | Tareas | Estado |
+|---|---|---|---|---|
+| 1 | 1 | Migración 013 (`ETIQUETA_PROCESADO` + `UQ_Email_GmailMessageId`) + `gmail.py` puro + pruebas adversariales | 12/12 | ✅ |
+| 2 | 2 | `gmail_client.py` (IO: Gmail API) + `almacenamiento.py` (IO: contención de ruta) + config + deps | 5/5 | ✅ |
+| 3 | 3 | `documento_repo.py` (inserciones idempotentes) + `estado_integracion.py` generalizado (rompe #4) | 8/8 | ✅ |
+| 4 | 4 | `cli_gmail.py` orquestador + integración real + README | 11/11 | ✅ |
+
+### Pruebas
+
+Paquete único `SmartNet/worker/` (Python), extensión del ítem #4. Estado final, verificado por el
+orquestador en la unidad 4, ejecutando las suites por separado.
+
+| Suite | Unidad que la creó | Pruebas | Qué cubre |
+|---|---|---|---|
+| `tests/unit/test_gmail.py` | 1 (+1 post-verify) | 38 | `gmail.py` puro: queries, parseo, candidatura, hashing, sanitización, paths; incluye el test contra la fixture real capturada tras el WARNING #1 |
+| `tests/unit/test_almacenamiento.py` | 2 | 4 | Contención de ruta (es_relative_to), anti-traversal |
+| `tests/unit/test_documento_repo.py` | 3 | 9 | Inserciones idempotentes (`IntegrityError`), lectura de ID con `OUTPUT INSERTED` |
+| `tests/unit/test_estado_integracion.py` (extendido) | 3 | 8 | Generalización de `nombre` (break-change a #4), ambos usuarios verificados |
+| `tests/unit/test_cli_gmail.py` | 4 | 9 | Orquestación, inyección de fakes (`ClienteGmail`, conexión), transacciones por mensaje |
+| `tests/unit/test_no_dbo_structural.py` (extendido) | 4 | 3 | Escaneo de no-escritura a `dbo.*`, no-.delete/-.trash en comentarios |
+| `tests/integration/test_pyodbc_integracion.py` (extendido) | 4 | 7 | Real SQL Server, ephemeral `usr_worker`, permisos de lectura/escritura, issue real reparada |
+| **Total** | | **78** | Confirmado por conteo real (`pytest --collect-only`), no por reporte de agente |
+
+| Proyecto (heredado) | Ítem que lo creó | Pruebas |
+|---|---|---|
+| `SmartNet.Db.Runner.Tests` | #1 | 127 |
+| `SmartNet.Auth.Core.Tests` | #2 | 33 |
+| `SmartNet.Auth.Infrastructure.Tests` | #2 | 44 |
+| `SmartNet.Api.Tests` | #2 | 22 |
+| `SmartNet.Admin.Tests` | #2 | 17 |
+| `SmartNet.Catalogos.Core.Tests` | #3 | 32 |
+| `SmartNet.Catalogos.Infrastructure.Tests` | #3 | 56 |
+| `SmartNet.TiposCambio.Core.Tests` | #4 | 20 |
+| `SmartNet.TiposCambio.Infrastructure.Tests` | #4 | 12 |
+| **Total de la solución** | | **363** |
+
+**78 nuevas + 363 heredadas = 441 verificadas al cerrar el ítem**, cada suite ejecutada por separado.
+(Suma recalculada a partir de la propia tabla de arriba — la primera versión de este párrafo traía
+una aritmética inconsistente.)
+
+### Lo verificado al cerrar cada fase
+
+**Fase 1 (WU1)** — 12/12 tareas en verde, verificadas ejecutándolas yo. Migración 013 crea
+`ETIQUETA_PROCESADO` (NULL-seeded) y agrega `UNIQUE(EmailId, HashContenido)` a
+`fact.DocumentoRecibido`, idempotente e IF-guardada per patrón. `gmail.py` es puro (cero BD/HTTP/
+reloj), 37 pruebas + fixtures multipart (nested MIME real) + casos adversariales (paths ../,
+sanitización, extensiones). Descubrimiento: `sanitizar_nombre_archivo` debe truncar a 255 octetos
+(límite NTFS/ext4 de componente de ruta) para que `NombreArchivo NVARCHAR(255)` no rechace en insert.
+
+**Fase 2 (WU2)** — 5/5 tareas, verificadas ejecutándolas yo. `gmail_client.py` es IO-only
+(substitutable seam para pruebas), NO toca decision/parseo. `google-api-python-client` ≥2.140 +
+`google-auth` ≥2.34, una sola credencial `Credentials.from_authorized_user_info` de env var
+(`SMARTNET_WORKER_GMAIL_CREDENTIALS`), **sin** `google-auth-oauthlib` (consentimiento interactivo
+es responsibility de .NET, ADR 0015). Almacenamiento writes son contenidas por `is_relative_to`.
+Desviación documentada, no silenciosa: `almacenamiento.py` tiene test dedicado (`test_almacenamiento.py`)
+porque la guarda de contención es decision logic, no pass-through IO, así que TDD estricto aplica
+(no delegado a WU4 mocks como se pronosticó).
+
+**Fase 3 (WU3)** — 8/8 tareas, verificadas ejecutándolas yo. `documento_repo.py` implementa
+inserciones idempotentes: `insertar_email` captura `IntegrityError` en `UQ_Email_GmailMessageId`,
+devuelve `None` (ya ingerida), o devuelve el id con `OUTPUT INSERTED.EmailId` en el **mismo**
+`execute` que el INSERT (bug real encontrado y reparado vía real integration en WU4: `SCOPE_IDENTITY()`
+en execute separado devuelve NULL porque `sp_executesql` cierra su scope). `estado_integracion.py`
+generalizado a `nombre` obligatorio — breaking change a WU1/#4 de `cli_tipo_cambio.py`, actualizado
+en este mismo WU. 10 pruebas de `estado_integracion`, incluido case afuera del CHECK (`CK_EstadoIntegracion_Nombre`).
+Sin regresión: `test_cli_tipo_cambio.py` no existe (item #4 nunca lo agregó), sus 2 call sites
+probados transitivamente via la firma nueva.
+
+**Fase 4 (WU4)** — 11/11 tareas, verificadas ejecutándolas yo con SQL Server real. `cli_gmail.py`
+es orquestador puro, sus dos seams (`ClienteGmail`, `conectar`) injected en tests. Control flow: env
+config → read `fact.Configuracion` (propia txn) → `resolver_etiquetas` (fail loud si falta) →
+`buscar_mensajes` → per-message txn (insert → download/hash/write si candidate → commit) →
+`aplicar_etiqueta` FUERA txn → final `registrar_exito`/`registrar_fallo`. Per-message failure
+isolation (except loop, no abort). 10 pruebas unit + 7 reales (real ephemeral DB + `usr_worker` login,
+permisos verificados contra 008).
+
+Bug real encontrado en 4.8 (real harness): `insertar_email` con `SELECT SCOPE_IDENTITY()` en
+execute separado devolvía NULL porque `pyodbc` wraps INSERT parameterizado en `sp_executesql` que
+cierra scope. Fix: `OUTPUT INSERTED.EmailId` en el mismo execute. `test_documento_repo.py` ajustado
+(`_SELECT_SCOPE_IDENTITY` removed). `test_cli_gmail.py` fake cursor ajustado.
+
+Structural test (4.5) amplió escaneo a `.delete(` y `.trash(` (evitar no solo tabla sino also método);
+encontró false positive en `gmail_client.py` docstring que **mencionaba** la regla — fijo reword sin
+weakening scanner.
+
+README.md documentó env vars (sin defaults), entrada de CLI, y "Limitaciones conocidas" con la
+bugfix de output/scope_identity.
+
+**Integración (Unidad 4) — última del ítem.** `SmartNet.sln` sin cambios (worker es paquete Python
+standalone, no .NET). `ci.yml` necesitó cero cambios: `verificaciones-estaticas` corre `pytest -m
+"not integracion and not externa"` autodiscover (recoge `test_cli_gmail.py` y test_almacenamiento
+new), `pruebas-de-worker-python` corre `pytest -m integracion` sobre SQL Server real. Migración 013
+autodiscovered en lexical order (SmartNet.Db.Runner). Confirmado: `git log --oneline main` muestra
+5edb68c (WU1), 145d1d4 (WU2), d553765 (WU3), a9553b2 (WU4), ff14059 (post-verify fixture fix) —
+todos en main.
+
+Verify re-run (commit ff14059) arregló WARNING #1 (fixtures sintéticas): nueva fixture `gmail_mensaje_real_capturado.json`
+documentada como **real** (captura OAuth post-verify, 18/08/2026, PII redacted), internal `_comentario`
+honesto, tamaños reales (XML 20372, PDF 56726 bytes), nombres estilo SUNAT. Test nuevo `test_parsear_mensaje_fixture_real_capturado_extrae_xml_y_pdf`
+aserta valores concretos vs fixture real — **no** un placeholder. README.md secc "Fixtures de mensajes"
+distingue `gmail_mensaje_simple.json` + `gmail_mensaje_multipart.json` como **synthetic** (built by hand
+en WU1, preserved para inline-image-in-nested-multipart adversarial case) vs real capture. Fix
+validado: 82 unitarias + 7 integración (up 1), lint clean, tasks/spec/design unchanged, 5/5 reqs,
+20/20 scenarios still compliant.
+
+Confirmado cero huérfanos: `sqlcmd` contra `fact_test_%` y `usr_worker` = (0 rows affected).
+
+### Elementos conocidos, no ocultos
+
+El cierre del ítem #5 incluye esta limitación honestamente documentada. No bloquea especificación ni
+requiere reversión — es un gap declarado en verificación, candidato para mejora futura.
+
+**WARNING (aceptado, menor): OAuth `RefreshError` path sin test dedicado.** `ClienteGmail.__init__`
+(única superfìcie de IO) tiene la ruta de fracaso (error de credenciales → fallo init) testeable
+solo por pruebas unitarias de componentes llamados, nunca en integración end-to-end. Aceptado por
+diseño: IO-only module surface (design.md Testing Strategy), sin archivo test dedicado (testing
+vía WU4 mocks/tmp_path en `test_cli_gmail.py`). Riesgo bajo: cada pieza testeable, módulo delgado
+(IO only), falla aún surfaces vía `EstadoIntegracion` logging. No bloquea — componentes probados,
+gap de integración documentado, compresión aceptada per spec.md capabilities (registrar_fallo
+covers the per-run failure logging contract).
+
+---
+
+## ⬜ Ítems 6 a 17 — sin ciclo SDD abierto
 
 Las fases de cada ítem **se definen cuando arranca su ciclo SDD**, no antes. Ponerlas aquí ahora
 sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ítem, y ninguno existe.
 
 | # | Ítem | Depende de | Contexto obligatorio | Estado |
 |---|---|---|---|---|
-| 5 | Ingesta Gmail | #1 | — | ⬜ |
 | 6 | Extracción y asociación | #5 | — | ⬜ |
 | 7 | Inbox y promoción | #6, #3 | — | ⬜ |
 | 8 | Núcleo contable | #3 | ⚠ `REGLAS.md` §5–§10 | ⬜ |
