@@ -9,3 +9,8 @@ SmartNet/db/fixtures/data/*.csv text eol=crlf
 
 # Datos maestros: binarios, git no debe tocarlos ni intentar hacer diff de texto.
 *.xlsx binary
+
+# Fixtures PDF (BACKLOG #6, WU2): contenido crudo con Length declarado por bytes exactos en cada
+# stream — una conversion CRLF en checkout corrompe el documento (el largo declarado dejaria de
+# coincidir con los bytes reales), igual riesgo que los CSV/SQL de arriba pero para binario.
+*.pdf binary
