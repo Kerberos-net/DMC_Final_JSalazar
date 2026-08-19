@@ -1,12 +1,21 @@
 # SmartNet Worker (Python)
 
-Primer paquete Python del repositorio (BACKLOG #4). Un script de un solo run que scrapea el tipo
-de cambio publicado por la SBS, inserta una fila `Origen='SBS'` en `fact.TipoCambio` y deja
-registro del intento (exito o fallo) en `fact.EstadoIntegracion`. Sin scheduler, sin polling, sin
-reintentos automaticos — la ejecucion recurrente queda para el ítem #5.
+Paquete Python del repositorio con dos scripts de un solo run:
 
-Ver `openspec/changes/tipos-de-cambio/design.md` para las decisiones de diseño (Decisiones 4-7) y
-`ADR 0003` para la particion de datos entre .NET y Python.
+- **`cli_tipo_cambio.py`** (BACKLOG #4): scrapea el tipo de cambio publicado por la SBS, inserta
+  una fila `Origen='SBS'` en `fact.TipoCambio` y deja registro del intento en
+  `fact.EstadoIntegracion` (`Nombre='SBS'`).
+- **`cli_gmail.py`** (BACKLOG #5): sondea un buzon Gmail etiquetado, descarga los adjuntos
+  candidatos (etiqueta + extension permitida, ADR 0017), los persiste como `fact.Email` +
+  `fact.DocumentoRecibido` (`Estado='DESCARGADO'`), aplica su propia etiqueta de "procesado" y deja
+  registro del intento en `fact.EstadoIntegracion` (`Nombre='GMAIL'`).
+
+Ambos sin scheduler, sin polling en proceso, sin reintentos automaticos — la ejecucion recurrente
+es un concern de despliegue (cron/Task Scheduler), no de este codigo.
+
+Ver `openspec/changes/tipos-de-cambio/design.md` (Decisiones 4-7) y
+`openspec/changes/ingesta-gmail/design.md` (Decisiones 1-7) para las decisiones de diseño, y
+`ADR 0003`/`ADR 0017` para la particion de datos y las reglas de Gmail.
 
 ## Instalacion
 
@@ -20,7 +29,7 @@ pip install -e .[dev]
 
 Esto instala el paquete en modo editable junto con `pytest` y `ruff` (dependencias de desarrollo).
 
-## Variable de entorno requerida
+## Variables de entorno requeridas
 
 ```
 SMARTNET_WORKER_ODBC_CONNECTION
@@ -37,20 +46,49 @@ Ejemplo (no un valor real):
 export SMARTNET_WORKER_ODBC_CONNECTION="DRIVER={ODBC Driver 18 for SQL Server};SERVER=<host>;DATABASE=BDSmartNet;UID=usr_worker;PWD=<password>;TrustServerCertificate=yes;"
 ```
 
-## Correr el scraper
+Dos variables adicionales, requeridas solo por `cli_gmail.py` (BACKLOG #5, sin valor por defecto en
+codigo, mismo principio que la cadena de conexion — ver `openspec/changes/ingesta-gmail/design.md`,
+Decision 2):
+
+```
+SMARTNET_WORKER_GMAIL_CREDENTIALS
+SMARTNET_WORKER_STORAGE_ROOT
+```
+
+- `SMARTNET_WORKER_GMAIL_CREDENTIALS`: el JSON completo `authorized_user` de OAuth
+  (`client_id`, `client_secret`, `refresh_token`, `token_uri`) como **un unico secreto atomico** —
+  nunca tres variables separadas que podrian rotarse de forma mutuamente inconsistente. Alcance
+  `gmail.modify` unicamente; el flujo de consentimiento interactivo que genera este JSON es
+  responsabilidad del lado .NET (`POST /api/integraciones/google/reconectar`, ADR 0015), fuera de
+  alcance de este paquete.
+- `SMARTNET_WORKER_STORAGE_ROOT`: raiz del volumen compartido (ADR 0013) donde el worker escribe
+  los adjuntos descargados. El lado .NET la lee para servir la descarga; este proceso solo escribe.
+
+Ejemplo (no un valor real):
+
+```bash
+export SMARTNET_WORKER_GMAIL_CREDENTIALS='{"client_id":"...","client_secret":"...","refresh_token":"...","token_uri":"https://oauth2.googleapis.com/token"}'
+export SMARTNET_WORKER_STORAGE_ROOT="/mnt/smartnet-adjuntos"
+```
+
+## Correr los workers
 
 ```bash
 python -m smartnet_worker.cli_tipo_cambio
+python -m smartnet_worker.cli_gmail
 ```
 
-O, tras la instalacion, mediante el entry point declarado en `pyproject.toml`:
+O, tras la instalacion, mediante los entry points declarados en `pyproject.toml`:
 
 ```bash
 smartnet-tipo-cambio
+smartnet-gmail
 ```
 
-Codigo de salida `0` en exito, `1` en fallo — pensado para invocarse desde un scheduler externo
-(fuera del alcance de este ítem) o a mano.
+Codigo de salida `0` en exito, `1` en fallo — pensados para invocarse desde un scheduler externo
+(fuera del alcance de estos ítems) o a mano. `cli_gmail.py` requiere ademas que las dos etiquetas
+Gmail (`INGESTA.ETIQUETA_ORIGEN` e `INGESTA.ETIQUETA_PROCESADO`) ya existan en el buzon antes del
+primer sondeo — el worker nunca las crea (design.md, Decision 3).
 
 ## Pruebas
 
@@ -93,6 +131,17 @@ pytest -m externa
   fila ni hora de consulta — ambas se derivan del span `#ctl00_cphContent_lblFecha`
   ("Tipo de Cambio al dd/mm/aaaa"), usando medianoche como convencion explicita para
   `fecha_consulta` (`DATETIME2(3) NOT NULL` en el esquema).
+- **BACKLOG #5, WU4 (cli_gmail.py + integracion real)**: a diferencia de WU1-WU3 de este mismo
+  ítem, esta tanda SI tuvo una instancia SQL Server real y `dotnet` alcanzables en el entorno de
+  implementacion. Se corrio la suite de integracion completa (`pytest -m integracion`) contra una
+  base `fact_test_worker_<id>` efimera real, aplicando el esquema versionado completo via
+  `SmartNet.Db.Runner` — **7/7 passed**, cero bases/logins huerfanos despues del run (verificado con
+  `sqlcmd`). Esa corrida encontro y corrigio un bug real: `insertar_email` leia el `EmailId`
+  generado con un `SELECT SCOPE_IDENTITY()` en un `execute()` separado del INSERT, que devuelve
+  `NULL` con pyodbc porque un INSERT parametrizado se envia envuelto en `sp_executesql` — ese
+  wrapper cierra su propio scope al retornar. El fix usa `OUTPUT INSERTED.EmailId` en el MISMO
+  `execute` que el INSERT, que no tiene ese problema porque lee el valor dentro del mismo
+  statement/scope. Suite unitaria completa: 81/81 passed; `ruff check src tests`: limpio.
 - **Entorno de implementacion sin interprete de Python al empezar**: este Work Unit empezo en un
   entorno donde solo existia el stub de Microsoft Store para `python`/`py` (sin instalacion real,
   sin `pip`, sin `pytest`, sin `ruff`). Se instalo Python 3.13.15 con `winget install

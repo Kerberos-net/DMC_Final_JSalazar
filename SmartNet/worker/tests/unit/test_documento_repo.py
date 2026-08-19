@@ -13,8 +13,9 @@ from smartnet_worker.gmail import AdjuntoGmail, MensajeGmail
 
 class _FakeCursor:
     """Registra cada `execute` (sentencia + parametros) en orden, y responde `fetchone` con un
-    valor configurable — necesario porque `insertar_email` hace un segundo `execute`
-    (`SELECT SCOPE_IDENTITY()`) sobre el mismo cursor tras el INSERT exitoso."""
+    valor configurable — `insertar_email` lee el id generado con `OUTPUT INSERTED.EmailId` en el
+    MISMO `execute` que el INSERT (nunca un `SELECT SCOPE_IDENTITY()` separado — ver
+    `documento_repo.py` para el porque)."""
 
     def __init__(self, *, lanzar_integrity_error: bool = False, identity: int = 42):
         self.llamadas: list[tuple[str, tuple]] = []
@@ -97,13 +98,15 @@ def test_insertar_email_retorna_el_id_generado_en_insercion_exitosa():
     assert resultado == 99
 
 
-def test_insertar_email_lee_scope_identity_del_mismo_cursor_tras_el_insert():
+def test_insertar_email_lee_el_id_con_output_en_el_mismo_execute_que_el_insert():
     cursor = _FakeCursor(identity=7)
 
     insertar_email(cursor, _mensaje(), datetime(2026, 8, 17, 9, 16, 0, tzinfo=UTC))
 
-    assert len(cursor.llamadas) == 2
-    assert "scope_identity" in cursor.llamadas[1][0].lower()
+    # Un unico execute: el INSERT con OUTPUT INSERTED.EmailId — nunca un SELECT SCOPE_IDENTITY()
+    # en un execute separado (ese patron devuelve NULL con pyodbc, ver documento_repo.py).
+    assert len(cursor.llamadas) == 1
+    assert "output inserted.emailid" in cursor.llamadas[0][0].lower()
 
 
 def test_insertar_email_retorna_none_cuando_ya_existe_gmail_message_id_integrity_error():
@@ -112,7 +115,6 @@ def test_insertar_email_retorna_none_cuando_ya_existe_gmail_message_id_integrity
     resultado = insertar_email(cursor, _mensaje(), datetime(2026, 8, 17, 9, 16, 0, tzinfo=UTC))
 
     assert resultado is None
-    # Ningun segundo execute (SCOPE_IDENTITY) tras un IntegrityError.
     assert len(cursor.llamadas) == 1
 
 

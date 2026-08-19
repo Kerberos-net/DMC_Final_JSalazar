@@ -78,8 +78,8 @@ class ClienteGmail:
 
     def aplicar_etiqueta(self, mensaje_id: str, etiqueta_id: str) -> None:
         """`users.messages.modify` agregando una etiqueta — nunca borra ni mueve a papelera
-        (ADR 0017; ver `test_no_dbo_structural.py`, que escanea que ningun modulo mencione
-        `.delete(`/`.trash(`)."""
+        (ADR 0017; ver `test_no_dbo_structural.py`, que escanea que ningun modulo del paquete
+        invoque un metodo de borrado o de papelera de Gmail)."""
         self._servicio.users().messages().modify(
             userId=_USUARIO,
             id=mensaje_id,

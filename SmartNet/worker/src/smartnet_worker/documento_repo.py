@@ -20,10 +20,9 @@ _LONGITUD_MAXIMA_NOMBRE_ARCHIVO = 255
 
 _INSERT_EMAIL = """
 INSERT INTO fact.Email (GmailMessageId, Remitente, Asunto, FechaRecepcion, FechaDeteccion, Estado)
+OUTPUT INSERTED.EmailId
 VALUES (?, ?, ?, ?, ?, 'CANDIDATO')
 """
-
-_SELECT_SCOPE_IDENTITY = "SELECT SCOPE_IDENTITY()"
 
 _INSERT_DOCUMENTO = """
 INSERT INTO fact.DocumentoRecibido
@@ -34,9 +33,14 @@ VALUES (?, ?, ?, ?, ?, ?, ?, ?, 'DESCARGADO')
 
 
 def insertar_email(cursor, m: MensajeGmail, fecha_deteccion: datetime) -> int | None:
-    """Inserta la fila `Email` en `Estado='CANDIDATO'`. Devuelve el `EmailId` generado
-    (leido con `SELECT SCOPE_IDENTITY()` del mismo cursor), o `None` (no lanza) si el mensaje ya
-    estaba ingestado — `UQ_Email_GmailMessageId` rechaza el duplicado y el llamador salta la
+    """Inserta la fila `Email` en `Estado='CANDIDATO'`. Devuelve el `EmailId` generado, leido con
+    `OUTPUT INSERTED.EmailId` en el MISMO `execute` que el INSERT — NUNCA un `SELECT
+    SCOPE_IDENTITY()` en un `execute` separado: pyodbc envuelve un INSERT parametrizado en
+    `sp_executesql`, y ese wrapper cierra su propio scope al retornar, asi que una llamada
+    posterior a `SCOPE_IDENTITY()` vuelve NULL (bug real encontrado en la prueba de integracion
+    contra SQL Server real, no una suposicion — `OUTPUT` no tiene ese problema porque lee el valor
+    dentro del mismo statement/scope que hizo el INSERT). Devuelve `None` (no lanza) si el mensaje
+    ya estaba ingestado — `UQ_Email_GmailMessageId` rechaza el duplicado y el llamador salta la
     descarga de adjuntos (design.md, Decision 4)."""
     try:
         cursor.execute(
@@ -49,7 +53,6 @@ def insertar_email(cursor, m: MensajeGmail, fecha_deteccion: datetime) -> int | 
         )
     except pyodbc.IntegrityError:
         return None
-    cursor.execute(_SELECT_SCOPE_IDENTITY)
     return int(cursor.fetchone()[0])
 
 
