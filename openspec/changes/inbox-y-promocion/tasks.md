@@ -136,17 +136,17 @@ one PR is far past budget on its own.
 
 ## Phase 5 (WU5): Angular Inbox screen
 
-- [ ] 5.1 Bootstrap the Angular workspace under `SmartNet/spa/` (signals, no state library) — decide
+- [x] 5.1 Bootstrap the Angular workspace under `SmartNet/spa/` (signals, no state library) — decide
       and record scope with the user first per design's Open Question (may need its own further PR
       split once real file counts are known).
-- [ ] 5.2 Add a frontend CI job (lint + `ng test`) to `.github/workflows/ci.yml`.
-- [ ] 5.3 `InboxService` (signals) — `GET /api/bandeja?estado=&orden=`.
-- [ ] 5.4 `InboxListComponent` — renders outcome (`PROMOVIDO`/`DESCARTADO`/`PENDIENTE`), linked
+- [x] 5.2 Add a frontend CI job (lint + `ng test`) to `.github/workflows/ci.yml`.
+- [x] 5.3 `InboxService` (signals) — `GET /api/bandeja?estado=&orden=`.
+- [x] 5.4 `InboxListComponent` — renders outcome (`PROMOVIDO`/`DESCARTADO`/`PENDIENTE`), linked
       `Factura` summary, indicator chips (count per confirmed D5); discard shows `MotivoDescarte`;
       no approve/edit/re-trigger controls rendered.
-- [ ] 5.5 Filter control by `EstadoConsumo`.
-- [ ] 5.6 Sort control by fecha (asc/desc).
-- [ ] 5.7 Component tests covering each spec scenario (promoted summary, discarded reason, filter,
+- [x] 5.5 Filter control by `EstadoConsumo`.
+- [x] 5.6 Sort control by fecha (asc/desc).
+- [x] 5.7 Component tests covering each spec scenario (promoted summary, discarded reason, filter,
       sort, no manual-action controls, signal-driven state).
 
 ## Phase 6 (WU6): Docs

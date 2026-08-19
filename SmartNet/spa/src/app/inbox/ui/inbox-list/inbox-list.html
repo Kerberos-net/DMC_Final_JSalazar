@@ -1,0 +1,32 @@
+<table class="inbox-list">
+  <thead>
+    <tr>
+      <th>Fecha</th>
+      <th>Estado</th>
+      <th>Detalle</th>
+      <th>Indicadores</th>
+    </tr>
+  </thead>
+  <tbody>
+    @for (fila of filas(); track fila.item.inboxEventId) {
+      <tr [attr.data-testid]="'inbox-row-' + fila.item.inboxEventId">
+        <td>{{ fila.item.creadoEn | date: 'short' }}</td>
+        <td>{{ fila.item.estadoConsumo }}</td>
+        <td>
+          @if (fila.item.estadoConsumo === 'PROMOVIDO') {
+            <span data-testid="factura-id">Factura #{{ fila.item.facturaId }}</span>
+          } @else if (fila.item.estadoConsumo === 'DESCARTADO') {
+            <span data-testid="motivo-descarte">{{ fila.item.motivoDescarte }}</span>
+          } @else {
+            <span>Pendiente de promoción</span>
+          }
+        </td>
+        <td>
+          @for (chip of fila.chips; track chip.clave) {
+            <span data-testid="indicador-chip" class="chip">{{ chip.etiqueta }}</span>
+          }
+        </td>
+      </tr>
+    }
+  </tbody>
+</table>

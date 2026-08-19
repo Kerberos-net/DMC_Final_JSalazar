@@ -1,0 +1,27 @@
+<div class="inbox-filter">
+  <label>
+    Estado
+    <select
+      data-testid="estado-select"
+      [value]="estado() ?? ''"
+      (change)="onEstadoSelect($any($event.target).value)"
+    >
+      <option value="">Todos</option>
+      <option value="PROMOVIDO">Promovido</option>
+      <option value="DESCARTADO">Descartado</option>
+      <option value="PENDIENTE">Pendiente</option>
+    </select>
+  </label>
+
+  <label>
+    Orden por fecha
+    <select
+      data-testid="orden-select"
+      [value]="orden()"
+      (change)="onOrdenSelect($any($event.target).value)"
+    >
+      <option value="desc">Más reciente primero</option>
+      <option value="asc">Más antiguo primero</option>
+    </select>
+  </label>
+</div>

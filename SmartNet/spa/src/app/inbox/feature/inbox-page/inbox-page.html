@@ -1,0 +1,20 @@
+<section class="inbox-page">
+  <h1>Bandeja de entrada</h1>
+
+  <app-inbox-filter
+    [estado]="estado()"
+    [orden]="orden()"
+    (estadoChange)="onEstadoChange($event)"
+    (ordenChange)="onOrdenChange($event)"
+  />
+
+  @if (loading()) {
+    <p data-testid="inbox-loading">Cargando…</p>
+  }
+
+  @if (error()) {
+    <p data-testid="inbox-error" role="alert">{{ error() }}</p>
+  }
+
+  <app-inbox-list [items]="items()" />
+</section>
