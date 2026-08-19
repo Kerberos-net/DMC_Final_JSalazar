@@ -10,6 +10,10 @@ dependencies = [
     "pyodbc>=5.1",
     "google-api-python-client>=2.140",
     "google-auth>=2.34",
+    # BACKLOG #6, WU1: parser XML/UBL endurecido (design.md, Decision 1). Adelantado desde el WU4
+    # original de la lista de tareas porque ubl.py (WU1) lo necesita para importar; pypdf/
+    # pypdfium2/pytesseract/Pillow siguen en WU4, que es donde el resto del stage PDF/OCR aterriza.
+    "lxml>=5.3",
 ]
 
 [project.optional-dependencies]

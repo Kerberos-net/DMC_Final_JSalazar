@@ -1,0 +1,64 @@
+<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
+<!-- Fixture redactada (BACKLOG #6, WU1): RUC, razon social y montos son sinteticos. Tipo '08'
+     Nota de Debito –– el tipo se lee de la raiz DebitNote-2. -->
+<DebitNote xmlns="urn:oasis:names:specification:ubl:schema:xsd:DebitNote-2"
+           xmlns:cac="urn:oasis:names:specification:ubl:schema:xsd:CommonAggregateComponents-2"
+           xmlns:cbc="urn:oasis:names:specification:ubl:schema:xsd:CommonBasicComponents-2">
+    <cbc:UBLVersionID>2.1</cbc:UBLVersionID>
+    <cbc:CustomizationID>2.0</cbc:CustomizationID>
+    <cbc:ID>FD01-00000007</cbc:ID>
+    <cbc:IssueDate>2026-08-06</cbc:IssueDate>
+    <cbc:DocumentCurrencyCode listAgencyName="United Nations Economic Commission for Europe" listName="Currency" listURI="urn:un:unece:uncefact:codelist:specification:ISO4217:2001">PEN</cbc:DocumentCurrencyCode>
+    <cac:AccountingSupplierParty>
+        <cac:Party>
+            <cac:PartyIdentification>
+                <cbc:ID schemeID="6" schemeName="SUNAT:Identificador de Documento de Identidad" schemeAgencyName="PE:SUNAT">20123456789</cbc:ID>
+            </cac:PartyIdentification>
+            <cac:PartyLegalEntity>
+                <cbc:RegistrationName>Proveedor Sintetico SAC</cbc:RegistrationName>
+            </cac:PartyLegalEntity>
+        </cac:Party>
+    </cac:AccountingSupplierParty>
+    <cac:AccountingCustomerParty>
+        <cac:Party>
+            <cac:PartyIdentification>
+                <cbc:ID schemeID="6" schemeName="SUNAT:Identificador de Documento de Identidad" schemeAgencyName="PE:SUNAT">20609999999</cbc:ID>
+            </cac:PartyIdentification>
+            <cac:PartyLegalEntity>
+                <cbc:RegistrationName>Empresa Sintetica de Pruebas SAC</cbc:RegistrationName>
+            </cac:PartyLegalEntity>
+        </cac:Party>
+    </cac:AccountingCustomerParty>
+    <cac:TaxTotal>
+        <cbc:TaxAmount currencyID="PEN">3.60</cbc:TaxAmount>
+    </cac:TaxTotal>
+    <cac:RequestedMonetaryTotal>
+        <cbc:PayableAmount currencyID="PEN">23.60</cbc:PayableAmount>
+    </cac:RequestedMonetaryTotal>
+    <cac:DebitNoteLine>
+        <cbc:ID>1</cbc:ID>
+        <cbc:DebitedQuantity unitCode="NIU">1</cbc:DebitedQuantity>
+        <cbc:LineExtensionAmount currencyID="PEN">20.00</cbc:LineExtensionAmount>
+        <cac:TaxTotal>
+            <cbc:TaxAmount currencyID="PEN">3.60</cbc:TaxAmount>
+            <cac:TaxSubtotal>
+                <cbc:TaxAmount currencyID="PEN">3.60</cbc:TaxAmount>
+                <cac:TaxCategory>
+                    <cbc:Percent>18.00</cbc:Percent>
+                    <cbc:TaxExemptionReasonCode listAgencyName="PE:SUNAT" listName="Afectacion del IGV" listURI="urn:pe:gob:sunat:cpe:see:gem:catalogos:catalogo07">10</cbc:TaxExemptionReasonCode>
+                    <cac:TaxScheme>
+                        <cbc:ID>1000</cbc:ID>
+                        <cbc:Name>IGV</cbc:Name>
+                        <cbc:TaxTypeCode>VAT</cbc:TaxTypeCode>
+                    </cac:TaxScheme>
+                </cac:TaxCategory>
+            </cac:TaxSubtotal>
+        </cac:TaxTotal>
+        <cac:Item>
+            <cbc:Description>Cargo adicional sintetico</cbc:Description>
+        </cac:Item>
+        <cac:Price>
+            <cbc:PriceAmount currencyID="PEN">20.00</cbc:PriceAmount>
+        </cac:Price>
+    </cac:DebitNoteLine>
+</DebitNote>
