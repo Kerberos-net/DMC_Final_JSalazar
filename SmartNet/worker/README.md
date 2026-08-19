@@ -210,18 +210,20 @@ pytest -m externa
   falla por DENY) — cero bases/logins huerfanos despues (verificado con `sqlcmd`). Suite unitaria
   completa: `pytest -q -m "not integracion and not ocr"` → 163/163 passed; `ruff check src tests`:
   limpio.
-  El marker **`ocr`** (nuevo, `tests/integration/test_ocr_real.py`) **NO se pudo correr contra
-  Tesseract real en este entorno**: `winget install UB-Mannheim.TesseractOCR` se intento dos veces
-  (silencioso y no-silencioso) y ambas fallo con `0x800704c7` (operacion cancelada por el usuario —
-  el instalador de Windows requiere una elevacion UAC interactiva que este entorno no puede
-  otorgar). La prueba esta escrita, tiene un fixture regenerado con texto real renderizado
-  (`comprobante_escaneado.pdf`, reemplazando el placeholder de 2x2 px de WU2 por una imagen
-  1600x900 con RUC/serie/numero/monto reales dibujados via Pillow+Arial, sin capa de texto
-  embebida) y un skip explicito y honesto (`pytest.skip` con el mensaje de
-  `TesseractNotFoundError`) cuando el binario no esta disponible — corrida aqui: **1 skipped**,
-  nunca reportado como passed. El job de CI (`pruebas-de-worker-python`, `apt-get install
-  tesseract-ocr tesseract-ocr-spa`) SI instala Tesseract sin necesitar elevacion interactiva, asi
-  que esta prueba corre de verdad ahi.
+  El marker **`ocr`** (nuevo, `tests/integration/test_ocr_real.py`) inicialmente no se pudo correr
+  contra Tesseract real en este entorno de WU4: `winget install UB-Mannheim.TesseractOCR` fallo dos
+  veces con `0x800704c7` (requiere elevacion UAC interactiva). La prueba quedo escrita con un
+  fixture regenerado con texto real renderizado (`comprobante_escaneado.pdf`, imagen 1600x900 con
+  RUC/serie/numero/monto reales via Pillow+Arial, sin capa de texto embebida) y un skip explicito y
+  honesto (`TesseractNotFoundError`) cuando el binario falta.
+  **Post-verify (sesion sdd-verify de BACKLOG #6): el usuario instalo Tesseract con permisos de
+  administrador** (`winget install UB-Mannheim.TesseractOCR`), y se descargo `spa.traineddata`
+  (paquete oficial de idioma espanol, `tesseract-ocr/tessdata` en GitHub — el instalador solo trae
+  `eng`) a una carpeta local via `TESSDATA_PREFIX`. Con `SMARTNET_WORKER_TESSERACT_CMD` y
+  `TESSDATA_PREFIX` fijados, `pytest -m ocr` **corrio de verdad contra Tesseract 5.4.0 real: 1
+  passed**, y la suite completa `pytest -q -m "not integracion"` → **164/164 passed** (163 previos +
+  el `ocr` real, ya no skippeado). El job de CI (`pruebas-de-worker-python`, `apt-get install
+  tesseract-ocr tesseract-ocr-spa`) tambien lo corre en cada push.
 - **Entorno de implementacion sin interprete de Python al empezar**: este Work Unit empezo en un
   entorno donde solo existia el stub de Microsoft Store para `python`/`py` (sin instalacion real,
   sin `pip`, sin `pytest`, sin `ruff`). Se instalo Python 3.13.15 con `winget install
