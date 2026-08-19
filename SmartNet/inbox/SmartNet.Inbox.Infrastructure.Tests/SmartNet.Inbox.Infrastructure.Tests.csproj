@@ -27,4 +27,15 @@
     <ProjectReference Include="..\..\db\test-bootstrap\SmartNet.Db.TestBootstrap\SmartNet.Db.TestBootstrap.csproj" />
   </ItemGroup>
 
+  <ItemGroup>
+    <!-- WU4 contract test (tasks.md 4.4-4.6, ADR 0019 level 2): the SAME fixture
+         test_payload_inbox_contract.py asserts payload_inbox.construir_payload produces,
+         proving PayloadInboxParser reads exactly what Python writes, not two independently
+         self-asserted shapes. Same linked-Content pattern as ResolucionDePrefijosGoldenTests'
+         CuentaContable.csv. -->
+    <Content Include="..\..\worker\tests\fixtures\inbox_event_payload.golden.json" Link="fixtures\inbox_event_payload.golden.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
 </Project>

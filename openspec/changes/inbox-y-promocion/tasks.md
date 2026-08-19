@@ -119,20 +119,20 @@ one PR is far past budget on its own.
 
 ## Phase 4 (WU4): API wiring + contract tests
 
-- [ ] 4.1 Create `SmartNet/api/SmartNet.Api/BandejaEndpoints.cs` — thin `GET /api/bandeja`,
+- [x] 4.1 Create `SmartNet/api/SmartNet.Api/BandejaEndpoints.cs` — thin `GET /api/bandeja`,
       `.RequireAuthorization()`, delegates to `IBandejaRepository`.
-- [ ] 4.2 Modify `SmartNet/api/SmartNet.Api/Program.cs` — register the three repos +
+- [x] 4.2 Modify `SmartNet/api/SmartNet.Api/Program.cs` — register the three repos +
       `AddHostedService<PromocionBackgroundService>()`.
-- [ ] 4.3 Modify `SmartNet.sln` (add `inbox` solution folder + 4 new projects) and `ci.yml` (Core →
+- [x] 4.3 Modify `SmartNet.sln` (add `inbox` solution folder + 4 new projects) and `ci.yml` (Core →
       `verificaciones-estaticas`, Infrastructure → `pruebas-de-base-de-datos`).
-- [ ] 4.4 Shared golden JSON fixture (contract test, ADR 0019 L2) — one payload example, confirmed
+- [x] 4.4 Shared golden JSON fixture (contract test, ADR 0019 L2) — one payload example, confirmed
       D4/D5 shape.
-- [ ] 4.5 Python contract test: `payload_inbox.py`'s builder output matches the golden JSON shape.
-- [ ] 4.6 .NET contract test: `PayloadInboxParser` parses the golden JSON into the expected
+- [x] 4.5 Python contract test: `payload_inbox.py`'s builder output matches the golden JSON shape.
+- [x] 4.6 .NET contract test: `PayloadInboxParser` parses the golden JSON into the expected
       `EventoInbox`.
-- [ ] 4.7 E2E (`WebApplicationFactory`): `GET /api/bandeja` returns promoted + discarded rows,
+- [x] 4.7 E2E (`WebApplicationFactory`): `GET /api/bandeja` returns promoted + discarded rows,
       filtered/sorted; 401 without cookie.
-- [ ] 4.8 Run full solution test suite; confirm zero orphaned `fact_test_*` databases after the run.
+- [x] 4.8 Run full solution test suite; confirm zero orphaned `fact_test_*` databases after the run.
 
 ## Phase 5 (WU5): Angular Inbox screen
 

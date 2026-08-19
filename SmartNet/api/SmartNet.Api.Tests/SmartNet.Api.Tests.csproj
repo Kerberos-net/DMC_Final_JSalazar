@@ -31,6 +31,8 @@
     <ProjectReference Include="..\..\auth\SmartNet.Auth.Core\SmartNet.Auth.Core.csproj" />
     <ProjectReference Include="..\..\auth\SmartNet.Auth.Infrastructure\SmartNet.Auth.Infrastructure.csproj" />
     <ProjectReference Include="..\..\db\test-bootstrap\SmartNet.Db.TestBootstrap\SmartNet.Db.TestBootstrap.csproj" />
+    <ProjectReference Include="..\..\inbox\SmartNet.Inbox.Core\SmartNet.Inbox.Core.csproj" />
+    <ProjectReference Include="..\..\inbox\SmartNet.Inbox.Infrastructure\SmartNet.Inbox.Infrastructure.csproj" />
   </ItemGroup>
 
 </Project>

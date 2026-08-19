@@ -1,0 +1,30 @@
+{
+  "version": 1,
+  "estadoProcesamiento": "COMPLETADO",
+  "documento": {
+    "documentoRecibidoId": 8,
+    "tipoDocumento": "XML",
+    "documentoAsociadoId": 9
+  },
+  "comprobante": {
+    "tipoComprobante": "01",
+    "numero": "F001-123",
+    "rucProveedor": "20100000001",
+    "nombreProveedor": "Acme SAC",
+    "monto": "1180.00",
+    "moneda": "PEN",
+    "fechaEmision": "2026-08-10"
+  },
+  "evidencia": [
+    {"campo": "tipoComprobante", "valor": "01", "fuente": "XML"},
+    {"campo": "numero", "valor": "F001-123", "fuente": "XML"},
+    {"campo": "ruc", "valor": "20100000001", "fuente": "XML"},
+    {"campo": "nombreProveedor", "valor": "Acme SAC", "fuente": "XML"},
+    {"campo": "total", "valor": "1180.00", "fuente": "XML"},
+    {"campo": "moneda", "valor": "PEN", "fuente": "XML"},
+    {"campo": "fechaEmision", "valor": "2026-08-10", "fuente": "XML"}
+  ],
+  "afectacionMixta": false,
+  "camposNoExtraidos": [],
+  "advertenciasAsociacion": []
+}

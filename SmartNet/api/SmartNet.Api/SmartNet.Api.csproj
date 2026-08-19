@@ -13,6 +13,8 @@
   <ItemGroup>
     <ProjectReference Include="..\..\auth\SmartNet.Auth.Core\SmartNet.Auth.Core.csproj" />
     <ProjectReference Include="..\..\auth\SmartNet.Auth.Infrastructure\SmartNet.Auth.Infrastructure.csproj" />
+    <ProjectReference Include="..\..\inbox\SmartNet.Inbox.Core\SmartNet.Inbox.Core.csproj" />
+    <ProjectReference Include="..\..\inbox\SmartNet.Inbox.Infrastructure\SmartNet.Inbox.Infrastructure.csproj" />
   </ItemGroup>
 
   <!-- Makes the top-level-statements Program class visible to WebApplicationFactory<Program> in

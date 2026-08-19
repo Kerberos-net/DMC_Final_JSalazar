@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.DataProtection.Repositories;
 using SmartNet.Api;
 using SmartNet.Auth.Core;
 using SmartNet.Auth.Infrastructure;
+using SmartNet.Inbox.Core;
+using SmartNet.Inbox.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -23,6 +25,23 @@ builder.Services.AddSingleton<IUsuarioRepository>(sp =>
     new SqlUsuarioRepository(ApiConnectionOptions.Resolve(sp.GetRequiredService<IConfiguration>())));
 builder.Services.AddSingleton<ISesionRepository>(sp =>
     new SqlSesionRepository(ApiConnectionOptions.Resolve(sp.GetRequiredService<IConfiguration>())));
+
+// BACKLOG #7 WU4 composition root: the three SmartNet.Inbox.Infrastructure (WU3) adapters behind
+// SmartNet.Inbox.Core's (WU2) ports, resolved the same lazy way as the auth repos above --
+// deferred to first use, after Build() has already merged any WebApplicationFactory override in
+// (SmartNet.Api.Tests.BandejaEndpointsTests, task 4.7).
+builder.Services.AddSingleton<IEventoInboxRepository>(sp =>
+    new SqlEventoInboxRepository(ApiConnectionOptions.Resolve(sp.GetRequiredService<IConfiguration>())));
+builder.Services.AddSingleton<IPromocionRepository>(sp =>
+    new SqlPromocionRepository(ApiConnectionOptions.Resolve(sp.GetRequiredService<IConfiguration>())));
+builder.Services.AddSingleton<IBandejaRepository>(sp =>
+    new SqlBandejaRepository(ApiConnectionOptions.Resolve(sp.GetRequiredService<IConfiguration>())));
+
+// design D7: PeriodicTimer(1 min) with the DI-registered TimeProvider.System above -- so a test
+// that substitutes a FakeTimeProvider via SmartNetApiFactory could drive it deterministically the
+// same way SmartNet.Inbox.Infrastructure.Tests.PromocionBackgroundServiceTests already does for
+// the standalone service.
+builder.Services.AddHostedService<PromocionBackgroundService>();
 
 builder.Services.AddAuthentication(CookieAuthenticationDefaults.AuthenticationScheme)
     .AddCookie(CookieAuthenticationDefaults.AuthenticationScheme);
@@ -83,6 +102,7 @@ app.UseAuthentication();
 app.UseAuthorization();
 
 app.MapSesionEndpoints();
+app.MapBandejaEndpoints();
 
 app.Run();
 

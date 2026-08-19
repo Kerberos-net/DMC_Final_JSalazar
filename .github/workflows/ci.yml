@@ -39,6 +39,7 @@ env:
   TESTS_AUTH_CORE: SmartNet/auth/SmartNet.Auth.Core.Tests
   TESTS_CATALOGOS_CORE: SmartNet/catalogos/SmartNet.Catalogos.Core.Tests
   TESTS_TIPOS_CAMBIO_CORE: SmartNet/tipos-de-cambio/SmartNet.TiposCambio.Core.Tests
+  TESTS_INBOX_CORE: SmartNet/inbox/SmartNet.Inbox.Core.Tests
   # pruebas-de-base-de-datos: every project whose tests use TestDatabaseFixture (throwaway
   # `fact_test_<guid>` databases) or WebApplicationFactory against a real SQL Server.
   TESTS_AUTH_INFRA: SmartNet/auth/SmartNet.Auth.Infrastructure.Tests
@@ -46,6 +47,7 @@ env:
   TESTS_ADMIN: SmartNet/admin/SmartNet.Admin.Tests
   TESTS_CATALOGOS_INFRA: SmartNet/catalogos/SmartNet.Catalogos.Infrastructure.Tests
   TESTS_TIPOS_CAMBIO_INFRA: SmartNet/tipos-de-cambio/SmartNet.TiposCambio.Infrastructure.Tests
+  TESTS_INBOX_INFRA: SmartNet/inbox/SmartNet.Inbox.Infrastructure.Tests
   # pruebas-de-worker-python: the worker's own SQL Server container (own ephemeral usr_worker
   # server-scoped LOGIN, kept out of the .NET DB job's shared container).
   WORKER_DIR: SmartNet/worker
@@ -92,6 +94,13 @@ jobs:
       - name: Nucleo de dominio de tipos de cambio (sin infraestructura)
         run: >
           dotnet test ${{ env.TESTS_TIPOS_CAMBIO_CORE }}
+          --configuration Release --no-build --logger "console;verbosity=normal"
+
+      # Pure domain logic (BACKLOG #7: promotion decision + 5 indicator flags). No DB, no HTTP, no
+      # wall clock -- PurityScanTests enforces this at build time, same as the three suites above.
+      - name: Nucleo de dominio de inbox y promocion (sin infraestructura)
+        run: >
+          dotnet test ${{ env.TESTS_INBOX_CORE }}
           --configuration Release --no-build --logger "console;verbosity=normal"
 
       - uses: actions/setup-python@v5
@@ -182,6 +191,11 @@ jobs:
       - name: TiposCambio.Infrastructure
         run: >
           dotnet test ${{ env.TESTS_TIPOS_CAMBIO_INFRA }}
+          --configuration Release --no-build --logger "console;verbosity=normal"
+
+      - name: Inbox.Infrastructure
+        run: >
+          dotnet test ${{ env.TESTS_INBOX_INFRA }}
           --configuration Release --no-build --logger "console;verbosity=normal"
 
   pruebas-de-worker-python:
