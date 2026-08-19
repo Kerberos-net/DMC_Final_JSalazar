@@ -93,24 +93,31 @@ Chain strategy: pending
 
 ## Phase 3 (WU3): Repositories + structural test correction
 
-- [ ] 3.1 RED: `tests/unit/test_procesamiento_repo.py` — `upsert_procesamiento` (INSERT on first call, UPDATE on retry via `UNIQUE(DocumentoRecibidoId)` IntegrityError path, same TOCTOU-avoidance pattern as #4/#5); `insertar_datos_extraidos` writes `AfectacionMixta`; `asociar_documentos` issues **two** `UPDATE`s (both sides of the FK); `insertar_error`/`insertar_intento` literals (`'PERMANENTE'`, `NULL` retry for permanente); `listar_huerfanos` filters `DocumentoAsociadoId IS NULL`. Exact SQL text + params, `fact.` qualified.
-- [ ] 3.2 Confirm RED: `pytest tests/unit/test_procesamiento_repo.py -q` fails on collection.
-- [ ] 3.3 GREEN: create `SmartNet/worker/src/smartnet_worker/procesamiento_repo.py` per Interfaces/Contracts.
-- [ ] 3.4 Confirm GREEN: `pytest tests/unit/test_procesamiento_repo.py -q` passes.
-- [ ] 3.5 RED: extend `tests/unit/test_documento_repo.py` — `listar_pendientes(cursor, ahora)` (Estado='DESCARGADO' OR expired-retry ERROR predicate from Decision 8); `fijar_tipo_documento`; `fijar_estado_documento`; `refrescar_estado_email` (CANDIDATO→PROCESADO/ERROR per Decision 9 closing rule).
-- [ ] 3.6 Confirm RED: new cases in `test_documento_repo.py` fail (`AttributeError`/`TypeError`, functions not yet defined).
-- [ ] 3.7 GREEN: extend `SmartNet/worker/src/smartnet_worker/documento_repo.py` with the four functions above.
-- [ ] 3.8 Confirm GREEN: `pytest tests/unit/test_documento_repo.py -q` passes.
-- [ ] 3.9 RED→GREEN: modify `SmartNet/worker/tests/unit/test_no_dbo_structural.py` — **remove** `fact.procesamiento`/`fact.datosextraidos` from the forbidden-mentions list (this item now owns writing them), **add** `fact.facturaextraccion`; add a new "sin red" scan asserting no `requests`/`urllib`/`http`/`socket` import across the extraction path modules. Run once before the list edit to confirm it is currently red against the new modules' legitimate mentions, then fix the list (never weaken the scanner itself).
-- [ ] 3.10 Confirm GREEN: `pytest tests/unit/test_no_dbo_structural.py -q` passes with the corrected list; `ruff check src/ tests/` clean.
+- [x] 3.1 RED: `tests/unit/test_procesamiento_repo.py` — `upsert_procesamiento` (INSERT on first call, UPDATE on retry via `UNIQUE(DocumentoRecibidoId)` IntegrityError path, same TOCTOU-avoidance pattern as #4/#5); `insertar_datos_extraidos` writes `AfectacionMixta`; `asociar_documentos` issues **two** `UPDATE`s (both sides of the FK); `insertar_error`/`insertar_intento` literals (`'PERMANENTE'`, `NULL` retry for permanente); `listar_huerfanos` filters `DocumentoAsociadoId IS NULL`. Exact SQL text + params, `fact.` qualified.
+- [x] 3.2 Confirm RED: `pytest tests/unit/test_procesamiento_repo.py -q` fails on collection. **RED confirmed**: `ModuleNotFoundError: No module named 'smartnet_worker.procesamiento_repo'`.
+- [x] 3.3 GREEN: create `SmartNet/worker/src/smartnet_worker/procesamiento_repo.py` per Interfaces/Contracts. **Deviation**: design.md's `insertar_datos_extraidos(cursor, procesamiento_id, d: DatosExtraidos)` names a `DatosExtraidos` type that did not previously exist as Python code (only as a table) — added a frozen `DatosExtraidos` dataclass in this module, one field per `fact.DatosExtraidos` column (`tipo_comprobante`, `numero`, `ruc_proveedor`, `nombre_proveedor`, `monto`, `moneda`, `fecha_emision`, `campos_no_extraidos`, `afectacion_mixta`), built by the caller (`cli_procesamiento.py`, WU4) from `ubl.ComprobanteUbl`/`pdf_texto.ExtraccionPdf` + `afectacion.calcular_afectacion_mixta`. `insertar_error`'s `Integracion` column is hardcoded `'WORKER'` (matches `EstadoIntegracion.Nombre`), same no-parameter-for-a-fixed-value discipline as `insertar_sbs`'s `Origen='SBS'`.
+- [x] 3.4 Confirm GREEN: `pytest tests/unit/test_procesamiento_repo.py -q` passes. **GREEN**: 8 passed.
+- [x] 3.5 RED: extend `tests/unit/test_documento_repo.py` — `listar_pendientes(cursor, ahora)` (Estado='DESCARGADO' OR expired-retry ERROR predicate from Decision 8); `fijar_tipo_documento`; `fijar_estado_documento`; `refrescar_estado_email` (CANDIDATO→PROCESADO/ERROR per Decision 9 closing rule).
+- [x] 3.6 Confirm RED: new cases in `test_documento_repo.py` fail. **RED confirmed**: `ImportError: cannot import name 'fijar_estado_documento' from 'smartnet_worker.documento_repo'` (collection-level, all new cases blocked).
+- [x] 3.7 GREEN: extend `SmartNet/worker/src/smartnet_worker/documento_repo.py` with the four functions above. Added `DocumentoPendiente` frozen dataclass (one field per `fact.DocumentoRecibido` column `listar_pendientes` reads) — not individually named in design.md's Interfaces list but required as `listar_pendientes`' return shape. `refrescar_estado_email` is one `UPDATE...CASE` statement (never `SELECT`-then-`UPDATE`), matching this module's existing anti-TOCTOU discipline.
+- [x] 3.8 Confirm GREEN: `pytest tests/unit/test_documento_repo.py -q` passes. **GREEN**: 14 passed.
+- [x] 3.9 RED→GREEN: modify `SmartNet/worker/tests/unit/test_no_dbo_structural.py` — **removed** `fact.procesamiento`/`fact.datosextraidos` from the forbidden-mentions list, **added** `fact.facturaextraccion`; added a new "sin red" scan asserting no `requests`/`urllib`/`http`/`socket` import across the extraction-path modules (`ubl.py`, `pdf_texto.py`, `pdf_lectura.py`, `comprobante.py`, `afectacion.py`, `errores.py`, `procesamiento_repo.py`). Ran the suite once before editing the list: confirmed red — `documento_repo.py menciona 'fact.procesamiento' fuera de un comentario` (the newly-added `listar_pendientes` query's legitimate JOIN). Then fixed the list, never weakened the scanner's comment-stripping logic.
+- [x] 3.10 Confirm GREEN: `pytest tests/unit/test_no_dbo_structural.py -q` passes with the corrected list; `ruff check src/ tests/` clean. **GREEN**: 4 passed; `ruff check src/ tests/` → All checks passed (after fixing 4 `E501` line-length violations found by the first ruff run, all in the new SQL/call-site lines — wrapped to stay under 100 chars, no logic change).
 
 ### Work Unit Evidence (WU3)
 
 | Evidence | Value |
 |---|---|
-| Focused test command | `pytest tests/unit/test_procesamiento_repo.py tests/unit/test_documento_repo.py tests/unit/test_no_dbo_structural.py -q` |
+| Focused test command | `pytest tests/unit/test_procesamiento_repo.py tests/unit/test_documento_repo.py tests/unit/test_no_dbo_structural.py -q` — **26 passed** (8 + 14 + 4) |
 | Runtime harness | N/A — fake-cursor unit tests only; real DB proven in WU4's integration slice |
-| Rollback boundary | Revert `procesamiento_repo.py`, `documento_repo.py`, `test_no_dbo_structural.py` to pre-WU3 state |
+| Rollback boundary | Revert `procesamiento_repo.py`, `documento_repo.py`, `test_no_dbo_structural.py`, `test_procesamiento_repo.py`, `test_documento_repo.py` to pre-WU3 state |
+
+**Deviations found during WU3 and fixed within scope**:
+1. `procesamiento_repo.py`'s `DatosExtraidos` dataclass is new Python code not literally specified by design.md's Interfaces/Contracts (which only names the parameter type, not its fields) — authored to mirror `fact.DatosExtraidos`'s columns 1:1, per the module's pure-persistence role.
+2. `documento_repo.py`'s `DocumentoPendiente` dataclass, same reasoning, for `listar_pendientes`' return shape.
+3. Four `E501` (line too long) ruff violations in the first draft — all mechanical wrapping, no behavior change.
+
+**Full non-integration unit suite**: `pytest -q -m "not integracion"` → **153 passed** (was 139 at WU2 baseline: +8 `test_procesamiento_repo.py`, +6 new `test_documento_repo.py` cases). No regression against items #4/#5/WU1/WU2.
 
 ## Phase 4 (WU4): `cli_procesamiento.py` orchestrator + integration + docs
 

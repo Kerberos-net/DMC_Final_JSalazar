@@ -7,7 +7,14 @@ from datetime import UTC, datetime
 
 import pyodbc
 
-from smartnet_worker.documento_repo import insertar_documento, insertar_email
+from smartnet_worker.documento_repo import (
+    fijar_estado_documento,
+    fijar_tipo_documento,
+    insertar_documento,
+    insertar_email,
+    listar_pendientes,
+    refrescar_estado_email,
+)
 from smartnet_worker.gmail import AdjuntoGmail, MensajeGmail
 
 
@@ -17,10 +24,17 @@ class _FakeCursor:
     MISMO `execute` que el INSERT (nunca un `SELECT SCOPE_IDENTITY()` separado — ver
     `documento_repo.py` para el porque)."""
 
-    def __init__(self, *, lanzar_integrity_error: bool = False, identity: int = 42):
+    def __init__(
+        self,
+        *,
+        lanzar_integrity_error: bool = False,
+        identity: int = 42,
+        filas: list[tuple] | None = None,
+    ):
         self.llamadas: list[tuple[str, tuple]] = []
         self._lanzar_integrity_error = lanzar_integrity_error
         self._identity = identity
+        self._filas = filas or []
 
     def execute(self, sentencia: str, *parametros):
         self.llamadas.append((sentencia, parametros))
@@ -29,6 +43,9 @@ class _FakeCursor:
 
     def fetchone(self):
         return (self._identity,)
+
+    def fetchall(self):
+        return self._filas
 
     @property
     def sentencia(self) -> str:
@@ -177,3 +194,80 @@ def test_insertar_documento_trunca_nombre_archivo_a_255_caracteres():
 
     nombre_archivo_param = cursor.parametros[2]
     assert len(nombre_archivo_param) == 255
+
+
+# --- listar_pendientes (design.md, Decision 8) ------------------------------------------------
+
+
+def test_listar_pendientes_selecciona_descargado_o_reintento_vencido():
+    cursor = _FakeCursor()
+    ahora = datetime(2026, 8, 19, 9, 0, 0, tzinfo=UTC)
+
+    listar_pendientes(cursor, ahora)
+
+    sentencia, parametros = cursor.llamadas[0]
+    sql = sentencia.lower()
+    assert "dbo." not in sql
+    assert "fact.documentorecibido" in sql
+    assert "'descargado'" in sql
+    assert "'error'" in sql
+    assert "numerointento < 3" in sql
+    assert "proximoreintentoen" in sql
+    assert ahora in parametros
+
+
+def test_listar_pendientes_devuelve_documentos_pendientes():
+    filas = [
+        (1, 10, "18d2f0a1", "factura.xml", "xml", "text/xml", 100, "a" * 64, "2026/08/f.xml"),
+    ]
+    cursor = _FakeCursor(filas=filas)
+
+    resultado = listar_pendientes(cursor, datetime(2026, 8, 19, 9, 0, 0, tzinfo=UTC))
+
+    assert len(resultado) == 1
+    assert resultado[0].documento_recibido_id == 1
+    assert resultado[0].email_id == 10
+    assert resultado[0].nombre_archivo == "factura.xml"
+    assert resultado[0].extension == "xml"
+    assert resultado[0].ruta_relativa == "2026/08/f.xml"
+
+
+# --- fijar_tipo_documento / fijar_estado_documento --------------------------------------------
+
+
+def test_fijar_tipo_documento_actualiza_la_columna_tipodocumento():
+    cursor = _FakeCursor()
+
+    fijar_tipo_documento(cursor, 1, "XML")
+
+    sentencia, parametros = cursor.llamadas[0]
+    assert "update fact.documentorecibido" in sentencia.lower()
+    assert "tipodocumento" in sentencia.lower()
+    assert parametros == ("XML", 1)
+
+
+def test_fijar_estado_documento_actualiza_la_columna_estado():
+    cursor = _FakeCursor()
+
+    fijar_estado_documento(cursor, 1, "PROCESADO")
+
+    sentencia, parametros = cursor.llamadas[0]
+    assert "update fact.documentorecibido" in sentencia.lower()
+    assert "set estado" in sentencia.lower()
+    assert parametros == ("PROCESADO", 1)
+
+
+# --- refrescar_estado_email (design.md, Decision 9) --------------------------------------------
+
+
+def test_refrescar_estado_email_es_una_sola_sentencia_sin_toctou():
+    cursor = _FakeCursor()
+
+    refrescar_estado_email(cursor, 10)
+
+    assert len(cursor.llamadas) == 1
+    sentencia, parametros = cursor.llamadas[0]
+    assert "update fact.email" in sentencia.lower()
+    assert "'procesado'" in sentencia.lower()
+    assert "'error'" in sentencia.lower()
+    assert 10 in parametros
