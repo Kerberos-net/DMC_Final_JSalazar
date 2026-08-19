@@ -3,23 +3,24 @@
 ## Purpose
 
 An Angular read-only screen surfaces every processed document's outcome — promoted, pending
-manual review (discarded), or failed — with the 6 indicator flags as visual cues, so a human can
-triage the inbox without querying the database directly. Manual actions are out of scope (item
-#13).
+manual review (discarded), or failed — with the 5 computed indicator flags as visual cues, so a
+human can triage the inbox without querying the database directly. Manual actions are out of scope
+(item #13).
 
 ## Requirements
 
 ### Requirement: List all InboxEvent outcomes
 
 The system MUST list every `InboxEvent` sourced from the API, showing outcome (`PROMOVIDO` /
-`DESCARTADO` / `PENDIENTE`) and, when promoted, the linked `Factura` summary with its 6 indicator
-flags as chips.
+`DESCARTADO` / `PENDIENTE`) and, when promoted, the linked `Factura` summary with its 5 computed
+indicator flags as chips (`EsReferenciaExterna` keeps its DDL default and is not computed here).
 
 #### Scenario: Promoted document shows Factura summary and indicators
 
 - GIVEN an `InboxEvent` with `EstadoConsumo='PROMOVIDO'` and a linked `Factura`
 - WHEN the Inbox screen loads
-- THEN the row displays the Factura's key fields and renders the 6 indicator flags as chips
+- THEN the row displays the Factura's key fields and renders the 5 computed indicator flags as
+  chips
 
 #### Scenario: Discarded document shows the discard reason
 

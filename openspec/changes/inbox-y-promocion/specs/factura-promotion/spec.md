@@ -11,22 +11,24 @@ Python-side notification as an instruction to create anything.
 
 ### Requirement: Pure promotion decision
 
-`SmartNet.Inbox.Core` MUST decide promote/no-promote and compute the 6 indicator flags as a pure
-function over the `InboxEvent.Payload`, with no database, HTTP, or clock dependency (ADR 0019
-level 1), and MUST pass `PurityScanTests`.
+`SmartNet.Inbox.Core` MUST decide promote/no-promote and compute 5 of the 6 documented indicator
+flags as a pure function over the `InboxEvent.Payload`, with no database, HTTP, or clock dependency
+(ADR 0019 level 1), and MUST pass `PurityScanTests`. `EsReferenciaExterna` keeps its DDL default
+(`0`) — `DatosExtraidos` has no reference-nota columns to derive it from in this item; notas de
+crédito is item #10 (design D5, ADR 0005).
 
 #### Scenario: Decision is computed without infrastructure
 
 - GIVEN an `InboxEvent.Payload` deserialized in memory
 - WHEN `SmartNet.Inbox.Core` evaluates it
-- THEN it returns a promote/no-promote decision plus the 6 indicator flags without touching a
-  database connection, an HTTP client, or `DateTime.Now`
+- THEN it returns a promote/no-promote decision plus the 5 computed indicator flags without
+  touching a database connection, an HTTP client, or `DateTime.Now`
 
 ### Requirement: Sufficient data promotes to Factura
 
 The system MUST create `Factura` (`Estado='PENDIENTE_VALIDACION'`) plus its `FacturaExtraccion`
-rows and the 6 indicator flags when the payload contains every field structurally required to
-construct them, and MUST mark the source `InboxEvent` `EstadoConsumo='PROMOVIDO'` with the new
+rows and the 5 computed indicator flags when the payload contains every field structurally required
+to construct them, and MUST mark the source `InboxEvent` `EstadoConsumo='PROMOVIDO'` with the new
 `FacturaId`.
 
 #### Scenario: Complete comprobante data promotes successfully
@@ -35,9 +37,10 @@ construct them, and MUST mark the source `InboxEvent` `EstadoConsumo='PROMOVIDO'
   `Factura` and `FacturaExtraccion`
 - WHEN the hosted consumer processes it
 - THEN a `Factura` row is created with `Estado='PENDIENTE_VALIDACION'` and `ProcesamientoId` set
-- AND matching `FacturaExtraccion` rows are created recording source (`XML`/`PDF`) and confidence
-  per field
-- AND the 6 indicator flags are persisted as fields on `Factura`
+- AND matching `FacturaExtraccion` rows are created recording source (`XML`/`PDF`) per field — no
+  confidence value: no component computes or persists one (D4, ADR 0017)
+- AND the 5 computed indicator flags are persisted as fields on `Factura`; `EsReferenciaExterna`
+  keeps its DDL default
 - AND the `InboxEvent` is updated to `EstadoConsumo='PROMOVIDO'`, `FacturaId=<new id>`
 
 ### Requirement: Insufficient data creates no Factura

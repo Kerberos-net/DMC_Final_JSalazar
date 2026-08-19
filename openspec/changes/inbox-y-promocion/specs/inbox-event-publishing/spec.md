@@ -20,8 +20,8 @@ already-closed processing transaction.
 - WHEN the InboxEvent publishing step runs
 - THEN one `InboxEvent` row is inserted with `Tipo='PROCESAMIENTO_FINALIZADO'` and
   `EstadoConsumo='PENDIENTE'`
-- AND `Payload` carries comprobante data, per-field evidence (`Fuente`/confianza),
-  `AfectacionMixta`, and association warnings
+- AND `Payload` carries comprobante data, per-field evidence (`Fuente` only — no confidence value:
+  no component computes or persists one, D4/ADR 0017), `AfectacionMixta`, and association warnings
 
 #### Scenario: Failed processing still emits an event
 
