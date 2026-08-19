@@ -40,7 +40,7 @@ def ejecutar() -> int:
     try:
         cursor = conexion.cursor()
         insertar_sbs(cursor, tipo_cambio)
-        registrar_exito(cursor, instante)
+        registrar_exito(cursor, "SBS", instante)
         conexion.commit()
         return 0
     except Exception as error:  # noqa: BLE001 — punto de entrada del proceso: todo fallo se loguea.
@@ -56,7 +56,7 @@ def _registrar_fallo_en_transaccion_propia(
     conexion = pyodbc.connect(connection_string)
     try:
         cursor = conexion.cursor()
-        registrar_fallo(cursor, instante, error)
+        registrar_fallo(cursor, "SBS", instante, error)
         conexion.commit()
     finally:
         conexion.close()
