@@ -130,6 +130,31 @@ def test_parsear_mensaje_sin_payload_lanza_parseo_gmail_error():
         parsear_mensaje({"id": "x", "internalDate": "1700000000000"})
 
 
+def test_parsear_mensaje_fixture_real_capturado_extrae_xml_y_pdf():
+    """gmail_mensaje_real_capturado.json es una captura REAL (via OAuth, verify post-item #5),
+    no sintetica como las dos de arriba -- ver el comentario del propio fixture y
+    tests/fixtures/README.md. Confirma que parsear_mensaje funciona contra la forma real de un
+    correo con factura en XML+PDF, no solo contra la forma inventada."""
+    mensaje = _leer_fixture("gmail_mensaje_real_capturado.json")
+
+    resultado = parsear_mensaje(mensaje)
+
+    assert resultado.gmail_message_id == "a1b2c3d4e5f6a7b8"
+    assert resultado.asunto == "Facturas de desayuno personal"
+    assert len(resultado.adjuntos) == 2
+    nombres = sorted(a.nombre for a in resultado.adjuntos)
+    assert nombres == [
+        "85877-20127765279-fa-f96x-00001230.pdf",
+        "85878-20127765279-fa-f96x-00001230.xml",
+    ]
+    pdf = next(a for a in resultado.adjuntos if a.extension == "pdf")
+    assert pdf.mime_type == "application/pdf"
+    assert pdf.tamano_bytes == 56726
+    xml = next(a for a in resultado.adjuntos if a.extension == "xml")
+    assert xml.mime_type == "text/xml"
+    assert xml.tamano_bytes == 20372
+
+
 # ---------------------------------------------------------------------------------------------
 # extensiones_permitidas / es_candidato — task 1.7
 # ---------------------------------------------------------------------------------------------

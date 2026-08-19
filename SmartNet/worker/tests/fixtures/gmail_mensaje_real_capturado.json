@@ -1,0 +1,110 @@
+{
+  "_comentario": "CAPTURA REAL redactada, obtenida via OAuth de una cuenta Gmail de prueba el 18/08/2026 (BACKLOG #5, post-verify). Estructura MIME (multipart/mixed > multipart/alternative + adjuntos XML+PDF), tipos y tamanos reales de un correo real con factura adjunta; From/To/Subject/Message-ID/attachmentId reemplazados por placeholders porque son PII. Complementa (no reemplaza) gmail_mensaje_simple.json y gmail_mensaje_multipart.json, que son sinteticos y cubren casos adversariales (imagen inline) que este correo real no tenia. Ver tests/fixtures/README.md.",
+  "id": "a1b2c3d4e5f6a7b8",
+  "threadId": "a1b2c3d4e5f6a7b8",
+  "labelIds": [
+    "UNREAD",
+    "CATEGORY_PERSONAL",
+    "INBOX"
+  ],
+  "snippet": "",
+  "historyId": "16658",
+  "internalDate": "1787107896000",
+  "sizeEstimate": 117589,
+  "payload": {
+    "mimeType": "multipart/mixed",
+    "headers": [
+      {
+        "name": "From",
+        "value": "Remitente de Prueba <remitente@example.com>"
+      },
+      {
+        "name": "To",
+        "value": "Destino de Prueba <destino@example.com>"
+      },
+      {
+        "name": "Subject",
+        "value": "Facturas de desayuno personal"
+      },
+      {
+        "name": "Date",
+        "value": "Wed, 19 Aug 2026 02:51:36 +0000"
+      },
+      {
+        "name": "Message-ID",
+        "value": "<fixture-redactado-0001@example.com>"
+      }
+    ],
+    "body": {
+      "size": 0
+    },
+    "parts": [
+      {
+        "mimeType": "multipart/alternative",
+        "headers": [
+          {
+            "name": "Content-Type",
+            "value": "multipart/alternative"
+          }
+        ],
+        "body": {
+          "size": 0
+        },
+        "parts": [
+          {
+            "mimeType": "text/plain",
+            "filename": "",
+            "headers": [],
+            "body": {
+              "size": 4
+            }
+          },
+          {
+            "mimeType": "text/html",
+            "filename": "",
+            "headers": [],
+            "body": {
+              "size": 503
+            }
+          }
+        ]
+      },
+      {
+        "mimeType": "text/xml",
+        "filename": "85878-20127765279-fa-f96x-00001230.xml",
+        "headers": [
+          {
+            "name": "Content-Type",
+            "value": "text/xml; name=\"85878-20127765279-fa-f96x-00001230.xml\""
+          },
+          {
+            "name": "Content-Disposition",
+            "value": "attachment; filename=\"85878-20127765279-fa-f96x-00001230.xml\""
+          }
+        ],
+        "body": {
+          "attachmentId": "FIXTURE_ATTACHMENT_ID_XML_REDACTADO",
+          "size": 20372
+        }
+      },
+      {
+        "mimeType": "application/pdf",
+        "filename": "85877-20127765279-fa-f96x-00001230.pdf",
+        "headers": [
+          {
+            "name": "Content-Type",
+            "value": "application/pdf; name=\"85877-20127765279-fa-f96x-00001230.pdf\""
+          },
+          {
+            "name": "Content-Disposition",
+            "value": "attachment; filename=\"85877-20127765279-fa-f96x-00001230.pdf\""
+          }
+        ],
+        "body": {
+          "attachmentId": "FIXTURE_ATTACHMENT_ID_PDF_REDACTADO",
+          "size": 56726
+        }
+      }
+    ]
+  }
+}

@@ -45,3 +45,23 @@ que la SBS reordene o quite temporalmente esa fila).
 Si la pagina real cambia de estructura otra vez, `sbs.py` debera ajustarse contra un fixture
 recapturado a mano (por ejemplo con las herramientas de desarrollo del navegador o Claude in
 Chrome) — nunca contra una suposicion silenciosa.
+
+# Fixtures de mensajes de Gmail
+
+`gmail_mensaje_simple.json` y `gmail_mensaje_multipart.json` son **sinteticos**: estructuras
+`messages.get` plausibles construidas a mano durante la implementacion de este ítem (WU1), no
+capturas reales. Existen para ejercitar casos adversariales concretos que un correo real elegido al
+azar puede no tener — en particular, `gmail_mensaje_multipart.json` cubre una imagen inline dentro
+de un `multipart/related` anidado (adjunto con `filename=""`, que nunca debe tratarse como
+candidato). Ambos siguen siendo utiles como fixtures de borde, aunque sean inventados.
+
+`gmail_mensaje_real_capturado.json` es una **captura REAL**, obtenida via el flujo de consentimiento
+OAuth (`gmail.modify`) contra una cuenta de Gmail de prueba el 18/08/2026, en respuesta al WARNING
+del `sdd-verify` de este ítem que senalaba que ninguna fixture era real (mismo tipo de gap que tuvo
+`sbs_tipo_cambio.html` en el ítem #4). Es un correo real con una factura adjunta en XML+PDF —
+`multipart/mixed` > `multipart/alternative` (texto) + adjunto `text/xml` + adjunto `application/pdf`
+— exactamente la forma que este ítem necesita reconocer en producción. `From`/`To`/`Message-ID` y
+los `attachmentId` reales fueron reemplazados por placeholders porque son PII; el resto (tipos MIME,
+nombres de archivo, tamanos en bytes, `internalDate`) es real, sin editar.
+
+No reemplaza a los dos fixtures sinteticos — los complementa. `test_gmail.py` ejercita las tres.
