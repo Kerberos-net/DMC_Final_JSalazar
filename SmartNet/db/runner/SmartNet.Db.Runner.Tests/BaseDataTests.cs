@@ -63,6 +63,7 @@ public sealed class BaseDataTests
     [InlineData("INGESTA", "EXTENSIONES_PERMITIDAS")]
     [InlineData("INGESTA", "FRECUENCIA_SONDEO_MINUTOS")]
     [InlineData("INGESTA", "FECHA_INICIO")]
+    [InlineData("INGESTA", "ETIQUETA_PROCESADO")]
     [InlineData("ADJUNTOS", "TIPOS_PERMITIDOS")]
     [InlineData("ADJUNTOS", "TAMANO_MAXIMO_BYTES")]
     [InlineData("TELEGRAM", "DESTINO_CHAT_ID")]

@@ -1,0 +1,42 @@
+{
+  "id": "18f2a3b4c5d6e7f8",
+  "threadId": "18f2a3b4c5d6e7f8",
+  "labelIds": ["INBOX", "Label_1"],
+  "snippet": "Adjunto la factura del mes.",
+  "internalDate": "1768480496000",
+  "payload": {
+    "partId": "",
+    "mimeType": "multipart/mixed",
+    "filename": "",
+    "headers": [
+      {"name": "From", "value": "Proveedor Redactado <facturacion@proveedor-redactado.example>"},
+      {"name": "To", "value": "compras@empresa-redactada.example"},
+      {"name": "Subject", "value": "Factura de agosto"},
+      {"name": "Date", "value": "Thu, 15 Jan 2026 12:34:56 -0000"}
+    ],
+    "body": {"size": 0},
+    "parts": [
+      {
+        "partId": "0",
+        "mimeType": "text/plain",
+        "filename": "",
+        "headers": [
+          {"name": "Content-Type", "value": "text/plain; charset=\"UTF-8\""}
+        ],
+        "body": {"size": 28, "data": "QWRqdW50byBsYSBmYWN0dXJhIGRlbCBtZXMu"}
+      },
+      {
+        "partId": "1",
+        "mimeType": "application/pdf",
+        "filename": "factura.pdf",
+        "headers": [
+          {"name": "Content-Type", "value": "application/pdf; name=\"factura.pdf\""},
+          {"name": "Content-Disposition", "value": "attachment; filename=\"factura.pdf\""},
+          {"name": "Content-Transfer-Encoding", "value": "base64"}
+        ],
+        "body": {"attachmentId": "ANGjdJ_redacted_attachment_id_1", "size": 154032}
+      }
+    ]
+  },
+  "sizeEstimate": 156000
+}

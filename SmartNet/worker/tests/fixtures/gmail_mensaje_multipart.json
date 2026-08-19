@@ -1,0 +1,94 @@
+{
+  "id": "18f9b1c2d3e4f5a6",
+  "threadId": "18f9b1c2d3e4f5a6",
+  "labelIds": ["INBOX", "Label_1"],
+  "snippet": "Se adjunta comprobante en PDF y XML.",
+  "internalDate": "1770102309000",
+  "payload": {
+    "partId": "",
+    "mimeType": "multipart/mixed",
+    "filename": "",
+    "headers": [
+      {"name": "From", "value": "Otro Proveedor Redactado <facturacion@otro-proveedor-redactado.example>"},
+      {"name": "To", "value": "compras@empresa-redactada.example"},
+      {"name": "Subject", "value": "Comprobante electronico"},
+      {"name": "Date", "value": "Tue, 03 Feb 2026 07:05:09 -0000"}
+    ],
+    "body": {"size": 0},
+    "parts": [
+      {
+        "partId": "0",
+        "mimeType": "multipart/alternative",
+        "filename": "",
+        "headers": [
+          {"name": "Content-Type", "value": "multipart/alternative; boundary=\"000000000000aaa\""}
+        ],
+        "body": {"size": 0},
+        "parts": [
+          {
+            "partId": "0.0",
+            "mimeType": "text/plain",
+            "filename": "",
+            "headers": [
+              {"name": "Content-Type", "value": "text/plain; charset=\"UTF-8\""}
+            ],
+            "body": {"size": 36, "data": "U2UgYWRqdW50YSBjb21wcm9iYW50ZS4="}
+          },
+          {
+            "partId": "0.1",
+            "mimeType": "text/html",
+            "filename": "",
+            "headers": [
+              {"name": "Content-Type", "value": "text/html; charset=\"UTF-8\""}
+            ],
+            "body": {"size": 58, "data": "PHA-U2UgYWRqdW50YSBjb21wcm9iYW50ZS48L3A-"}
+          }
+        ]
+      },
+      {
+        "partId": "1",
+        "mimeType": "multipart/related",
+        "filename": "",
+        "headers": [
+          {"name": "Content-Type", "value": "multipart/related; boundary=\"000000000000bbb\""}
+        ],
+        "body": {"size": 0},
+        "parts": [
+          {
+            "partId": "1.0",
+            "mimeType": "image/png",
+            "filename": "",
+            "headers": [
+              {"name": "Content-Type", "value": "image/png"},
+              {"name": "Content-ID", "value": "<logo_inline>"}
+            ],
+            "body": {"attachmentId": "ANGjdJ_redacted_attachment_id_inline", "size": 4096}
+          },
+          {
+            "partId": "1.1",
+            "mimeType": "application/xml",
+            "filename": "comprobante.xml",
+            "headers": [
+              {"name": "Content-Type", "value": "application/xml; name=\"comprobante.xml\""},
+              {"name": "Content-Disposition", "value": "attachment; filename=\"comprobante.xml\""},
+              {"name": "Content-Transfer-Encoding", "value": "base64"}
+            ],
+            "body": {"attachmentId": "ANGjdJ_redacted_attachment_id_2", "size": 8421}
+          }
+        ]
+      },
+      {
+        "partId": "2",
+        "mimeType": "application/pdf",
+        "filename": "comprobante.pdf",
+        "headers": [
+          {"name": "Content-Type", "value": "application/pdf; name=\"comprobante.pdf\""},
+          {"name": "Content-Disposition", "value": "attachment; filename=\"comprobante.pdf\""},
+          {"name": "Content-Transfer-Encoding", "value": "base64"}
+        ],
+        "body": {"attachmentId": "ANGjdJ_redacted_attachment_id_3", "size": 201455}
+      }
+    ]
+  },
+  "sizeEstimate": 214500
+}
