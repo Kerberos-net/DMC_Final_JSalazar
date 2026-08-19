@@ -78,6 +78,21 @@ JOIN fact.DatosExtraidos de ON de.ProcesamientoId = p.ProcesamientoId
 WHERE p.DocumentoAsociadoId IS NULL
 """
 
+# WU4 (cli_procesamiento.py): un huerfano de un run ANTERIOR ya tiene su fila `fact.Procesamiento`
+# committeada -- listar_huerfanos() no expone su ProcesamientoId (solo el DocumentoRecibidoId que
+# comprobante.asociar necesita para la clave), asi que el orquestador lo resuelve aparte con esta
+# consulta puntual, en vez de repetir upsert_procesamiento (que reescribiria Estado/IniciadoEn/
+# FinalizadoEn de una fila ya terminal).
+_SELECT_PROCESAMIENTO_ID = """
+SELECT ProcesamientoId FROM fact.Procesamiento WHERE DocumentoRecibidoId = ?
+"""
+
+# WU4: el numero de intento previo -- insertar_intento necesita NumeroIntento, y un reintento
+# (Decision 8) no debe repetir el numero de un intento anterior del MISMO Procesamiento.
+_CONTAR_INTENTOS = """
+SELECT COUNT(*) FROM fact.ProcesamientoIntentos WHERE ProcesamientoId = ?
+"""
+
 
 @dataclass(frozen=True)
 class DatosExtraidos:
@@ -180,3 +195,13 @@ def listar_huerfanos(cursor) -> tuple[Documento, ...]:
             )
         )
     return tuple(huerfanos)
+
+
+def obtener_procesamiento_id(cursor, documento_recibido_id: int) -> int:
+    cursor.execute(_SELECT_PROCESAMIENTO_ID, documento_recibido_id)
+    return int(cursor.fetchone()[0])
+
+
+def contar_intentos(cursor, procesamiento_id: int) -> int:
+    cursor.execute(_CONTAR_INTENTOS, procesamiento_id)
+    return int(cursor.fetchone()[0])

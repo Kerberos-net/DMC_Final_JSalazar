@@ -1,6 +1,6 @@
 # SmartNet Worker (Python)
 
-Paquete Python del repositorio con dos scripts de un solo run:
+Paquete Python del repositorio con tres scripts de un solo run:
 
 - **`cli_tipo_cambio.py`** (BACKLOG #4): scrapea el tipo de cambio publicado por la SBS, inserta
   una fila `Origen='SBS'` en `fact.TipoCambio` y deja registro del intento en
@@ -9,13 +9,63 @@ Paquete Python del repositorio con dos scripts de un solo run:
   candidatos (etiqueta + extension permitida, ADR 0017), los persiste como `fact.Email` +
   `fact.DocumentoRecibido` (`Estado='DESCARGADO'`), aplica su propia etiqueta de "procesado" y deja
   registro del intento en `fact.EstadoIntegracion` (`Nombre='GMAIL'`).
+- **`cli_procesamiento.py`** (BACKLOG #6): procesa `fact.DocumentoRecibido` pendiente
+  (`Estado='DESCARGADO'` o un reintento vencido) — parsea XML/UBL como fuente autoritativa,
+  extrae texto de PDF con OCR local (Tesseract) solo donde hace falta, asocia pares XML<->PDF por
+  el RUC/tipo/serie/numero (ADR 0017), calcula `AfectacionMixta` (REGLAS.md §8) y deja registro del
+  intento en `fact.EstadoIntegracion` (`Nombre='WORKER'`).
 
-Ambos sin scheduler, sin polling en proceso, sin reintentos automaticos — la ejecucion recurrente
-es un concern de despliegue (cron/Task Scheduler), no de este codigo.
+Los tres sin scheduler, sin polling en proceso, sin reintentos automaticos en el mismo proceso — la
+ejecucion recurrente es un concern de despliegue (cron/Task Scheduler), no de este codigo.
+`cli_procesamiento.py` se agenda **despues** de `cli_gmail.py`: solo tiene sentido correr sobre lo
+que #5 ya descargo.
 
-Ver `openspec/changes/tipos-de-cambio/design.md` (Decisiones 4-7) y
-`openspec/changes/ingesta-gmail/design.md` (Decisiones 1-7) para las decisiones de diseño, y
-`ADR 0003`/`ADR 0017` para la particion de datos y las reglas de Gmail.
+Ver `openspec/changes/tipos-de-cambio/design.md` (Decisiones 4-7),
+`openspec/changes/ingesta-gmail/design.md` (Decisiones 1-7) y
+`openspec/changes/extraccion-y-asociacion/design.md` (Decisiones 1-9) para las decisiones de
+diseño, y `ADR 0003`/`ADR 0010`/`ADR 0017` para la particion de datos, la clasificacion de errores
+y las reglas de Gmail/extraccion.
+
+## Prerequisitos de sistema
+
+Ademas de Python y el driver ODBC (ver "Instalacion" abajo), `cli_procesamiento.py` (BACKLOG #6)
+necesita el binario **Tesseract** con el paquete de idioma **`spa`** instalados a nivel de sistema
+— igual clase de prerequisito que el ODBC Driver 18: un binario que `pip` no puede instalar por
+si solo (design.md, Decision 3/7).
+
+- **Debian/Ubuntu** (y el job de CI `pruebas-de-worker-python`):
+
+  ```bash
+  sudo apt-get update
+  sudo apt-get install -y tesseract-ocr tesseract-ocr-spa
+  ```
+
+- **Windows**:
+
+  ```powershell
+  winget install UB-Mannheim.TesseractOCR
+  ```
+
+  El instalador de Windows NO agrega el binario al `PATH` por defecto (se instala en
+  `C:\Program Files\Tesseract-OCR\tesseract.exe`). Fijar la ruta completa via la variable de
+  entorno opcional:
+
+  ```
+  SMARTNET_WORKER_TESSERACT_CMD
+  ```
+
+  ```powershell
+  $env:SMARTNET_WORKER_TESSERACT_CMD = "C:\Program Files\Tesseract-OCR\tesseract.exe"
+  ```
+
+  A diferencia de la cadena de conexion, las credenciales de Gmail y la raiz de almacenamiento, la
+  **ausencia** de esta variable es legitima (design.md, Decision 7): significa "esperar `tesseract`
+  en el `PATH`", que es el caso normal en Linux/CI tras `apt-get install`.
+
+`cli_procesamiento.py` corre una **preflight** (`pytesseract.get_tesseract_version()`) una unica
+vez, antes del primer documento del run: si Tesseract no responde, el run entero aborta con **cero
+filas escritas** — nunca un `PERMANENTE` por documento causado por una mala configuracion del host
+(design.md, Decision 7).
 
 ## Instalacion
 
@@ -76,6 +126,7 @@ export SMARTNET_WORKER_STORAGE_ROOT="/mnt/smartnet-adjuntos"
 ```bash
 python -m smartnet_worker.cli_tipo_cambio
 python -m smartnet_worker.cli_gmail
+python -m smartnet_worker.cli_procesamiento
 ```
 
 O, tras la instalacion, mediante los entry points declarados en `pyproject.toml`:
@@ -83,6 +134,7 @@ O, tras la instalacion, mediante los entry points declarados en `pyproject.toml`
 ```bash
 smartnet-tipo-cambio
 smartnet-gmail
+smartnet-procesamiento
 ```
 
 Codigo de salida `0` en exito, `1` en fallo — pensados para invocarse desde un scheduler externo
@@ -93,15 +145,21 @@ primer sondeo — el worker nunca las crea (design.md, Decision 3).
 ## Pruebas
 
 Markers definidos en `pyproject.toml`: `integracion` (requiere SQL Server real), `externa`
-(requiere red real hacia `sbs.gob.pe`, excluida de CI).
+(requiere red real hacia `sbs.gob.pe`, excluida de CI), `ocr` (requiere el binario Tesseract real —
+a diferencia de `externa`, SI corre en CI, ver "Prerequisitos de sistema").
 
 ```bash
-# Solo unitarias, sin red ni DB — lo que corre en verificaciones-estaticas de CI
-pytest -m "not integracion and not externa"
+# Solo unitarias, sin red ni DB ni Tesseract — lo que corre en verificaciones-estaticas de CI
+pytest -m "not integracion and not externa and not ocr"
 
 # Con integracion real (requiere una instancia SQL Server desechable + el SDK de .NET en PATH —
 # ver tests/integration/conftest.py para el detalle completo)
 pytest -m integracion
+
+# Con OCR real (requiere el binario Tesseract + el paquete de idioma 'spa' instalados —
+# ver "Prerequisitos de sistema"). Corre en el job pruebas-de-worker-python de CI junto con
+# `integracion`.
+pytest -m ocr
 
 # Scrape real contra sbs.gob.pe — deseleccionado por defecto, solo para verificacion manual
 # tras un incidente (design.md, Testing Strategy, fila "Excluido de CI")
@@ -142,6 +200,28 @@ pytest -m externa
   wrapper cierra su propio scope al retornar. El fix usa `OUTPUT INSERTED.EmailId` en el MISMO
   `execute` que el INSERT, que no tiene ese problema porque lee el valor dentro del mismo
   statement/scope. Suite unitaria completa: 81/81 passed; `ruff check src tests`: limpio.
+- **BACKLOG #6, WU4 (cli_procesamiento.py + integracion real + `ocr`)**: la misma instancia SQL
+  Server 2025 local real de WU4/#5 estaba alcanzable — se corrio `dotnet test
+  SmartNet.Db.Runner.Tests --filter "FullyQualifiedName~BaseDataTests"` (33/33 passed, incluye
+  `Configuracion_PendienteKeys_HaveValorAndValorPorDefectoBothNull("EMPRESA","RUC")`) y `pytest -m
+  integracion` completo (11/11 passed, incluye las 4 pruebas nuevas de este item: `Procesamiento`+
+  `DatosExtraidos`+`AfectacionMixta` reales, FK de asociacion en ambos lados,
+  `CK_Procesamiento_NoAutoAsociacion` rechaza la auto-asociacion, `INSERT fact.FacturaExtraccion`
+  falla por DENY) — cero bases/logins huerfanos despues (verificado con `sqlcmd`). Suite unitaria
+  completa: `pytest -q -m "not integracion and not ocr"` → 163/163 passed; `ruff check src tests`:
+  limpio.
+  El marker **`ocr`** (nuevo, `tests/integration/test_ocr_real.py`) **NO se pudo correr contra
+  Tesseract real en este entorno**: `winget install UB-Mannheim.TesseractOCR` se intento dos veces
+  (silencioso y no-silencioso) y ambas fallo con `0x800704c7` (operacion cancelada por el usuario —
+  el instalador de Windows requiere una elevacion UAC interactiva que este entorno no puede
+  otorgar). La prueba esta escrita, tiene un fixture regenerado con texto real renderizado
+  (`comprobante_escaneado.pdf`, reemplazando el placeholder de 2x2 px de WU2 por una imagen
+  1600x900 con RUC/serie/numero/monto reales dibujados via Pillow+Arial, sin capa de texto
+  embebida) y un skip explicito y honesto (`pytest.skip` con el mensaje de
+  `TesseractNotFoundError`) cuando el binario no esta disponible — corrida aqui: **1 skipped**,
+  nunca reportado como passed. El job de CI (`pruebas-de-worker-python`, `apt-get install
+  tesseract-ocr tesseract-ocr-spa`) SI instala Tesseract sin necesitar elevacion interactiva, asi
+  que esta prueba corre de verdad ahi.
 - **Entorno de implementacion sin interprete de Python al empezar**: este Work Unit empezo en un
   entorno donde solo existia el stub de Microsoft Store para `python`/`py` (sin instalacion real,
   sin `pip`, sin `pytest`, sin `ruff`). Se instalo Python 3.13.15 con `winget install

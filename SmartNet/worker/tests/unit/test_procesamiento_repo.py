@@ -11,10 +11,12 @@ import pyodbc
 from smartnet_worker.procesamiento_repo import (
     DatosExtraidos,
     asociar_documentos,
+    contar_intentos,
     insertar_datos_extraidos,
     insertar_error,
     insertar_intento,
     listar_huerfanos,
+    obtener_procesamiento_id,
     upsert_procesamiento,
 )
 
@@ -191,3 +193,41 @@ def test_listar_huerfanos_sin_datos_extraidos_completos_produce_clave_none():
     resultado = listar_huerfanos(cursor)
 
     assert resultado[0].clave is None
+
+
+# --- obtener_procesamiento_id / contar_intentos (WU4: cli_procesamiento.py necesita el
+# ProcesamientoId de un huerfano de un run ANTERIOR para escribir la asociacion, y el numero de
+# intento previo para no pisar NumeroIntento en un reintento) -----------------------------------
+
+
+def test_obtener_procesamiento_id_consulta_por_documento_recibido_id():
+    cursor = _FakeCursor(identity=99)
+
+    resultado = obtener_procesamiento_id(cursor, 5)
+
+    assert resultado == 99
+    sentencia, parametros = cursor.llamadas[0]
+    assert "select" in sentencia.lower()
+    assert "fact.procesamiento" in sentencia.lower()
+    assert "dbo." not in sentencia.lower()
+    assert parametros == (5,)
+
+
+def test_contar_intentos_devuelve_cero_sin_intentos_previos():
+    cursor = _FakeCursor(identity=0)
+
+    resultado = contar_intentos(cursor, 5)
+
+    assert resultado == 0
+    sentencia, parametros = cursor.llamadas[0]
+    assert "count" in sentencia.lower()
+    assert "fact.procesamientointentos" in sentencia.lower()
+    assert parametros == (5,)
+
+
+def test_contar_intentos_devuelve_el_conteo_existente():
+    cursor = _FakeCursor(identity=2)
+
+    resultado = contar_intentos(cursor, 5)
+
+    assert resultado == 2

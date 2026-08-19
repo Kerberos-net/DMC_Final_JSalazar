@@ -20,6 +20,12 @@ import pytest
 from smartnet_worker.documento_repo import insertar_documento, insertar_email
 from smartnet_worker.estado_integracion import registrar_exito
 from smartnet_worker.gmail import AdjuntoGmail, MensajeGmail
+from smartnet_worker.procesamiento_repo import (
+    DatosExtraidos,
+    asociar_documentos,
+    insertar_datos_extraidos,
+    upsert_procesamiento,
+)
 from smartnet_worker.sbs import TipoCambioSbs
 from smartnet_worker.tipo_cambio_repo import insertar_sbs
 
@@ -184,5 +190,151 @@ def test_usr_worker_no_puede_escribir_en_configuracion(worker_db):
             conexion.cursor().execute(
                 "UPDATE fact.Configuracion SET Valor = 'Facturas' "
                 "WHERE Seccion = 'INGESTA' AND Clave = 'ETIQUETA_ORIGEN'"
+            )
+            conexion.commit()
+
+
+# --- BACKLOG #6: extraccion y asociacion (procesamiento_repo.py, migracion 014) -----------------
+
+
+def _email_y_documento_reales(cursor, gmail_message_id: str, nombre_archivo: str) -> int:
+    """Inserta un `Email`+`DocumentoRecibido` real via `documento_repo.py` (mismo camino que #5) y
+    devuelve el `DocumentoRecibidoId` — `fact.Procesamiento.DocumentoRecibidoId` es NOT NULL con FK
+    real, asi que las pruebas de este item necesitan una fila padre real, nunca un id inventado."""
+    m = MensajeGmail(
+        gmail_message_id=gmail_message_id,
+        remitente="proveedor@example.com",
+        asunto="Factura de agosto",
+        fecha_recepcion=datetime(2026, 8, 17, 9, 15, 0, tzinfo=UTC),
+        adjuntos=(),
+    )
+    a = AdjuntoGmail(
+        nombre=nombre_archivo,
+        extension=nombre_archivo.rsplit(".", 1)[-1],
+        mime_type="application/xml" if nombre_archivo.endswith(".xml") else "application/pdf",
+        attachment_id="ANGjdJ_abc123",
+        tamano_bytes=100,
+    )
+    email_id = insertar_email(cursor, m, datetime.now(UTC))
+    assert email_id is not None
+    hash_contenido = gmail_message_id.ljust(64, "0")[:64]
+    insertar_documento(cursor, email_id, m, a, hash_contenido, f"2026/08/{nombre_archivo}")
+
+    fila = cursor.execute(
+        "SELECT DocumentoRecibidoId FROM fact.DocumentoRecibido WHERE HashContenido = ?",
+        hash_contenido,
+    ).fetchone()
+    return fila[0]
+
+
+def _datos_extraidos_minimos(*, afectacion_mixta: bool | None) -> DatosExtraidos:
+    return DatosExtraidos(
+        tipo_comprobante="01",
+        numero="F001-123",
+        ruc_proveedor="20123456789",
+        nombre_proveedor="Proveedor SAC",
+        monto=Decimal("118.00"),
+        moneda="PEN",
+        fecha_emision=date(2026, 8, 15),
+        campos_no_extraidos=None,
+        afectacion_mixta=afectacion_mixta,
+    )
+
+
+def test_procesamiento_datosextraidos_y_afectacionmixta_reales(worker_db):
+    """`usr_worker` real inserta `fact.Procesamiento` + `fact.DatosExtraidos` (con
+    `AfectacionMixta`, migracion 014) — 008 ya otorga SELECT/INSERT/UPDATE sobre ambas."""
+    instante = datetime.now(UTC)
+    with pyodbc.connect(worker_db["worker_connection_string"]) as conexion:
+        cursor = conexion.cursor()
+        documento_id = _email_y_documento_reales(cursor, "18d2f0a1b2c3aaaa", "factura.xml")
+        procesamiento_id = upsert_procesamiento(
+            cursor, documento_id, "COMPLETADO", instante, instante
+        )
+        insertar_datos_extraidos(
+            cursor, procesamiento_id, _datos_extraidos_minimos(afectacion_mixta=True)
+        )
+        conexion.commit()
+
+    with pyodbc.connect(worker_db["worker_connection_string"]) as conexion:
+        fila = conexion.cursor().execute(
+            "SELECT AfectacionMixta FROM fact.DatosExtraidos WHERE ProcesamientoId = ?",
+            procesamiento_id,
+        ).fetchone()
+
+    assert fila is not None
+    assert fila[0] == 1
+
+
+def test_asociar_documentos_real_escribe_fk_en_ambos_lados(worker_db):
+    """`asociar_documentos` escribe DOS `UPDATE` -- design.md Decision 6: el FK vive en AMBOS
+    `Procesamiento.DocumentoAsociadoId` en la misma transaccion."""
+    instante = datetime.now(UTC)
+    with pyodbc.connect(worker_db["worker_connection_string"]) as conexion:
+        cursor = conexion.cursor()
+        documento_xml = _email_y_documento_reales(cursor, "18d2f0a1b2c3bbbb", "par_a.xml")
+        documento_pdf = _email_y_documento_reales(cursor, "18d2f0a1b2c3cccc", "par_a.pdf")
+        procesamiento_xml = upsert_procesamiento(
+            cursor, documento_xml, "COMPLETADO", instante, instante
+        )
+        procesamiento_pdf = upsert_procesamiento(
+            cursor, documento_pdf, "COMPLETADO", instante, instante
+        )
+        insertar_datos_extraidos(
+            cursor, procesamiento_xml, _datos_extraidos_minimos(afectacion_mixta=False)
+        )
+        insertar_datos_extraidos(
+            cursor, procesamiento_pdf, _datos_extraidos_minimos(afectacion_mixta=None)
+        )
+        asociar_documentos(
+            cursor, procesamiento_xml, documento_pdf, procesamiento_pdf, documento_xml
+        )
+        conexion.commit()
+
+    with pyodbc.connect(worker_db["worker_connection_string"]) as conexion:
+        filas = conexion.cursor().execute(
+            "SELECT DocumentoRecibidoId, DocumentoAsociadoId FROM fact.Procesamiento "
+            "WHERE ProcesamientoId IN (?, ?)",
+            procesamiento_xml,
+            procesamiento_pdf,
+        ).fetchall()
+
+    asociado_por_documento = {fila[0]: fila[1] for fila in filas}
+    assert asociado_por_documento[documento_xml] == documento_pdf
+    assert asociado_por_documento[documento_pdf] == documento_xml
+
+
+def test_ck_procesamiento_no_autoasociacion_rechaza_autoasociacion(worker_db):
+    """`CK_Procesamiento_NoAutoAsociacion` (014): un `Procesamiento` no puede apuntar su
+    `DocumentoAsociadoId` a su propio `DocumentoRecibidoId` — invariante del motor, no de la
+    disciplina del worker."""
+    instante = datetime.now(UTC)
+    with pyodbc.connect(worker_db["worker_connection_string"]) as conexion:
+        cursor = conexion.cursor()
+        documento_id = _email_y_documento_reales(cursor, "18d2f0a1b2c3dddd", "auto.xml")
+        procesamiento_id = upsert_procesamiento(
+            cursor, documento_id, "COMPLETADO", instante, instante
+        )
+        conexion.commit()
+
+    with pytest.raises(pyodbc.Error):
+        with pyodbc.connect(worker_db["worker_connection_string"]) as conexion:
+            conexion.cursor().execute(
+                "UPDATE fact.Procesamiento SET DocumentoAsociadoId = ? WHERE ProcesamientoId = ?",
+                documento_id,
+                procesamiento_id,
+            )
+            conexion.commit()
+
+
+def test_usr_worker_no_puede_insertar_en_facturaextraccion(worker_db):
+    """Negativa (ADR 0003, spec.md Non-Goals): `fact.FacturaExtraccion` es propiedad de .NET —
+    `usr_worker` no tiene ningun GRANT sobre ella, el INSERT falla por DENY, nunca por FK."""
+    with pytest.raises(pyodbc.Error):
+        with pyodbc.connect(worker_db["worker_connection_string"]) as conexion:
+            conexion.cursor().execute(
+                "INSERT INTO fact.FacturaExtraccion "
+                "(FacturaId, CampoNombre, ValorExtraido, Fuente) "
+                "VALUES (1, 'ruc', '20123456789', 'XML')"
             )
             conexion.commit()

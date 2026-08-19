@@ -12,9 +12,12 @@
 # GRANT/DENY matrix, and it is why the fast job is not enough on its own.
 #
 # `pruebas-de-worker-python` raises its OWN SQL Server container and runs the worker's real
-# `pytest -m integracion` suite, which needs a server-scoped `CREATE LOGIN usr_worker` -- that
-# would mutate the container shared by the job above, so it gets a disposable one of its own
+# `pytest -m "integracion or ocr"` suite, which needs a server-scoped `CREATE LOGIN usr_worker` --
+# that would mutate the container shared by the job above, so it gets a disposable one of its own
 # (design.md Decision 7). `-m externa` (live scraping against sbs.gob.pe) is never run in CI.
+# `ocr` (BACKLOG #6) is unlike `externa`: Tesseract is a deterministic local binary pinned by apt,
+# not a third-party service, so it DOES run here -- `apt-get install tesseract-ocr
+# tesseract-ocr-spa` below.
 
 name: CI
 
@@ -95,14 +98,15 @@ jobs:
         with:
           python-version: '3.13'
 
-      # Unit tests only (marker exclusion) -- no database, no HTTP. `-m externa` (real scraping
-      # against sbs.gob.pe) is never selected here: a red build from SBS downtime carries no
-      # information about our change (design.md Decision 7 / Testing Strategy).
+      # Unit tests only (marker exclusion) -- no database, no HTTP, no Tesseract. `-m externa`
+      # (real scraping against sbs.gob.pe) is never selected here: a red build from SBS downtime
+      # carries no information about our change (design.md Decision 7 / Testing Strategy). `-m ocr`
+      # (BACKLOG #6) belongs to pruebas-de-worker-python, the job that installs Tesseract.
       - name: Worker Python -- pruebas unitarias (sin base de datos)
         working-directory: ${{ env.WORKER_DIR }}
         run: |
           pip install -e .[dev]
-          pytest -m "not integracion and not externa"
+          pytest -m "not integracion and not externa and not ocr"
 
   pruebas-de-base-de-datos:
     name: Suite completa contra SQL Server
@@ -223,6 +227,11 @@ jobs:
           sudo apt-get update
           sudo ACCEPT_EULA=Y apt-get install -y mssql-tools18 unixodbc-dev
 
+      # BACKLOG #6, design.md Decision 3/7: Tesseract es un binario de sistema que pip no puede
+      # instalar. 'spa' es el paquete de idioma que pdf_lectura.py fija (config.OCR_IDIOMA).
+      - name: Instalar Tesseract OCR (marker ocr)
+        run: sudo apt-get install -y tesseract-ocr tesseract-ocr-spa
+
       - uses: actions/setup-python@v5
         with:
           python-version: '3.13'
@@ -234,11 +243,13 @@ jobs:
       # tests/integration/conftest.py provisiona su propia base efimera `fact_test_worker_<id>`,
       # aplica el esquema versionado real via `dotnet run --project SmartNet.Db.Runner` (nunca una
       # reimplementacion en Python -- ADR 0016) y crea un LOGIN efimero real `usr_worker` contra
-      # ESTE contenedor, ejerciendo los GRANT reales de 008_usuarios_y_permisos.sql. `-m externa`
-      # nunca se selecciona aqui (scraping real contra sbs.gob.pe queda fuera de CI).
-      - name: Worker Python -- pruebas de integracion (marker integracion)
+      # ESTE contenedor, ejerciendo los GRANT reales de 008_usuarios_y_permisos.sql. `ocr`
+      # (BACKLOG #6) corre contra el Tesseract real recien instalado -- ver tests/integration/
+      # test_ocr_real.py. `-m externa` nunca se selecciona aqui (scraping real contra sbs.gob.pe
+      # queda fuera de CI).
+      - name: Worker Python -- pruebas de integracion y OCR (markers integracion, ocr)
         working-directory: ${{ env.WORKER_DIR }}
-        run: pytest -m integracion
+        run: pytest -m "integracion or ocr"
 
       - name: Confirmar cero bases y logins efimeros huerfanos
         if: always()

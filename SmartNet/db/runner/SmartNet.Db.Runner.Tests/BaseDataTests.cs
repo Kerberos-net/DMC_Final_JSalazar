@@ -73,6 +73,10 @@ public sealed class BaseDataTests
     [InlineData("INTEGRACIONES", "INTERVALO_ESPERADO_SHEETS")]
     [InlineData("INTEGRACIONES", "INTERVALO_ESPERADO_SBS")]
     [InlineData("CONTABILIDAD", "FECHA_CORTE_CONTABLE")]
+    // BACKLOG #6 (migration 014): EMPRESA.RUC is NULL-seeded like every other undecided key --
+    // used to exclude the company's own RUC when a PDF-only document shows two RUCs and no XML is
+    // present to disambiguate (design.md, Open Question 1).
+    [InlineData("EMPRESA", "RUC")]
     public async Task Configuracion_PendienteKeys_HaveValorAndValorPorDefectoBothNull(string seccion, string clave)
     {
         await using var db = await MigratedDatabaseWithBaseData();
