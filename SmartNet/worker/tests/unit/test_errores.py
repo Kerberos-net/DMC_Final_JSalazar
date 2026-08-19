@@ -4,18 +4,19 @@ ADR 0010: PERMANENTE nunca reintenta; TRANSITORIO reintenta hasta 3 veces con es
 "la clasificacion debe errar hacia transitorio ante la duda" -- toda excepcion no reconocida cae en
 TRANSITORIO, nunca en PERMANENTE.
 
-WU1 solo trae `ubl.py` (XML) -- `pdf_lectura.PdfIlegibleError`/`pypdf.errors.PdfReadError` (PDF)
-llegan en WU2 y se agregan a `clasificar` ahi, sin tocar esta suite (design.md, Decision 8's tabla
-lista ambas familias; `errores.py` esta escrito para aceptar la segunda sin romper la primera --
-ver `_TIPOS_PERMANENTES`)."""
+WU2 agrega `pdf_lectura.PdfIlegibleError`/`pypdf.errors.PdfReadError` (familia PDF) a
+`_TIPOS_PERMANENTES`, sin tocar `clasificar` ni las pruebas de la familia XML de arriba
+(design.md, Decision 8's tabla lista ambas familias)."""
 
 from datetime import UTC, datetime, timedelta
 
 import pyodbc
 import pytest
 from lxml.etree import XMLSyntaxError
+from pypdf.errors import PdfReadError
 
 from smartnet_worker.errores import Clasificacion, clasificar, proximo_reintento
+from smartnet_worker.pdf_lectura import PdfIlegibleError
 from smartnet_worker.ubl import UblInvalidoError
 
 
@@ -34,6 +35,8 @@ def _xml_syntax_error() -> XMLSyntaxError:
     [
         _xml_syntax_error(),
         UblInvalidoError("raiz no reconocida"),
+        PdfIlegibleError("PDF corrupto o cifrado"),
+        PdfReadError("no se pudo leer el PDF"),
     ],
 )
 def test_errores_de_documento_son_permanentes(excepcion):

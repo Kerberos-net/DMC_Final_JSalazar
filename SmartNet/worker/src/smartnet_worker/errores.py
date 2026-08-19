@@ -10,9 +10,9 @@ CUALQUIER excepcion no reconocida, porque "la clasificacion debe errar hacia tra
 duda" (ADR 0010). `DIFERIBLE` no tiene productor en este item -- nada aqui llama una API con cuota;
 queda deliberadamente sin usar, no olvidado.
 
-`_TIPOS_PERMANENTES` es una tupla abierta a proposito: WU1 solo trae el lado XML (`XMLSyntaxError`,
-`UblInvalidoError`); WU2 agrega aqui las excepciones del lado PDF (`PdfIlegibleError` de
-`pdf_lectura.py`, `pypdf.errors.PdfReadError`) sin tocar `clasificar` ni esta suite."""
+`_TIPOS_PERMANENTES` cubre ambas familias de documento (design.md, Decision 8's tabla): el lado XML
+(`XMLSyntaxError`, `UblInvalidoError`, WU1) y el lado PDF (`PdfIlegibleError` de `pdf_lectura.py`,
+`pypdf.errors.PdfReadError`, WU2)."""
 
 from __future__ import annotations
 
@@ -20,7 +20,9 @@ from datetime import datetime, timedelta
 from enum import StrEnum
 
 from lxml.etree import XMLSyntaxError
+from pypdf.errors import PdfReadError
 
+from smartnet_worker.pdf_lectura import PdfIlegibleError
 from smartnet_worker.ubl import UblInvalidoError
 
 _TOPE_INTENTOS_BACKOFF = 3
@@ -34,9 +36,13 @@ class Clasificacion(StrEnum):
 
 
 # Excepciones de documento: nunca se resuelven reintentando (ADR 0010: "Adjunto corrupto, protegido
-# con contrasena o en formato no soportado; XML invalido"). Ver docstring del modulo para por que
-# esta tupla queda abierta para WU2.
-_TIPOS_PERMANENTES: tuple[type[BaseException], ...] = (XMLSyntaxError, UblInvalidoError)
+# con contrasena o en formato no soportado; XML invalido").
+_TIPOS_PERMANENTES: tuple[type[BaseException], ...] = (
+    XMLSyntaxError,
+    UblInvalidoError,
+    PdfIlegibleError,
+    PdfReadError,
+)
 
 
 def clasificar(error: BaseException) -> Clasificacion:

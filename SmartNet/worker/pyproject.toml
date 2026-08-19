@@ -11,9 +11,16 @@ dependencies = [
     "google-api-python-client>=2.140",
     "google-auth>=2.34",
     # BACKLOG #6, WU1: parser XML/UBL endurecido (design.md, Decision 1). Adelantado desde el WU4
-    # original de la lista de tareas porque ubl.py (WU1) lo necesita para importar; pypdf/
-    # pypdfium2/pytesseract/Pillow siguen en WU4, que es donde el resto del stage PDF/OCR aterriza.
+    # original de la lista de tareas porque ubl.py (WU1) lo necesita para importar.
     "lxml>=5.3",
+    # BACKLOG #6, WU2: extraccion de texto/OCR local de PDF (design.md, Decision 3). Adelantado
+    # desde el WU4 original de la lista de tareas por el mismo motivo que lxml en WU1 --
+    # pdf_lectura.py necesita importarlos ahora. Tesseract en si es un binario de sistema, no un
+    # paquete Python (README.md, "Prerequisitos de sistema").
+    "pypdf>=5.1",
+    "pypdfium2>=4.30",
+    "pytesseract>=0.3.13",
+    "Pillow>=11",
 ]
 
 [project.optional-dependencies]

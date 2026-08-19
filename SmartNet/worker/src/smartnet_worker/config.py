@@ -40,6 +40,21 @@ SBS_TIPO_CAMBIO_URL = "https://www.sbs.gob.pe/app/pp/SISTIP_PORTAL/Paginas/Publi
 # Threat Matrix — "red + credenciales").
 HTTP_TIMEOUT_SECONDS = 10
 
+# Ruta opcional al binario Tesseract (BACKLOG #6, design.md Decision 7). A diferencia de la cadena
+# de conexion, las credenciales de Gmail y la raiz de almacenamiento, su AUSENCIA es legitima: en
+# Linux/CI el binario ya esta en el PATH tras `apt-get install tesseract-ocr`; en Windows no
+# (instala en `C:\Program Files\Tesseract-OCR\tesseract.exe`, fuera del PATH por defecto), y ahi es
+# donde un operador fija esta variable. No carga ningun secreto ni tiene un "default peligroso".
+TESSERACT_CMD_ENV_VAR = "SMARTNET_WORKER_TESSERACT_CMD"
+
+# REGLAS/ADR 0017: OCR local, castellano — 'spa' es el paquete de idioma de Tesseract instalado en
+# CI (`tesseract-ocr-spa`) y documentado como prerequisito en README.md.
+OCR_IDIOMA = "spa"
+
+# 300 DPI (design.md, Decision 3): balance entre precision de reconocimiento y tiempo de proceso
+# para un documento SUNAT tipico; escala = OCR_DPI / 72 (72 DPI es la unidad nativa de PDF).
+OCR_DPI = 300
+
 
 class ConfiguracionError(Exception):
     """La configuracion requerida del worker (variables de entorno) no esta presente."""
@@ -83,3 +98,11 @@ def obtener_raiz_almacenamiento() -> str:
             f"La variable de entorno {STORAGE_ROOT_ENV_VAR} no esta definida."
         )
     return valor
+
+
+def obtener_tesseract_cmd() -> str | None:
+    """Lee la ruta opcional al binario Tesseract. A diferencia de `obtener_connection_string`/
+    `obtener_credenciales_gmail_json`/`obtener_raiz_almacenamiento`, su ausencia es legal y NO
+    lanza -- significa 'esperar `tesseract` en el PATH' (design.md, Decision 7)."""
+    valor = os.environ.get(TESSERACT_CMD_ENV_VAR)
+    return valor or None
