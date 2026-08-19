@@ -14,7 +14,7 @@ ODBC_CONNECTION_ENV_VAR = "SMARTNET_WORKER_ODBC_CONNECTION"
 
 # URL publica, no un secreto: sin este valor el CLI no sabria que pagina scrapear. La cadena de
 # conexion (la parte con credenciales) nunca vive aqui.
-SBS_TIPO_CAMBIO_URL = "https://www.sbs.gob.pe/app/pp/EstadisticasSAEEPortal/Paginas/TipoCambioPromedio.aspx"
+SBS_TIPO_CAMBIO_URL = "https://www.sbs.gob.pe/app/pp/SISTIP_PORTAL/Paginas/Publicacion/TipoCambioPromedio.aspx"
 
 # Explicito para que un cuelgue de la SBS no deje el proceso vivo indefinidamente (design.md,
 # Threat Matrix — "red + credenciales").

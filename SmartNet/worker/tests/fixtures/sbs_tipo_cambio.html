@@ -1,33 +1,40 @@
 <!--
-  FIXTURE SINTETICO — no es una copia de la pagina real de sbs.gob.pe.
-  Ver tests/fixtures/README.md para el porque y las limitaciones conocidas.
+  FIXTURE REAL — subarbol capturado con un navegador real (Claude in Chrome) contra
+  https://www.sbs.gob.pe/app/pp/SISTIP_PORTAL/Paginas/Publicacion/TipoCambioPromedio.aspx
+  el 18/08/2026. Ver tests/fixtures/README.md para el detalle de la captura y por que un
+  `curl`/WebFetch sin motor JS no puede obtener este markup (WAF Incapsula).
+
+  Envoltorio <html><body> minimo agregado a proposito para mantener el fixture legible; el
+  contenido de la tabla y el span de fecha son el markup real, sin editar.
 -->
 <!DOCTYPE html>
 <html lang="es">
 <head>
   <meta charset="utf-8">
-  <title>Tipo de Cambio Contable - SBS</title>
+  <title>Tipo de Cambio Promedio - SBS</title>
 </head>
 <body>
-  <div id="contenido">
-    <h1>Tipo de Cambio Contable</h1>
-    <span id="lblFechaConsulta">Consulta generada el 17/08/2026 09:15:00</span>
-    <table id="tblTipoCambio" class="table table-striped">
-      <thead>
-        <tr>
-          <th>Fecha</th>
-          <th>Compra</th>
-          <th>Venta</th>
-        </tr>
-      </thead>
-      <tbody>
-        <tr>
-          <td>17/08/2026</td>
-          <td>3.798000</td>
-          <td>3.802000</td>
-        </tr>
-      </tbody>
-    </table>
-  </div>
+  <span id="ctl00_cphContent_lblFecha">Tipo de Cambio al 18/08/2026</span>
+  <table class="rgMasterTable" id="ctl00_cphContent_rgTipoCambio_ctl00">
+    <thead>
+      <tr>
+        <th class="rgHeader APLI_fila1">MONEDA</th>
+        <th class="rgHeader APLI_fila1">COMPRA (S/)</th>
+        <th class="rgHeader APLI_fila1">VENTA (S/)</th>
+      </tr>
+    </thead>
+    <tbody>
+      <tr class="rgRow" id="ctl00_cphContent_rgTipoCambio_ctl00__0">
+        <td class="APLI_fila3">Dólar de N.A.</td>
+        <td class="APLI_fila2">3.356</td>
+        <td class="APLI_fila2">3.362</td>
+      </tr>
+      <tr class="rgAltRow" id="ctl00_cphContent_rgTipoCambio_ctl00__1">
+        <td class="APLI_fila3">Dólar Canadiense</td>
+        <td class="APLI_fila2">2.240</td>
+        <td class="APLI_fila2">2.615</td>
+      </tr>
+    </tbody>
+  </table>
 </body>
 </html>

@@ -6,12 +6,23 @@ el HTML ya descargado (por `cli_tipo_cambio.py`, el unico punto de IO) y devuelv
 probarlo con una pagina guardada, sin red (design.md, Testing Strategy).
 
 Nota sobre el fixture de pruebas (ver tests/fixtures/README.md): la pagina real de la SBS esta
-detras de un WAF (Incapsula) que bloquea peticiones automatizadas sin navegador, asi que el HTML
-real no pudo obtenerse en este entorno. El fixture usado en las pruebas es SINTETICO — una
-estructura plausible con un `<table id="tblTipoCambio">` de tres columnas (Fecha, Compra, Venta) y
-un elemento con el id de fecha de consulta — no una copia literal de la pagina de producción. Si
-la pagina real usa otro `id`/estructura, este parser debera ajustarse contra un fixture real
-capturado a mano (documentado, nunca adivinado en silencio).
+detras de un WAF (Incapsula) que bloquea peticiones automatizadas sin motor JS (`curl`/WebFetch),
+pero un navegador real (Claude in Chrome) la renderiza sin problema. El fixture usado en las
+pruebas es una captura REAL del subarbol de la tabla (Telerik RadGrid `rgMasterTable`) y del span
+de fecha, tomada el 18/08/2026 contra
+`https://www.sbs.gob.pe/app/pp/SISTIP_PORTAL/Paginas/Publicacion/TipoCambioPromedio.aspx`.
+
+Decision de diseno — `fecha` sin columna propia: la tabla real solo tiene tres columnas (MONEDA,
+COMPRA, VENTA); no existe una columna "Fecha" por fila como asumia el fixture sintetico anterior.
+La unica fecha que publica la pagina es la del span `#ctl00_cphContent_lblFecha`
+("Tipo de Cambio al dd/mm/aaaa"), asi que `fecha` (la fecha a la que aplica el tipo de cambio) se
+deriva de ese mismo texto, igual que `fecha_consulta`.
+
+Decision de diseno — `fecha_consulta` sin hora: ese span tampoco publica una hora (a diferencia de
+lo que asumia el fixture sintetico, "dd/mm/aaaa hh:mm:ss"). `TipoCambioSbs.fecha_consulta` sigue
+siendo `datetime` porque `fact.TipoCambio.FechaConsulta` es `DATETIME2(3) NOT NULL` (no admite
+NULL ni un tipo `date`) — se usa medianoche (00:00:00) del dia publicado como convencion explicita,
+nunca la hora del reloj del proceso (la funcion sigue siendo pura).
 """
 
 from __future__ import annotations
@@ -23,16 +34,16 @@ from decimal import Decimal, InvalidOperation
 
 from bs4 import BeautifulSoup
 
-_TABLA_ID = "tblTipoCambio"
-_CONSULTA_ID = "lblFechaConsulta"
+_TABLA_ID = "ctl00_cphContent_rgTipoCambio_ctl00"
+_CONSULTA_ID = "ctl00_cphContent_lblFecha"
+_MONEDA_USD_TEXTO = "Dólar de N.A."
 
-_FECHA_RE = re.compile(r"(\d{2})/(\d{2})/(\d{4})")
-_FECHA_CONSULTA_RE = re.compile(r"(\d{2})/(\d{2})/(\d{4})\s+(\d{2}):(\d{2}):(\d{2})")
+_FECHA_CONSULTA_RE = re.compile(r"(\d{2})/(\d{2})/(\d{4})")
 
 
 class ParseoSbsError(Exception):
-    """La pagina de la SBS no tiene la estructura esperada (tabla ausente, fila ausente, valor
-    no numerico, fecha con formato invalido)."""
+    """La pagina de la SBS no tiene la estructura esperada (tabla ausente, fila de USD ausente,
+    valor no numerico, fecha con formato invalido)."""
 
 
 @dataclass(frozen=True)
@@ -44,11 +55,11 @@ class TipoCambioSbs:
 
 
 def parse_tipo_cambio(html: str) -> TipoCambioSbs:
-    """Extrae la fila de tipo de cambio vigente de la pagina de la SBS.
+    """Extrae la fila de tipo de cambio del dolar (USD) de la pagina de la SBS.
 
-    Puro: ni red, ni DB, ni `datetime.now()`. `fecha_consulta` viene del propio HTML (la pagina
-    muestra cuando se genero la consulta), nunca del reloj del proceso — de lo contrario esta
-    funcion dejaria de ser pura y las pruebas dejarian de ser deterministas.
+    Puro: ni red, ni DB, ni `datetime.now()`. `fecha`/`fecha_consulta` vienen del propio HTML (la
+    pagina muestra la fecha a la que aplica la consulta), nunca del reloj del proceso — de lo
+    contrario esta funcion dejaria de ser pura y las pruebas dejarian de ser deterministas.
     """
     soup = BeautifulSoup(html, "html.parser")
 
@@ -56,14 +67,13 @@ def parse_tipo_cambio(html: str) -> TipoCambioSbs:
     if tabla is None:
         raise ParseoSbsError(f"No se encontro la tabla '#{_TABLA_ID}' en el HTML de la SBS.")
 
-    fila_datos = _buscar_fila_de_datos(tabla)
-    if fila_datos is None:
+    fila_usd = _buscar_fila_usd(tabla)
+    if fila_usd is None:
         raise ParseoSbsError(
-            f"No se encontro una fila de datos (Fecha, Compra, Venta) dentro de '#{_TABLA_ID}'."
+            f"No se encontro una fila de '{_MONEDA_USD_TEXTO}' dentro de '#{_TABLA_ID}'."
         )
 
-    texto_fecha, texto_compra, texto_venta = fila_datos
-    fecha = _parsear_fecha(texto_fecha)
+    texto_compra, texto_venta = fila_usd
     compra = _parsear_decimal(texto_compra, etiqueta="Compra")
     venta = _parsear_decimal(texto_venta, etiqueta="Venta")
 
@@ -73,40 +83,35 @@ def parse_tipo_cambio(html: str) -> TipoCambioSbs:
             f"No se encontro el elemento '#{_CONSULTA_ID}' con la fecha de consulta."
         )
 
-    fecha_consulta = _parsear_fecha_consulta(elemento_consulta.get_text(strip=True))
+    fecha = _parsear_fecha(elemento_consulta.get_text(strip=True))
+    fecha_consulta = datetime(fecha.year, fecha.month, fecha.day)
 
     return TipoCambioSbs(fecha=fecha, compra=compra, venta=venta, fecha_consulta=fecha_consulta)
 
 
-def _buscar_fila_de_datos(tabla) -> tuple[str, str, str] | None:
+def _buscar_fila_usd(tabla) -> tuple[str, str] | None:
+    """Recorre las filas de `<tbody>` buscando la que corresponde al dolar (USD): la primera cuyo
+    primer `<td>` (columna MONEDA) es exactamente "Dólar de N.A.". Preferido sobre depender del
+    indice de fila (`__0`) porque no se rompe si la SBS reordena las filas."""
     for fila in tabla.find_all("tr"):
         celdas = fila.find_all("td")
-        if len(celdas) == 3:
-            return tuple(celda.get_text(strip=True) for celda in celdas)  # type: ignore[return-value]
+        if len(celdas) != 3:
+            continue
+        moneda, compra, venta = celdas
+        if moneda.get_text(strip=True) == _MONEDA_USD_TEXTO:
+            return compra.get_text(strip=True), venta.get_text(strip=True)
     return None
 
 
 def _parsear_fecha(texto: str) -> date:
-    coincidencia = _FECHA_RE.search(texto)
-    if coincidencia is None:
-        raise ParseoSbsError(f"Fecha con formato inesperado: '{texto}' (se esperaba dd/mm/aaaa).")
-    dia, mes, anio = (int(grupo) for grupo in coincidencia.groups())
-    try:
-        return date(anio, mes, dia)
-    except ValueError as error:
-        raise ParseoSbsError(f"Fecha invalida: '{texto}'.") from error
-
-
-def _parsear_fecha_consulta(texto: str) -> datetime:
     coincidencia = _FECHA_CONSULTA_RE.search(texto)
     if coincidencia is None:
         raise ParseoSbsError(
-            f"Fecha de consulta con formato inesperado: '{texto}' "
-            "(se esperaba dd/mm/aaaa hh:mm:ss)."
+            f"Fecha de consulta con formato inesperado: '{texto}' (se esperaba dd/mm/aaaa)."
         )
-    dia, mes, anio, hora, minuto, segundo = (int(grupo) for grupo in coincidencia.groups())
+    dia, mes, anio = (int(grupo) for grupo in coincidencia.groups())
     try:
-        return datetime(anio, mes, dia, hora, minuto, segundo)
+        return date(anio, mes, dia)
     except ValueError as error:
         raise ParseoSbsError(f"Fecha de consulta invalida: '{texto}'.") from error
 

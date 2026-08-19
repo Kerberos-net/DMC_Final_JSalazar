@@ -83,12 +83,16 @@ pytest -m externa
 
 ## Limitaciones conocidas de esta implementacion
 
-- **Fixture de la SBS sintetico, no real**: la pagina real de `sbs.gob.pe` esta detras de un WAF
-  (Incapsula) que bloqueó la peticion automatizada usada durante la implementacion (devolvio solo
-  un script de challenge, sin la tabla de datos). El fixture `tests/fixtures/sbs_tipo_cambio.html`
-  es una estructura plausible construida a mano, documentada en
-  `tests/fixtures/README.md` — no una copia de la pagina real. Si la estructura real difiere,
-  `sbs.py` debera ajustarse contra un fixture capturado a mano.
+- **Fixture de la SBS ahora real** (actualizado 18/08/2026): la pagina real de `sbs.gob.pe` sigue
+  detras de un WAF (Incapsula) que bloquea `curl`/WebFetch sin motor JS, pero un navegador real
+  (Claude in Chrome) la renderiza sin problema. `tests/fixtures/sbs_tipo_cambio.html` es ahora una
+  captura literal del subarbol real (tabla Telerik RadGrid + span de fecha) — ver
+  `tests/fixtures/README.md` para el detalle. `sbs.py` fue ajustado contra esa estructura real: la
+  URL correcta es `SISTIP_PORTAL/Paginas/Publicacion/TipoCambioPromedio.aspx` (la
+  `EstadisticasSAEEPortal/...` original era incorrecta), y la pagina no tiene columna de fecha por
+  fila ni hora de consulta — ambas se derivan del span `#ctl00_cphContent_lblFecha`
+  ("Tipo de Cambio al dd/mm/aaaa"), usando medianoche como convencion explicita para
+  `fecha_consulta` (`DATETIME2(3) NOT NULL` en el esquema).
 - **Entorno de implementacion sin interprete de Python al empezar**: este Work Unit empezo en un
   entorno donde solo existia el stub de Microsoft Store para `python`/`py` (sin instalacion real,
   sin `pip`, sin `pytest`, sin `ruff`). Se instalo Python 3.13.15 con `winget install
