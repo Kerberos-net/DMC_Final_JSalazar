@@ -11,9 +11,9 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | **6 de 17 cerrados** |
-| Ciclo SDD activo | Ninguno — último cerrado: ítem #6 |
-| Última fase cerrada | Ítem #6, WU4 (Fase 4 — `cli_procesamiento.py`, integración, suite completa, README), 53/53 tareas del ítem cerradas — ítem #6 cerrado 2026-08-19 |
+| Ítems del backlog | **7 de 17 cerrados** |
+| Ciclo SDD activo | Ninguno — último cerrado: ítem #7 |
+| Última fase cerrada | Ítem #7 (Inbox y promoción), 6 unidades de trabajo (WU1 productor Python, WU2 SmartNet.Inbox.Core, WU3 SmartNet.Inbox.Infrastructure, WU4 API wiring + tests de contrato, WU5 workspace Angular + pantalla Inbox, WU6 corrección ADR 0005), 49/49 tareas cerradas, verify-report PASS con 2 advertencias no bloqueantes (specs desactualizadas ya corregidas, y 3 tests flaky preexistentes del ítem #6 no relacionados) — ítem #7 cerrado 2026-08-19 |
 
 ---
 
@@ -22,7 +22,7 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 SQL versionado, esquema `fact`, tablas, índices, restricciones y los `GRANT` de los dos usuarios
 de base de datos. Sin dependencias.
 
-**Ciclo SDD:** `openspec/changes/esquema-y-permisos/` · **36 de 36 tareas cerradas**
+**Ciclo SDD:** `openspec/changes/archive/2026-08-16-esquema-y-permisos/` · **36 de 36 tareas cerradas**
 
 | Fase | Unidad | Alcance | Tareas | Estado |
 |---|---|---|---|---|
@@ -155,7 +155,7 @@ Host mínimo de API, cookie `__Host-session` con `SameSite=Lax`, tabla `fact.Ses
 sesión revocable en servidor, bloqueo por intentos sobre las columnas ya existentes, y el comando de
 restablecimiento de ADR 0007. Depende del ítem #1 (completo).
 
-**Ciclo SDD:** `openspec/changes/autenticacion-y-sesion/` · **88 de 88 tareas cerradas**
+**Ciclo SDD:** `openspec/changes/archive/2026-08-16-autenticacion-y-sesion/` · **88 de 88 tareas cerradas**
 
 | Fase | Unidad | Alcance | Tareas | Estado |
 |---|---|---|---|---|
@@ -311,7 +311,7 @@ repositorios de lectura/escritura sobre los 3 satélites propios `fact.*`, más 
 `ResolverCandidatas` (REGLAS.md §3). Sin DDL nuevo: el esquema y los `GRANT` ya existen (ítem #1).
 Depende del ítem #1 (completo).
 
-**Ciclo SDD:** `openspec/changes/catalogos-y-satelites/` · **47 de 47 tareas cerradas** — **✅ CERRADO 2026-08-17**
+**Ciclo SDD:** `openspec/changes/archive/2026-08-17-catalogos-y-satelites/` · **47 de 47 tareas cerradas** — **✅ CERRADO 2026-08-17**
 
 | Fase | Unidad | Alcance | Tareas | Estado |
 |---|---|---|---|---|
@@ -456,7 +456,7 @@ Python que puebla las filas `Origen='SBS'` (ADR 0003: solo Python escribe filas 
 nuevo: la tabla y sus `GRANT` `fact_api`/`fact_worker` ya existen (ítem #1). Depende del ítem #1
 (completo).
 
-**Ciclo SDD:** `openspec/changes/tipos-de-cambio/` · **47 de 47 tareas cerradas** — **✅ CERRADO 2026-08-17**
+**Ciclo SDD:** `openspec/changes/archive/2026-08-17-tipos-de-cambio/` · **47 de 47 tareas cerradas** — **✅ CERRADO 2026-08-17**
 
 | Fase | Unidad | Alcance | Tareas | Estado |
 |---|---|---|---|---|
@@ -579,7 +579,7 @@ Python worker extension que sondea un buzón de Gmail etiquetado, descarga adjun
 XML), y los persiste como filas `fact.Email` + `fact.DocumentoRecibido` (`Estado='DESCARGADO'`).
 Single-run, sin daemon ni scheduler (eso es despliegue). Depende del ítem #1 (completo).
 
-**Ciclo SDD:** `openspec/changes/ingesta-gmail/` · **36 de 36 tareas cerradas** — ✅ **CERRADO 2026-08-18**
+**Ciclo SDD:** `openspec/changes/archive/2026-08-18-ingesta-gmail/` · **36 de 36 tareas cerradas** — ✅ **CERRADO 2026-08-18**
 
 | Fase | Unidad | Alcance | Tareas | Estado |
 |---|---|---|---|---|
@@ -710,7 +710,7 @@ Procesamiento de documentos: parseo XML como fuente autorizada, extracción de t
 locales (Tesseract en máquina), asociación XML↔PDF mediante clave de 4 componentes (RUC, tipo, 
 serie, número), cálculo de `AfectacionMixta`. Depende del ítem #5 (completo).
 
-**Ciclo SDD:** `openspec/changes/extraccion-y-asociacion/` · **53 de 53 tareas cerradas** — ✅ **CERRADO 2026-08-19**
+**Ciclo SDD:** `openspec/changes/archive/2026-08-19-extraccion-y-asociacion/` · **53 de 53 tareas cerradas** — ✅ **CERRADO 2026-08-19**
 
 | Fase | Unidad | Alcance | Tareas | Estado |
 |---|---|---|---|---|
@@ -850,14 +850,93 @@ Cero huérfanos: `sqlcmd` contra `fact_test_%` = (0 rows affected).
 
 ---
 
-## ⬜ Ítems 7 a 17 — sin ciclo SDD abierto
+## ✅ 7. Inbox y promoción
+
+Consumo del inbox con resultado persistido, decisión de promover, `FacturaExtraccion`, e
+indicadores de la factura. Depende de los ítems #6 y #3 (completos).
+
+**Ciclo SDD:** `openspec/changes/archive/2026-08-19-inbox-y-promocion/` · **49 de 49 tareas cerradas** — ✅ **CERRADO 2026-08-19**
+
+| Fase | Unidad | Alcance | Estado |
+|---|---|---|---|
+| 1 | 1 | Productor de eventos de inbox en Python (worker) | ✅ |
+| 2 | 2 | `SmartNet.Inbox.Core` — dominio puro (ADR 0019) | ✅ |
+| 3 | 3 | `SmartNet.Inbox.Infrastructure` — adaptadores SQL | ✅ |
+| 4 | 4 | API wiring + tests de contrato Python↔.NET | ✅ |
+| 5 | 5 | Workspace Angular bootstrap + pantalla Inbox | ✅ |
+| 6 | 6 | Corrección de ADR 0005 | ✅ |
+
+### Pruebas
+
+Seis unidades de trabajo, cada una con su propio resultado de pruebas real, verificado por el
+orquestador en lugar de aceptado del reporte del agente.
+
+| Unidad | Alcance | Pruebas | Líneas cambiadas |
+|---|---|---|---|
+| WU1 | Productor de eventos de inbox, Python (worker) | 176 unitarias + 13 de integración (SQL Server real) | 782 (excepción de tamaño aceptada) |
+| WU2 | `SmartNet.Inbox.Core` — núcleo puro | 29/29, incluye `PurityScanTests` (ADR 0019) | 794 (excepción) |
+| WU3 | `SmartNet.Inbox.Infrastructure` | 28/28 contra SQL Server real | 1307 (excepción) |
+| WU4 | API wiring + tests de contrato | 426 .NET + 177 Python, contrato Python↔.NET verificado con fixture JSON dorado compartido | 426 (excepción, apenas sobre presupuesto) |
+| WU5 | Workspace Angular bootstrap + pantalla Inbox | 18/18, build de producción OK | ~741 de autoría real (excepción) |
+| WU6 | Corrección de ADR 0005 | doc-only | 18 (dentro de presupuesto) |
+
+### Lo verificado al cerrar cada fase
+
+**WU1 (productor Python)** — 176 pruebas unitarias + 13 de integración contra SQL Server real, en
+verde. 782 líneas cambiadas, excepción de presupuesto de revisión aceptada explícitamente por el
+usuario.
+
+**WU2 (`SmartNet.Inbox.Core`)** — 29/29 pruebas en verde, incluida `PurityScanTests`: núcleo puro
+sin dependencia de base de datos, HTTP ni reloj (ADR 0019). 794 líneas, excepción de presupuesto.
+
+**WU3 (`SmartNet.Inbox.Infrastructure`)** — 28/28 pruebas en verde contra SQL Server real. 1307
+líneas, excepción de presupuesto. Incluyó un parche para que `PromocionBackgroundService` dependa
+de `IPromocionRepository` (abstracción) en vez de la clase concreta.
+
+**WU4 (API wiring + tests de contrato)** — 426 pruebas .NET + 177 Python en verde. El contrato
+Python↔.NET se verificó con una fixture JSON dorada compartida entre ambos lados. 426 líneas,
+excepción de presupuesto, apenas por encima de las 400 líneas.
+
+**WU5 (workspace Angular + pantalla Inbox)** — 18/18 pruebas en verde, build de producción sin
+errores. Signals sin librería de estado, patrón container/presentational. ~741 líneas de autoría
+real, excepción de presupuesto.
+
+**WU6 (corrección de ADR 0005)** — cambio doc-only, 18 líneas, dentro de presupuesto. Corrigió el
+ADR: **un solo** `Tipo` (`PROCESAMIENTO_FINALIZADO`) en vez de varios, y **5** indicadores en vez
+de 6 (`EsReferenciaExterna` queda con su valor por defecto de DDL, no calculado en esta fase).
+
+**Decisiones de diseño resueltas antes del apply:**
+
+- **D4** — sin campo `confianza` en `evidencia[]`. No hay ningún componente que lo calcule; incluirlo
+  hubiera sido inventar el dato (ADR 0017).
+- **D5** — 5 de los 6 indicadores se calculan al promover. `EsReferenciaExterna` queda con su
+  default de DDL: notas de crédito es el ítem #10, y `DatosExtraidos` no tiene columnas de
+  referencia todavía.
+
+**Estrategia de entrega:** 6 PRs encadenados (`stacked-to-main`), cada WU excedió el presupuesto de
+revisión de 400 líneas salvo WU4 (justo en el límite) y WU6 (dentro de presupuesto) — todas
+aceptadas como excepción explícita del usuario.
+
+**Verify:** PASS con 2 advertencias no bloqueantes, ambas resueltas antes de archivar: specs
+desactualizadas corregidas en un commit posterior, y 3 fallos flaky confirmados preexistentes del
+ítem #6, no relacionados con el ítem #7.
+
+Cero huérfanos confirmado al cierre.
+
+### Elementos conocidos, no ocultos
+
+- **6 ramas locales pusheadas a origin, sin PRs abiertos todavía.** El usuario decidió no abrirlos
+  en esta sesión: `feat/inbox-y-promocion-wu1-python-producer` .. `wu6-adr-fix`.
+
+---
+
+## ⬜ Ítems 8 a 17 — sin ciclo SDD abierto
 
 Las fases de cada ítem **se definen cuando arranca su ciclo SDD**, no antes. Ponerlas aquí ahora
 sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ítem, y ninguno existe.
 
 | # | Ítem | Depende de | Contexto obligatorio | Estado |
 |---|---|---|---|---|
-| 7 | Inbox y promoción | #6, #3 | — | ⬜ |
 | 8 | Núcleo contable | #3 | ⚠ `REGLAS.md` §5–§10 | ⬜ |
 | 9 | Sugerencia de cuenta | #8 | ⚠ `REGLAS.md` §3 | ⬜ |
 | 10 | Notas de crédito | #8 | ⚠ `REGLAS.md` §5, §7 | ⬜ |
