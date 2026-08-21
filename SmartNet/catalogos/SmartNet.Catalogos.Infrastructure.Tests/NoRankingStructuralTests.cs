@@ -36,4 +36,29 @@ public sealed class NoRankingStructuralTests
         Assert.Contains(members, m => m.Name == nameof(ISugerenciaCuentaRepository.ListarPorProveedorAsync));
         Assert.Contains(members, m => m.Name == nameof(ISugerenciaCuentaRepository.RegistrarUsoAsync));
     }
+
+    /// <summary>
+    /// tasks.md (item #9, Phase 6.3): extends this guard — never weakens it (the assertion above
+    /// stays byte-for-byte) — to the whole <c>SmartNet.Catalogos.Core.dll</c> assembly, not just
+    /// <see cref="ISugerenciaCuentaRepository"/>'s members. design.md Decision 1: item #9's cascade
+    /// lives in a separate <c>SmartNet.Sugerencia.Core</c> assembly precisely so this boundary can
+    /// be checked structurally — if a ranking-shaped type ever lands back in Catalogos.Core, this
+    /// fails even though the narrower interface-only check above would not catch it.
+    /// </summary>
+    [Fact]
+    public void CatalogosCore_DeclaresNoType_ThatIsRankingOrSelectionShaped()
+    {
+        var catalogosCoreAssembly = typeof(ISugerenciaCuentaRepository).Assembly;
+
+        var suspects = catalogosCoreAssembly.GetTypes()
+            .Where(t => t.IsPublic && RankingShapedName.IsMatch(t.Name))
+            .Select(t => t.Name)
+            .ToList();
+
+        Assert.True(
+            suspects.Count == 0,
+            "SmartNet.Catalogos.Core.dll declares ranking/selection-shaped public type(s) — that " +
+            "logic belongs to SmartNet.Sugerencia.Core (item #9, design.md Decision 1): " +
+            string.Join(", ", suspects));
+    }
 }
