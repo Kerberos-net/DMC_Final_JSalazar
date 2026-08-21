@@ -11,9 +11,9 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | **8 de 17 cerrados** |
-| Ciclo SDD activo | Ninguno — último cerrado: ítem #8 |
-| Última fase cerrada | Ítem #8 (Núcleo contable), 2 unidades de trabajo + 1 seguimiento post-verify, 48/48 tareas cerradas, verify-report PASS WITH WARNINGS (WARNING pineado con 2 tests de regresión, degradado a informativo), 41/41 tests, build limpio — ítem #8 cerrado 2026-08-19, commiteado 2026-08-20, rebaseado sobre `main` con el ítem #7 ya mergeado |
+| Ítems del backlog | **9 de 17 cerrados** |
+| Ciclo SDD activo | Ninguno — último cerrado: ítem #9 |
+| Última fase cerrada | Ítem #9 (Sugerencia de cuenta), 2 PRs apilados, 32/32 tareas cerradas, verify-report PASS WITH WARNINGS (ambos WARNING corregidos antes de archivar), 27/27 + 2/2 tests, build limpio — ítem #9 cerrado 2026-08-20 |
 
 ---
 
@@ -988,14 +988,80 @@ pendiente como *follow-up* de los ítems #3/#11, fuera de alcance de #8.
 
 ---
 
-## ⬜ Ítems 9 a 17 — sin ciclo SDD abierto
+## ✅ 9. Sugerencia de cuenta
+
+Cascada de ranking determinista de cuenta y motivo por frecuencia de uso, con filtrado contra
+candidatas vigentes y texto de fundamento, orquestada para invocación desde el flujo de registro
+de asientos. Depende del ítem #8 (completo).
+
+**Entrega:** 2 PRs apilados (`stacked-to-main`), sin PR abierto todavía — `feat/item-9-sugerencia-cuenta-pr1`
+(rebasado sobre `main` con #7/#8 ya mergeados) y `feat/item-9-sugerencia-cuenta-pr2` (sobre PR1).
+
+**Ciclo SDD:** `openspec/changes/archive/2026-08-20-item-9-sugerencia-de-cuenta/` · **32 de 32 tareas cerradas** — ✅ **CERRADO 2026-08-20**
+
+| Fase | Unidad | Alcance | Tareas | Estado |
+|---|---|---|---|---|
+| 1 | 1 (PR1) | Scaffolding: `SmartNet.Sugerencia.Core`/`.Tests`, `.sln`, 4 record types de resultado | 4/4 | ✅ |
+| 2 | 1 (PR1) | `CascadaDeSugerencia.SugerirCuenta` — 3 escalones, desempate, filtro de vigencia | 18/18 | ✅ |
+| 3 | 1 (PR1) | `CascadaDeSugerencia.SugerirMotivo` — 2 escalones (proveedor), desempate | 4/4 | ✅ |
+| 4 | 1 (PR1) | Fundamento + rationale (`Veces`, `VecesDelAmbito`) | 3/3 | ✅ |
+| 5 | 2 (PR2) | `ServicioDeSugerencia` orquestador (4 puertos, `SugerirParaFacturaAsync`) | 9/9 | ✅ |
+| 6 | 2 (PR2) | Guardas estructurales: `PurityScanTests` + extensión de `NoRankingStructuralTests` | 3/3 | ✅ |
+| 7 | 2 (PR2) | Verificación e2e: 7 requisitos / 12 escenarios → tests | 2/2 | ✅ |
+
+**Decisiones de diseño previas al apply:**
+
+- No existe siembra histórica: la compañía no tiene sistema contable externo previo. Se corrigió
+  ADR 0011 a revisión 4, eliminando la sección "Carga inicial desde el histórico" (decisión del
+  dueño del proyecto durante la exploración).
+- Desempate en escalones 1–2 de la cascada: `Veces` DESC → `UltimoUso` DESC → `CuentaCodigo` ASC.
+- Alcance incluye orquestación (a diferencia del ítem #8, que es puro): `ServicioDeSugerencia`
+  llama al repositorio existente (ítem #3) y a `ResolverCandidatas`.
+- `VecesDelAmbito` de `SugerirMotivo` = total `Veces` del proveedor entre todos los motivos
+  ofrecibles (confirmado con el dueño tras hueco detectado tarde por el validador de PR1).
+
+### Pruebas
+
+Dos proyectos nuevos: `SmartNet.Sugerencia.Core` (puro, sin `.Infrastructure`) y
+`SmartNet.Sugerencia.Core.Tests`.
+
+| Suite | Pruebas | Qué cubre |
+|---|---|---|
+| `CascadaDeSugerenciaTests.cs` | 15 | Cascada 3 escalones, desempate, filtro de vigencia, sugerencia de motivo |
+| `ServicioDeSugerenciaTests.cs` | 5 | Orquestador, `motivoSeleccionado` null/provisto, `RegistrarUsoAsync` nunca invocado (spy, 0 llamadas) |
+| `PurityScanTests.cs` | 7 | NetArchTest (sin SqlClient/AspNetCore/Http) + escaneo IL (sin `DateTime.Now`/`UtcNow`) |
+| `NoRankingStructuralTests.cs` (extendido) | 2 | `Catalogos.Core.dll` sigue sin tipos de ranking (aserción original intacta + nueva) |
+| **Total del ítem #9** | **27** | Confirmado por `dotnet test` corrido por el orquestador |
+
+**27/27 + 2/2 verificadas de forma independiente** (2026-08-20), build `SmartNet.sln` limpio.
+
+### Lo verificado al cerrar
+
+**PR1 (fases 1–4)** — 15/15 pruebas en verde, validadas por un revisor de contrato en contexto
+fresco: cascada de 3 escalones y desempate coinciden exactamente con ADR 0011 rev. 4, filtrado
+obligatorio contra `ResolverCandidatas`, proveedor nuevo cae a escalón 2/3 según disponibilidad.
+
+**PR2 (fases 5–7)** — 27/27 pruebas en verde, validadas de forma independiente dos veces (al
+cerrar PR2 y al verificar este SPRINT.md). `ServicioDeSugerencia.SugerirParaFacturaAsync` combina
+cuenta + motivo + fundamento en un único resultado; nunca llama `RegistrarUsoAsync` (responsabilidad
+del ítem #11). Purity scan real vía Mono.Cecil, no un test débil. `NoRankingStructuralTests`
+extendido sin debilitar la aserción original de item #3.
+
+**Verify:** PASS WITH WARNINGS, 0 CRITICAL. Los 2 WARNING (conteo de escenarios, nota de rama
+obsoleta en `apply-progress.md`) fueron corregidos antes de archivar, no quedaron pendientes.
+
+Cero cambios de esquema SQL. Único ADR tocado: 0011 (revisión 3→4), hecho en la fase de
+exploración, no en apply.
+
+---
+
+## ⬜ Ítems 10 a 17 — sin ciclo SDD abierto
 
 Las fases de cada ítem **se definen cuando arranca su ciclo SDD**, no antes. Ponerlas aquí ahora
 sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ítem, y ninguno existe.
 
 | # | Ítem | Depende de | Contexto obligatorio | Estado |
 |---|---|---|---|---|
-| 9 | Sugerencia de cuenta | #8 | ⚠ `REGLAS.md` §3 | ⬜ |
 | 10 | Notas de crédito | #8 | ⚠ `REGLAS.md` §5, §7 | ⬜ |
 | 11 | API de facturas y asientos | #7, #8 | — | ⬜ |
 | 12 | Detalle y validación | #11 | — | ⬜ |
