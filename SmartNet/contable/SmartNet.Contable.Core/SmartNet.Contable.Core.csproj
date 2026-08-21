@@ -1,0 +1,20 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- ADR 0019 / design.md "SmartNet.Contable.Core: net10.0, zero PackageReference". No
+       Microsoft.Data.SqlClient, no Microsoft.AspNetCore.*, no System.Net.Http, no ambient clock.
+       The purity scan in SmartNet.Contable.Core.Tests enforces this in CI, not just this comment.
+       ProjectReference to two other pure Core projects keeps the purity scan green transitively
+       (design.md Decision 1). -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\catalogos\SmartNet.Catalogos.Core\SmartNet.Catalogos.Core.csproj" />
+    <ProjectReference Include="..\..\tipos-de-cambio\SmartNet.TiposCambio.Core\SmartNet.TiposCambio.Core.csproj" />
+  </ItemGroup>
+
+</Project>

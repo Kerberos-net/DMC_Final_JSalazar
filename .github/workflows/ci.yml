@@ -44,6 +44,7 @@ env:
   TESTS_CATALOGOS_CORE: SmartNet/catalogos/SmartNet.Catalogos.Core.Tests
   TESTS_TIPOS_CAMBIO_CORE: SmartNet/tipos-de-cambio/SmartNet.TiposCambio.Core.Tests
   TESTS_INBOX_CORE: SmartNet/inbox/SmartNet.Inbox.Core.Tests
+  TESTS_CONTABLE_CORE: SmartNet/contable/SmartNet.Contable.Core.Tests
   # pruebas-de-base-de-datos: every project whose tests use TestDatabaseFixture (throwaway
   # `fact_test_<guid>` databases) or WebApplicationFactory against a real SQL Server.
   TESTS_AUTH_INFRA: SmartNet/auth/SmartNet.Auth.Infrastructure.Tests
@@ -107,6 +108,14 @@ jobs:
       - name: Nucleo de dominio de inbox y promocion (sin infraestructura)
         run: >
           dotnet test ${{ env.TESTS_INBOX_CORE }}
+          --configuration Release --no-build --logger "console;verbosity=normal"
+
+      # Pure domain logic (composicion de asiento PRINCIPAL/DESTINO, invariantes de confirmacion
+      # §7). No DB, no HTTP, no wall clock -- PurityScanTests enforces this at build time, same as
+      # the suites above. BACKLOG #8.
+      - name: Nucleo de dominio contable (sin infraestructura)
+        run: >
+          dotnet test ${{ env.TESTS_CONTABLE_CORE }}
           --configuration Release --no-build --logger "console;verbosity=normal"
 
       - uses: actions/setup-python@v5

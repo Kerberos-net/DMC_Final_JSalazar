@@ -11,9 +11,9 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | **7 de 17 cerrados** |
-| Ciclo SDD activo | Ninguno — último cerrado: ítem #7 |
-| Última fase cerrada | Ítem #7 (Inbox y promoción), 6 unidades de trabajo (WU1 productor Python, WU2 SmartNet.Inbox.Core, WU3 SmartNet.Inbox.Infrastructure, WU4 API wiring + tests de contrato, WU5 workspace Angular + pantalla Inbox, WU6 corrección ADR 0005), 49/49 tareas cerradas, verify-report PASS con 2 advertencias no bloqueantes (specs desactualizadas ya corregidas, y 3 tests flaky preexistentes del ítem #6 no relacionados) — ítem #7 cerrado 2026-08-19 |
+| Ítems del backlog | **8 de 17 cerrados** |
+| Ciclo SDD activo | Ninguno — último cerrado: ítem #8 |
+| Última fase cerrada | Ítem #8 (Núcleo contable), 2 unidades de trabajo + 1 seguimiento post-verify, 48/48 tareas cerradas, verify-report PASS WITH WARNINGS (WARNING pineado con 2 tests de regresión, degradado a informativo), 41/41 tests, build limpio — ítem #8 cerrado 2026-08-19, commiteado 2026-08-20, rebaseado sobre `main` con el ítem #7 ya mergeado |
 
 ---
 
@@ -930,14 +930,71 @@ Cero huérfanos confirmado al cierre.
 
 ---
 
-## ⬜ Ítems 8 a 17 — sin ciclo SDD abierto
+## ✅ 8. Núcleo contable
+
+Generación del asiento contable puro (bloques `PRINCIPAL` y `DESTINO`), invariantes de
+confirmación §7, y conversión de moneda ancla/derivada. Sin base de datos ni HTTP (ADR 0019).
+Depende del ítem #3 (completo).
+
+**Ciclo SDD:** `openspec/changes/archive/2026-08-19-nucleo-contable/` · **48 de 48 tareas cerradas** — ✅ **CERRADO 2026-08-19**
+
+| Fase | Unidad | Alcance | Tareas | Estado |
+|---|---|---|---|---|
+| 1 | 1 | Scaffolding: `SmartNet.Contable.Core`/`.Tests`, `PurityScanTests` copiado (RED hasta fase 2) | 4/4 | ✅ |
+| 2 | 1 | Tipos de entrada/salida: `LineaAsiento`, `AsientoContable`, `TipoCambioCongelado`, `CargoSolicitado`, `HerenciaNotaCredito`, `EntradaAsiento` | 7/7 | ✅ |
+| 3 | 1 | `Componer` — PRINCIPAL (4 casos) + DESTINO + conversión §6, TDD estricto sobre los 7 goldens §10 | 19/19 | ✅ |
+| 4 | 2 | `InvariantesDeConfirmacion.Evaluar` — 7 invariantes §7 (5 globales + PRINCIPAL + DESTINO), jerarquía cerrada `ResultadoConfirmacion` | 13/13 | ✅ |
+| 5 | 2 | Wiring: `ci.yml`, `PurityScanTests` en verde contra el ensamblado completo, suite completa | 4/4 | ✅ |
+| 6 | — | Seguimiento post-verify: 2 tests de regresión que pinean el discriminador Boleta+Gravada (WARNING del verify-report) | 1/1 | ✅ |
+
+**Nota de reconciliación**: `tasks.md` y el verify-report archivados declaran "49/49" — el conteo
+real de checkboxes en el archivo es **48**, verificado con `grep`. No afecta el veredicto (todas
+las tareas listadas están cerradas); queda anotado para no propagar el número incorrecto.
+
+### Pruebas
+
+Un solo proyecto nuevo, `SmartNet.Contable.Core.Tests`, dominio puro sin `PackageReference` de
+infraestructura (`ProjectReference` únicamente a `SmartNet.Catalogos.Core` y
+`SmartNet.TiposCambio.Core`).
+
+| Suite | Fase que la creó | Pruebas | Qué cubre |
+|---|---|---|---|
+| `ComponerGoldenTests.cs` | 3 (+1 en fase 6) | 12 | Los 7 casos golden de REGLAS.md §10, 4 casos estructurales de PRINCIPAL, DESTINO automático + invertido en NC, regresión Boleta+Gravada |
+| `InvariantesDeConfirmacionTests.cs` | 4 (+1 en fase 6) | 16 | 5 invariantes globales (accept+reject), invariante PRINCIPAL, invariante DESTINO, multi-fallo, regresión Boleta+Gravada |
+| `PurityScanTests.cs` | 1 | 13 | NetArchTest + escaneo IL de `DateTime.Now`/`UtcNow`, cero `PackageReference` de infraestructura |
+| **Total del ítem #8** | | **41** | Confirmado por `dotnet test` corrido por el orquestador |
+
+**41/41 verificadas de forma independiente** (2026-08-20), build `SmartNet.sln` limpio.
+
+### Lo verificado al cerrar
+
+**Fases 1–3** — 30/30 pruebas en verde. Los 7 goldens de REGLAS.md §10 pasan con los importes
+exactos del documento normativo. `ConversionDeMoneda` ancla `totalPEN`/`igvPEN` y deriva
+`basePEN` (§10.3: TC 3.712000, totalPEN 4471.61, igvPEN 682.11, basePEN 3789.50). La NC en
+dólares hereda el TC de su factura vía `HerenciaNotaCredito` (§10.7: saldo del proveedor en 0.00
+usando el TC original 3.712000, no el vigente 3.715000).
+
+**Fases 4–5** — 13/13 pruebas en verde. `Evaluar` devuelve **todas** las invariantes incumplidas,
+no la primera. `ResultadoConfirmacion` es jerarquía cerrada (constructor `private protected`),
+nunca excepción para un rechazo de dominio.
+
+**Fase 6 (seguimiento post-verify)** — el verify-report original señaló que `Componer` y
+`EvaluarPrincipal` discriminan la rama PRINCIPAL-gravada usando solo
+`AfectacionCongelada == Gravada`, sin verificar `TipoComprobante == Boleta`. Se agregaron dos
+tests de regresión que **pinean** (no arreglan) el comportamiento actual, para que CI detecte
+automáticamente el día que esa suposición se rompa. No se tocó lógica de negocio. El WARNING
+queda degradado a informativo. La guardia real (rechazar Boleta+Gravada como estado ilegal) sigue
+pendiente como *follow-up* de los ítems #3/#11, fuera de alcance de #8.
+
+---
+
+## ⬜ Ítems 9 a 17 — sin ciclo SDD abierto
 
 Las fases de cada ítem **se definen cuando arranca su ciclo SDD**, no antes. Ponerlas aquí ahora
 sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ítem, y ninguno existe.
 
 | # | Ítem | Depende de | Contexto obligatorio | Estado |
 |---|---|---|---|---|
-| 8 | Núcleo contable | #3 | ⚠ `REGLAS.md` §5–§10 | ⬜ |
 | 9 | Sugerencia de cuenta | #8 | ⚠ `REGLAS.md` §3 | ⬜ |
 | 10 | Notas de crédito | #8 | ⚠ `REGLAS.md` §5, §7 | ⬜ |
 | 11 | API de facturas y asientos | #7, #8 | — | ⬜ |
