@@ -1,0 +1,18 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- ADR 0019 / design.md "SmartNet.Sugerencia.Core: net10.0, zero PackageReference". No
+       Microsoft.Data.SqlClient, no Microsoft.AspNetCore.*, no System.Net.Http, no ambient clock.
+       The purity scan in SmartNet.Sugerencia.Core.Tests enforces this in CI, not just this
+       comment (added in PR 2 / tasks.md Phase 6). -->
+
+  <ItemGroup>
+    <ProjectReference Include="..\..\catalogos\SmartNet.Catalogos.Core\SmartNet.Catalogos.Core.csproj" />
+  </ItemGroup>
+
+</Project>

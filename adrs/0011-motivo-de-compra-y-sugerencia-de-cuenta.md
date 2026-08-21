@@ -2,8 +2,14 @@
 
 ## Estado
 
-Aceptado. Revisión 3. Añade la carga inicial de `SugerenciaCuenta` desde el histórico de la compañía
-y fija el orden del tercer escalón de la cascada (revisión adversarial v2: A10, S4).
+Aceptado. Revisión 4. **Elimina la carga inicial desde histórico** (ítem #9, exploración
+2026-08-20): la compañía no tiene un sistema contable previo con datos aprovechables —
+`SugerenciaCuenta` arranca vacía y se llena únicamente vía `RegistrarUsoAsync` al confirmar
+asientos. Fija el desempate de los escalones 1 y 2 de la cascada (`UltimoUso` DESC, luego
+`CuentaCodigo`).
+
+La revisión 3 añadía la carga inicial de `SugerenciaCuenta` desde el histórico de la compañía
+y fijaba el orden del tercer escalón de la cascada (revisión adversarial v2: A10, S4).
 
 La revisión 2 se hizo tras recibir los datos maestros reales: 1650 cuentas, 90 motivos y 13 orígenes
 de libro.
@@ -101,37 +107,16 @@ El `ORDER BY` del tercer escalón no es un detalle: sin él, "la primera" es la 
 y eso cambia con un índice nuevo o un plan de ejecución distinto. La misma pantalla propondría
 cuentas distintas en dos días, lo que parece un error aunque no lo sea.
 
-### Carga inicial desde el histórico de la compañía
+**Desempate en los escalones 1 y 2.** Cuando dos o más cuentas empatan en `Veces`, gana la de
+`UltimoUso` más reciente; si también empata, se aplica el mismo criterio determinista del tercer
+escalón (`CuentaCodigo` ascendente). Sin esta regla la cascada dejaría de ser determinista en el
+caso de empate, contradiciendo el fundamento mostrado al asistente.
 
-`SugerenciaCuenta` **no arranca vacía**. Un proceso ejecutado una vez al desplegar cuenta
-`(proveedor, cuenta)` sobre los asientos históricos que el sistema contable mantiene en esta misma
-base (ADR 0003) y siembra la tabla:
-
-```sql
-INSERT INTO SugerenciaCuenta (ProveedorCodigo, CuentaCodigo, Veces)
-SELECT d.ProveedorCodigo, d.CuentaCodigo, COUNT(*)
-  FROM <asientos históricos del sistema contable> d
- WHERE d.Fecha >= @desde
- GROUP BY d.ProveedorCodigo, d.CuentaCodigo;
-```
-
-**No es migración de datos.** Es un `SELECT` sobre el histórico y un `INSERT` en una tabla propia: no
-mueve nada, no transforma nada y no toca el sistema contable.
-
-Sin la siembra, en el arranque **todas** las facturas caen al tercer escalón, que para un motivo con
-34 candidatas es prácticamente arbitrario — y el criterio de menos de 5 minutos por factura estaría
-en su peor momento justo cuando se forma la confianza del usuario en el sistema.
-
-No cambia el mecanismo ni pierde explicabilidad: el fundamento que se muestra sigue siendo un número,
-solo que ahora existe desde la primera factura.
-
-Tres condiciones del proceso:
-
-- La ventana `@desde` es una decisión. Doce meses es el punto de partida razonable, y hay que
-  **verificar que el plan de cuentas no cambió** en ese periodo.
-- Las cuentas históricas que **ya no existen** en el plan actual se excluyen, o la cascada sugeriría
-  una cuenta imposible.
-- El proceso es **idempotente**: ejecutarlo dos veces no duplica contadores.
+`SugerenciaCuenta` **arranca vacía**. La compañía no tiene un sistema contable previo del que
+extraer historial: no hay carga inicial. La tabla se llena únicamente con el uso real, vía
+`RegistrarUsoAsync` al confirmar cada asiento (ítem #11). Consecuencia aceptada: en el arranque,
+todas las facturas caen al segundo o tercer escalón de la cascada hasta que se acumule uso — no hay
+forma de evitarlo sin una fuente de histórico que no existe.
 
 ### La sugerencia nunca decide sola
 
@@ -163,12 +148,9 @@ con este proveedor"*— para que la decisión sea informada y no un autocompleta
   número, y se puede auditar y reproducir.
 - Una cuenta nueva bajo un prefijo ya declarado **aparece sola**, sin tocar nada.
 - **Costo:** la sugerencia **no generaliza a proveedores nuevos**. La primera factura de un proveedor
-  cae al segundo o tercer nivel de la cascada. Es el precio de que sea explicable. La siembra desde
-  el histórico lo mitiga para los proveedores que la compañía ya conoce, que son la mayoría; no para
-  los realmente nuevos.
-- **Costo de la siembra:** hereda la calidad del histórico. Si el histórico tiene criterios
-  inconsistentes, la sugerencia los reproduce. Es aceptable —el asistente corrige y el contador
-  vuelve a aprender— pero conviene saberlo antes de culpar al mecanismo.
+  cae al segundo o tercer nivel de la cascada. Es el precio de que sea explicable. Al no existir
+  carga inicial, esto también es cierto para proveedores que la compañía ya conocía antes de
+  arrancar el sistema: el aprendizaje empieza en cero para todos.
 - **Costo:** un motivo mal elegido produce un asiento **correcto en forma y equivocado en fondo**.
   El control de cuadre no lo detecta, porque cuadra igual. Solo lo detecta la revisión humana.
 - **Costo:** un prefijo corto ofrece muchas candidatas —hasta 34— y la sugerencia por frecuencia es

@@ -20,7 +20,7 @@ cinco premisas externas verificadas y ningún ADR queda condicionado.
 | 6 | **Extracción y asociación** | XML como fuente prioritaria, OCR del PDF, asociación por los cuatro componentes normalizados, `AfectacionMixta` | #5 | — |
 | 7 | **Inbox y promoción** | Consumo del inbox con resultado persistido, decisión de promover, `FacturaExtraccion`, indicadores de la factura | #6, #3 | — |
 | 8 | **Núcleo contable** | Generación del asiento, bloques `PRINCIPAL` y `DESTINO`, invariantes, conversión de moneda. **Sin base de datos ni HTTP** | #3 | ⚠ **`REGLAS.md` §5–§10** |
-| 9 | **Sugerencia de cuenta** | Cascada por frecuencia, siembra inicial desde el histórico, orden determinista del último escalón | #8 | ⚠ `REGLAS.md` §3 |
+| 9 | **Sugerencia de cuenta** | Cascada por frecuencia, desempate determinista, orden determinista del último escalón | #8 | ⚠ `REGLAS.md` §3 |
 | 10 | **Notas de crédito** | Referencia interna y externa, herencia de los cuatro atributos, reparto proporcional, tope acumulado | #8 | ⚠ `REGLAS.md` §5, §7 |
 | 11 | **API de facturas y asientos** | `PATCH` con `If-Match`, endpoints de comando, correlativo, `409`/`412`/`422`, `AuditoriaCorreccion` | #7, #8 | — |
 | 12 | **Detalle y validación** | Pantalla lado a lado, edición del asiento, guardar avance, validar, visor de documentos | #11 | — |
