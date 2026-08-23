@@ -29,14 +29,22 @@ endpoints (per item #2).
 - **When** `GET /api/documentos/{id}/contenido` is called
 - **Then** the response is `401 Unauthorized` and no bytes are returned
 
-### Requirement: Reads never write to Python-owned storage
+### Requirement: Content is served from the .NET-owned projection, never from Python-owned storage
 
-Per ADR 0003, this endpoint MUST read `DocumentoRecibido` content strictly
-read-only when the document originates from Python's ingesta pipeline; it
-MUST NOT write, update, or delete any Python-owned table or row.
+Per ADR 0003 §Privadas (invariant 3, symmetric with the Python-side rule),
+`fact.DocumentoRecibido` is Python-owned and `fact_api` has **no SELECT
+grant** on it (`008_usuarios_y_permisos.sql` DENY, unchanged). Reading it —
+not just writing it — is the violation. For a document that originated from
+Python's ingesta pipeline, this endpoint MUST resolve its metadata
+(`NombreArchivo`, `MimeType`, `RutaRelativa`) from `fact.DocumentoFactura`
+(the .NET-owned projection populated asynchronously at `InboxEvent`
+promoción — schema 016), never from `fact.DocumentoRecibido`. This endpoint
+MUST NOT issue any SELECT, INSERT, UPDATE, or DELETE against
+`fact.DocumentoRecibido` or any other Python-owned table.
 
-#### Scenario: Serving a DocumentoRecibido-origin file
-- **Given** the requested document is a `DocumentoRecibido` (ingesta-owned)
+#### Scenario: Serving a projected ingesta-origin file
+- **Given** the requested document is an ingesta-origin document already
+  promoted into `fact.DocumentoFactura`
 - **When** its content is served
-- **Then** only a read query executes against that table; no write statement
-  is issued
+- **Then** only a read query executes against `fact.DocumentoFactura`; no
+  statement of any kind is issued against `fact.DocumentoRecibido`

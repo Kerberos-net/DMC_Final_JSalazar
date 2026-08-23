@@ -76,12 +76,12 @@ Chain strategy: feature-branch-chain
 - [x] 5.6 RED→GREEN: delete-confirm cancel leaves state unchanged; 412 → reload discards local edits; 422/409 → edits kept, inline/banner errors shown
 - [x] 5.7 RED→GREEN (owner-added task, PR5): CREATE `SmartNet/spa/src/app/login/feature/login-page` — `/login` form (`NombreUsuario`/`Clave`), calls `POST /api/sesion` via `SessionService.iniciarSesion()`, on success navigates to `?returnUrl=` or `/bandeja`, on 401 shows the `ProblemaDetails.detail`; extended `SessionService`, `authGuard` (now carries `returnUrl`), and `httpErrorInterceptor` (exempts the login POST's own 401 from the global session-expiry handling) to support it
 
-## Phase 6: Documentation
+## Phase 6: Documentation — COMPLETE (2/2, PR6)
 
-- [ ] 6.1 Write ADR 0013 Revisión 3 — `fact.DocumentoFactura` is a .NET-owned projection, not a cross-partition read
-- [ ] 6.2 Amend `documentos-lista-unificada-api` / `documento-contenido-api` specs if residual language implies a forbidden SELECT
+- [x] 6.1 Write ADR 0013 Revisión 3 — `fact.DocumentoFactura` is a .NET-owned projection, not a cross-partition read
+- [x] 6.2 Amend `documentos-lista-unificada-api` / `documento-contenido-api` specs if residual language implies a forbidden SELECT
 
-## Phase 7: Verification
+## Phase 7: Verification — 1/2 (PR6; 7.2 explicitly deferred to the user, see below)
 
-- [ ] 7.1 Run full suite (.NET, Python, SPA) — PermissionMatrixTests + all threat-matrix RED tests green
-- [ ] 7.2 Manual/E2E smoke — guardar avance → validar → 412 reload flow
+- [x] 7.1 Run full suite (.NET, Python, SPA) — PermissionMatrixTests + all threat-matrix RED tests green
+- [ ] 7.2 Manual/E2E smoke — guardar avance → validar → 412 reload flow (cannot be executed by the apply agent — no browser available; explicit pending steps documented in apply-progress for the user to run)
