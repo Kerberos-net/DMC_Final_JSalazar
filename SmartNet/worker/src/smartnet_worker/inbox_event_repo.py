@@ -24,6 +24,7 @@ _TIPO_EVENTO = "PROCESAMIENTO_FINALIZADO"
 
 _LISTAR_NO_NOTIFICADOS = """
 SELECT p.ProcesamientoId, p.Estado, p.DocumentoRecibidoId, dr.TipoDocumento, p.DocumentoAsociadoId,
+       dr.NombreArchivo, dr.MimeType, dr.RutaRelativa, dr.TamanoBytes,
        de.TipoComprobante, de.Numero, de.RucProveedor, de.NombreProveedor, de.Monto, de.Moneda,
        de.FechaEmision, de.CamposNoExtraidos, de.AfectacionMixta
 FROM fact.Procesamiento p
@@ -50,6 +51,10 @@ class ProcesamientoNoNotificado:
     documento_recibido_id: int
     tipo_documento: str
     documento_asociado_id: int | None
+    nombre_archivo: str
+    mime_type: str
+    ruta_relativa: str
+    tamano_bytes: int
     tipo_comprobante: str | None
     numero: str | None
     ruc_proveedor: str | None
@@ -70,15 +75,19 @@ def listar_no_notificados(cursor) -> tuple[ProcesamientoNoNotificado, ...]:
             documento_recibido_id=fila[2],
             tipo_documento=fila[3],
             documento_asociado_id=fila[4],
-            tipo_comprobante=fila[5],
-            numero=fila[6],
-            ruc_proveedor=fila[7],
-            nombre_proveedor=fila[8],
-            monto=fila[9],
-            moneda=fila[10],
-            fecha_emision=fila[11],
-            campos_no_extraidos=fila[12],
-            afectacion_mixta=fila[13],
+            nombre_archivo=fila[5],
+            mime_type=fila[6],
+            ruta_relativa=fila[7],
+            tamano_bytes=fila[8],
+            tipo_comprobante=fila[9],
+            numero=fila[10],
+            ruc_proveedor=fila[11],
+            nombre_proveedor=fila[12],
+            monto=fila[13],
+            moneda=fila[14],
+            fecha_emision=fila[15],
+            campos_no_extraidos=fila[16],
+            afectacion_mixta=fila[17],
         )
         for fila in cursor.fetchall()
     )

@@ -38,6 +38,10 @@ def test_construir_payload_matches_the_golden_fixture_dotnet_also_reads():
             documento_recibido_id=8,
             tipo_documento="XML",
             documento_asociado_id=9,
+            nombre_archivo="factura.xml",
+            mime_type="application/xml",
+            ruta_relativa="2026/08/factura.xml",
+            tamano_bytes=2048,
             comprobante=comprobante,
         )
     )

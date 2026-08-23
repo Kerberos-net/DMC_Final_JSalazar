@@ -20,7 +20,9 @@ public sealed class PromocionBackgroundServiceTests : IAsyncLifetime
     private const string PayloadCompleto =
         """
         {"version": 1, "estadoProcesamiento": "COMPLETADO",
-         "documento": {"documentoRecibidoId": 1, "tipoDocumento": "XML", "documentoAsociadoId": 2},
+         "documento": {"documentoRecibidoId": 1, "tipoDocumento": "XML", "documentoAsociadoId": 2,
+                       "nombreArchivo": "factura.xml", "mimeType": "application/xml",
+                       "rutaRelativa": "2026/08/factura.xml", "tamanoBytes": 2048},
          "comprobante": {"tipoComprobante": "01", "numero": "F001-1", "rucProveedor": "20100000001",
                          "nombreProveedor": "Acme SAC", "monto": "100.00", "moneda": "PEN", "fechaEmision": "2026-08-09"},
          "evidencia": [{"campo": "total", "valor": "100.00", "fuente": "XML"}],
@@ -30,7 +32,9 @@ public sealed class PromocionBackgroundServiceTests : IAsyncLifetime
     private const string PayloadInsuficiente =
         """
         {"version": 1, "estadoProcesamiento": "COMPLETADO",
-         "documento": {"documentoRecibidoId": 3, "tipoDocumento": "PDF", "documentoAsociadoId": null},
+         "documento": {"documentoRecibidoId": 3, "tipoDocumento": "PDF", "documentoAsociadoId": null,
+                       "nombreArchivo": "factura.pdf", "mimeType": "application/pdf",
+                       "rutaRelativa": "2026/08/factura.pdf", "tamanoBytes": 4096},
          "comprobante": {"tipoComprobante": "01", "numero": null, "rucProveedor": null,
                          "nombreProveedor": null, "monto": null, "moneda": "PEN", "fechaEmision": "2026-08-09"},
          "evidencia": [], "afectacionMixta": null, "camposNoExtraidos": [], "advertenciasAsociacion": ["SIN_PAREJA"]}

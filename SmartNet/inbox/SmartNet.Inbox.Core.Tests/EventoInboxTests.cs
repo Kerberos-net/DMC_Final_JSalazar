@@ -49,6 +49,10 @@ public class EventoInboxTests
             DocumentoRecibidoId: 8,
             TipoDocumento: "XML",
             DocumentoAsociadoId: 9,
+            NombreArchivo: "factura.xml",
+            MimeType: "application/xml",
+            RutaRelativa: "2026/08/factura.xml",
+            TamanoBytes: 2048,
             Comprobante: comprobante,
             Evidencia: evidencia,
             AfectacionMixta: false,
@@ -58,6 +62,10 @@ public class EventoInboxTests
         Assert.Equal(1, evento.Version);
         Assert.Equal("COMPLETADO", evento.EstadoProcesamiento);
         Assert.Equal(8, evento.DocumentoRecibidoId);
+        Assert.Equal("factura.xml", evento.NombreArchivo);
+        Assert.Equal("application/xml", evento.MimeType);
+        Assert.Equal("2026/08/factura.xml", evento.RutaRelativa);
+        Assert.Equal(2048, evento.TamanoBytes);
         Assert.Same(comprobante, evento.Comprobante);
         Assert.Single(evento.Evidencia);
         Assert.False(evento.AfectacionMixta);
@@ -74,6 +82,10 @@ public class EventoInboxTests
             DocumentoRecibidoId: 8,
             TipoDocumento: "PDF",
             DocumentoAsociadoId: null,
+            NombreArchivo: "factura.pdf",
+            MimeType: "application/pdf",
+            RutaRelativa: "2026/08/factura.pdf",
+            TamanoBytes: 4096,
             Comprobante: null,
             Evidencia: Array.Empty<EvidenciaCampo>(),
             AfectacionMixta: null,

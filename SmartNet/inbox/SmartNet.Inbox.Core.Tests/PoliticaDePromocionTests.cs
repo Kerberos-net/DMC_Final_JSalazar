@@ -18,7 +18,8 @@ public class PoliticaDePromocionTests
         FechaEmision: new DateOnly(2026, 8, 10));
 
     private static EventoInbox EventoCon(ComprobanteExtraido? comprobante, string estado = "COMPLETADO") =>
-        new(1, estado, 8, "XML", 9, comprobante, Array.Empty<EvidenciaCampo>(), false,
+        new(1, estado, 8, "XML", 9, "factura.xml", "application/xml", "2026/08/factura.xml", 2048,
+            comprobante, Array.Empty<EvidenciaCampo>(), false,
             Array.Empty<string>(), Array.Empty<string>());
 
     [Fact]

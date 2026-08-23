@@ -34,6 +34,10 @@ def test_listar_no_notificados_filtra_por_not_exists_inboxevent():
             8,
             "XML",
             9,
+            "factura.xml",
+            "application/xml",
+            "2026/08/factura.xml",
+            2048,
             "01",
             "F001-123",
             "20100000001",
@@ -61,18 +65,28 @@ def test_listar_no_notificados_filtra_por_not_exists_inboxevent():
     assert fila.documento_recibido_id == 8
     assert fila.tipo_documento == "XML"
     assert fila.documento_asociado_id == 9
+    assert fila.nombre_archivo == "factura.xml"
+    assert fila.mime_type == "application/xml"
+    assert fila.ruta_relativa == "2026/08/factura.xml"
+    assert fila.tamano_bytes == 2048
     assert fila.tipo_comprobante == "01"
     assert fila.monto == Decimal("1180.00")
     assert fila.afectacion_mixta is False
 
 
 def test_listar_no_notificados_documento_error_sin_datosextraidos():
-    filas = [(11, "ERROR", 5, "PDF", None, None, None, None, None, None, None, None, None, None)]
+    filas = [
+        (
+            11, "ERROR", 5, "PDF", None, "factura.pdf", "application/pdf", "2026/08/factura.pdf",
+            4096, None, None, None, None, None, None, None, None, None,
+        )
+    ]
     cursor = _FakeCursor(filas=filas)
 
     resultado = listar_no_notificados(cursor)
 
     assert resultado[0].estado == "ERROR"
+    assert resultado[0].nombre_archivo == "factura.pdf"
     assert resultado[0].tipo_comprobante is None
     assert resultado[0].monto is None
 

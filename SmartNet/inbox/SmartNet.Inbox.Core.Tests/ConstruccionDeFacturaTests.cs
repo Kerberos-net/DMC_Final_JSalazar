@@ -8,7 +8,7 @@ namespace SmartNet.Inbox.Core.Tests;
 public class ConstruccionDeFacturaTests
 {
     private static readonly EventoInbox Evento = new(
-        1, "COMPLETADO", 8, "XML", 9,
+        1, "COMPLETADO", 8, "XML", 9, "factura.xml", "application/xml", "2026/08/factura.xml", 2048,
         new ComprobanteExtraido("01", "F001-123", "20100000001", "Acme SAC", 1180.00m, "PEN", new DateOnly(2026, 8, 10)),
         new[] { new EvidenciaCampo("total", "1180.00", "XML"), new EvidenciaCampo("moneda", "PEN", "XML") },
         false,
