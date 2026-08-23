@@ -84,4 +84,4 @@ Chain strategy: feature-branch-chain
 ## Phase 7: Verification — 1/2 (PR6; 7.2 explicitly deferred to the user, see below)
 
 - [x] 7.1 Run full suite (.NET, Python, SPA) — PermissionMatrixTests + all threat-matrix RED tests green
-- [ ] 7.2 Manual/E2E smoke — guardar avance → validar → 412 reload flow (cannot be executed by the apply agent — no browser available; explicit pending steps documented in apply-progress for the user to run)
+- [x] 7.2 Manual/E2E smoke — guardar avance → validar → 412 reload flow (verified by the user against a local dev environment: seeded factura via manual InboxEvent/Procesamiento/DocumentoRecibido/Email chain, login, bandeja listing, guardar avance, validar, and 412 concurrent-edit reload all confirmed working)
