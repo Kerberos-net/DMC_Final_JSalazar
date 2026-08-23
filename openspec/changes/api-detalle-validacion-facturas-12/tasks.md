@@ -38,10 +38,10 @@ Chain strategy: feature-branch-chain
 
 ## Phase 2: Promoción Persistence
 
-- [ ] 2.1 RED: `SqlPromocionRepository` test — promoción inserts one `fact.DocumentoFactura` row with mapped metadata
-- [ ] 2.2 GREEN: MODIFY `PayloadInboxParser.cs` + `SqlPromocionRepository.cs` — parse and persist projection row
-- [ ] 2.3 RED: test asserting promoción issues no SELECT against `fact.DocumentoRecibido` (ADR 0003 symmetry)
-- [ ] 2.4 REFACTOR: confirm no cross-partition read path; tidy repository mapping
+- [x] 2.1 RED: `SqlPromocionRepository` test — promoción inserts one `fact.DocumentoFactura` row with mapped metadata
+- [x] 2.2 GREEN: MODIFY `PayloadInboxParser.cs` + `SqlPromocionRepository.cs` — parse and persist projection row
+- [x] 2.3 RED: test asserting promoción issues no SELECT against `fact.DocumentoRecibido` (ADR 0003 symmetry)
+- [x] 2.4 REFACTOR: confirm no cross-partition read path; tidy repository mapping
 
 ## Phase 3: .NET Read Endpoints
 

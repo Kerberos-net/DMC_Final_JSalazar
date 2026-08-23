@@ -18,7 +18,8 @@ public sealed class SqlPromocionRepository : IPromocionRepository
     public SqlPromocionRepository(string connectionString) => _connectionString = connectionString;
 
     public async Task<ResultadoPromocion> PromoverAsync(
-        long inboxEventId, long procesamientoId, FacturaPromovida factura, CancellationToken ct)
+        long inboxEventId, long procesamientoId, FacturaPromovida factura, DocumentoPromovido documento,
+        CancellationToken ct)
     {
         await using var connection = new SqlConnection(_connectionString);
         await connection.OpenAsync(ct);
@@ -41,6 +42,17 @@ public sealed class SqlPromocionRepository : IPromocionRepository
                 // Resolve the row that already exists instead of ever inserting a second one.
                 facturaId = await ResolverFacturaIdExistenteAsync(connection, transaction, procesamientoId, ct);
                 yaExistia = true;
+            }
+
+            try
+            {
+                await InsertarDocumentoFacturaAsync(connection, transaction, facturaId, documento, ct);
+            }
+            catch (SqlException ex) when (ex.Number is 2601 or 2627)
+            {
+                // UQ_DocumentoFactura_DocumentoRecibidoId violation (schema 016) -- same anti-TOCTOU
+                // idempotency discipline as fact.Factura above: a re-processed InboxEvent for the
+                // same ingested document already projected this row, skip it.
             }
 
             await MarcarPromovidoAsync(connection, transaction, inboxEventId, facturaId, ct);
@@ -168,6 +180,30 @@ public sealed class SqlPromocionRepository : IPromocionRepository
             command.Parameters.AddWithValue("@fuente", extraccion.Fuente);
             await command.ExecuteNonQueryAsync(ct);
         }
+    }
+
+    /// <summary>BACKLOG #12 (design D1, schema 016) -- projects <paramref name="documento"/> (built
+    /// entirely from the InboxEvent payload, never a SELECT against fact.DocumentoRecibido) into
+    /// fact.DocumentoFactura, in the same transaction as the Factura row it references.</summary>
+    private static async Task InsertarDocumentoFacturaAsync(
+        SqlConnection connection, SqlTransaction transaction, long facturaId, DocumentoPromovido documento, CancellationToken ct)
+    {
+        await using var command = connection.CreateCommand();
+        command.Transaction = transaction;
+        command.CommandText =
+            """
+            INSERT INTO fact.DocumentoFactura
+                (FacturaId, DocumentoRecibidoId, NombreArchivo, MimeType, RutaRelativa, TamanoBytes)
+            VALUES
+                (@facturaId, @documentoRecibidoId, @nombreArchivo, @mimeType, @rutaRelativa, @tamanoBytes);
+            """;
+        command.Parameters.AddWithValue("@facturaId", facturaId);
+        command.Parameters.AddWithValue("@documentoRecibidoId", documento.DocumentoRecibidoId);
+        command.Parameters.AddWithValue("@nombreArchivo", documento.NombreArchivo);
+        command.Parameters.AddWithValue("@mimeType", documento.MimeType);
+        command.Parameters.AddWithValue("@rutaRelativa", documento.RutaRelativa);
+        command.Parameters.AddWithValue("@tamanoBytes", documento.TamanoBytes);
+        await command.ExecuteNonQueryAsync(ct);
     }
 
     private static async Task<long> ResolverFacturaIdExistenteAsync(

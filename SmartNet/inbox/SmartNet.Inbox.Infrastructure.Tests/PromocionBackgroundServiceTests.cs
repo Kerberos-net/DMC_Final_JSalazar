@@ -60,6 +60,13 @@ public sealed class PromocionBackgroundServiceTests : IAsyncLifetime
         var facturaCount = await _db.ExecuteScalarAsync<int>(
             $"SELECT COUNT(*) FROM fact.Factura WHERE ProcesamientoId = {procesamientoId} AND Estado = 'PENDIENTE_VALIDACION';");
         Assert.Equal(1, facturaCount);
+
+        // BACKLOG #12 task 2.2 -- end-to-end proof the wiring projects fact.DocumentoFactura too,
+        // not just the repository-level test (documentoRecibidoId comes from PayloadCompleto's own
+        // literal `documento` object, never a SELECT against fact.DocumentoRecibido).
+        var documentoCount = await _db.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM fact.DocumentoFactura WHERE DocumentoRecibidoId = 1 AND NombreArchivo = 'factura.xml';");
+        Assert.Equal(1, documentoCount);
     }
 
     [Fact]

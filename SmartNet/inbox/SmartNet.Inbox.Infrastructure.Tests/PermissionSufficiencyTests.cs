@@ -73,6 +73,41 @@ public sealed class PermissionSufficiencyTests : IAsyncLifetime
         Assert.Equal(1, extraccionRows);
     }
 
+    /// <summary>BACKLOG #12 task 2.3 -- replays the exact literal INSERT
+    /// <see cref="SqlPromocionRepository"/> issues for the schema-016 projection row, as
+    /// <c>usr_api</c>, with no <c>SELECT</c> against <c>fact.DocumentoRecibido</c> anywhere in this
+    /// session (ADR 0003 §Privadas symmetry: the row is built purely from the InboxEvent payload,
+    /// never read back from Python's table).</summary>
+    [Fact]
+    public async Task UsrApi_CanInsert_DocumentoFactura_WithoutEverSelectingDocumentoRecibido()
+    {
+        var procesamientoId = await _db.InsertarProcesamientoAsync();
+
+        var facturaId = await _db.ExecuteAsUserAsync(UsrApi, async connection =>
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                $"""
+                 INSERT INTO fact.Factura (ProcesamientoId, ProveedorCodigo, TipoComprobante, TotalOrig, Moneda, FechaEmision)
+                 OUTPUT INSERTED.FacturaId
+                 VALUES ({procesamientoId}, 'P00000', '01', 100.00, 'PEN', '2026-08-09');
+                 """;
+            return (long)(await command.ExecuteScalarAsync())!;
+        });
+
+        var documentoRows = await _db.ExecuteAsUserAsync(UsrApi, async connection =>
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                $"""
+                 INSERT INTO fact.DocumentoFactura (FacturaId, DocumentoRecibidoId, NombreArchivo, MimeType, RutaRelativa, TamanoBytes)
+                 VALUES ({facturaId}, 999, 'f.pdf', 'application/pdf', '/f.pdf', 10);
+                 """;
+            return await command.ExecuteNonQueryAsync();
+        });
+        Assert.Equal(1, documentoRows);
+    }
+
     [Fact]
     public async Task UsrApi_CanSelect_DboProveedor()
     {
