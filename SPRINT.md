@@ -11,9 +11,9 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | **9 de 17 cerrados** |
-| Ciclo SDD activo | Ninguno — último cerrado: ítem #9 |
-| Última fase cerrada | Ítem #9 (Sugerencia de cuenta), 2 PRs apilados, 32/32 tareas cerradas, verify-report PASS WITH WARNINGS (ambos WARNING corregidos antes de archivar), 27/27 + 2/2 tests, build limpio — ítem #9 cerrado 2026-08-20 |
+| Ítems del backlog | **10 de 17 cerrados** |
+| Ciclo SDD activo | Ninguno — último cerrado: ítem #11 |
+| Última fase cerrada | Ítem #11 (API de facturas y asientos), 5 fases encadenadas (commits), 29/29 tareas cerradas, primer verify PASS WITH WARNINGS con 1 CRITICAL (gap SinTipoCambio) cerrado en una fase 5 de seguimiento, segundo verify PASS sin CRITICAL, 253/253 tests, build limpio — ítem #11 cerrado 2026-08-23 |
 
 ---
 
@@ -1055,7 +1055,83 @@ exploración, no en apply.
 
 ---
 
-## ⬜ Ítems 10 a 17 — sin ciclo SDD abierto
+## ✅ 11. API de facturas y asientos
+
+15 rutas HTTP per ADR 0008: `FacturaEndpoints` (PATCH/abrir/validar/descartar/adjuntos),
+`AsientoEndpoints` (PATCH/líneas por `LineaId`/reabrir/anular), `TipoCambioEndpoints` (carga
+manual), `IntegracionEndpoints` (reprocesar/sincronizar/reconectar/estado). Concurrencia
+optimista vía ETag/If-Match (412/428), `CommandQueue` enqueue-only hacia Python — nunca RPC
+directo (ADR 0003) —, correlativo gapless. Depende de los ítems #7 y #8 (completos).
+
+**Entrega:** 5 unidades de trabajo (commits) encadenadas en la rama `feat/api-facturas-asientos-11`,
+sin PR abierto todavía.
+
+**Ciclo SDD:** `openspec/changes/archive/2026-08-23-api-facturas-asientos/` · **29 de 29 tareas cerradas** — ✅ **CERRADO 2026-08-23**
+
+| Fase | Alcance | Tareas | Estado |
+|---|---|---|---|
+| 1 | Core scaffold: `TokenDeConcurrencia`, `ResultadoComando`/`CasoConflicto`, puertos + servicios, `PurityScanTests`, esquema `015`, adaptadores SQL | 11/11 | ✅ |
+| 2 | `FacturaEndpoints` (PATCH/abrir/validar/descartar/adjuntos) + `IfMatch`/`ProblemasDeNegocio` | 6/6 | ✅ |
+| 3 | `AsientoEndpoints` (PATCH/líneas por `LineaId`/reabrir/anular) | 3/3 | ✅ |
+| 4 | `TipoCambioEndpoints`, `IntegracionEndpoints`, *wiring* `Program.cs`, `ci.yml` | 5/5 | ✅ |
+| 5 | Seguimiento post-verify: cierre del gap `SinTipoCambio` (hallazgo CRITICAL) | 4/4 | ✅ |
+
+Pronóstico de revisión: alto riesgo de presupuesto de 400 líneas (~3200-3800 estimadas); PRs
+encadenados, `ask-on-risk`. Detalle completo en `tasks.md`.
+
+### Pruebas
+
+| Proyecto | Pruebas | Qué cubre |
+|---|---|---|
+| `SmartNet.Facturacion.Core.Tests` | 66/66 | Núcleo puro: comandos, invariantes, gate `SinTipoCambio` (fase 5), `PurityScanTests` |
+| `SmartNet.Facturacion.Infrastructure.Tests` | 31/31 | CAS real (*rowversion*), correlativo gapless, adjuntos, líneas por `LineaId`, gate `SinTipoCambio` contra SQL Server real |
+| `SmartNet.TiposCambio.Core.Tests` / `.Infrastructure.Tests` | 20/20 + 12/12 | Heredadas del ítem #4 sin cambio; reutilizadas por `ExisteTipoCambioVigenteAsync` |
+| `SmartNet.Api.Tests` | 83/83 | 15 rutas vía `SmartNetApiFactory` (real DB + *cookie* de sesión): 428/412/200/409/422 |
+| `SmartNet.Contable.Core.Tests` (REGLAS.md) | 41/41 | Sanity check: sin regresión sobre el ítem #8 |
+| **Total** | **253/253** | Confirmado por dos pasadas independientes de `sdd-verify` |
+
+### Lo verificado al cerrar
+
+**Fases 1-4** — 25/25 tareas en verde, 243/243 tests. Primer `sdd-verify`: PASS WITH WARNINGS, 19
+desviaciones no bloqueantes, pero **1 hallazgo CRITICAL real**: `POST /api/facturas/{id}/abrir`
+nunca rechazaba (409 `SinTipoCambio`) abrir una factura en moneda extranjera sin tipo de cambio
+vigente — `CargarAsientoAsync` tenía el campo hardcodeado en `false` desde la fase 2, ya
+documentado como desviación abierta pero nunca cerrado en las fases siguientes.
+
+**Fase 5 (seguimiento post-verify)** — cerró el gap: `ServicioDeFacturas.AbrirAsync` gatea sobre
+`Moneda != PEN` antes de crear el asiento, vía nuevo puerto
+`IUnidadDeTrabajo.ExisteTipoCambioVigenteAsync` que reutiliza `ITipoCambioRepository` (ítem #4)
+en vez de duplicar infraestructura. 10 pruebas nuevas, 253/253 sin regresión sobre las fases 1-4.
+
+**Segundo `sdd-verify` (re-corrida completa)** — PASS, 0 CRITICAL, 13/13 requisitos y 36/36
+escenarios COMPLIANT en los 4 specs (`api-facturas`, `api-asientos`,
+`api-incidencias-integraciones`, `tipos-de-cambio`), 253/253 tests re-corridos de forma
+independiente contra SQL Server real, ADR 0019 (pureza de Core)/0003 (partición Python↔.NET)/0016
+(SQL versionado) y nomenclatura española confirmados por inspección directa del código, no solo
+aceptados del reporte del agente.
+
+**Discrepancia real encontrada al archivar, corregida antes de comitear.** El agente `sdd-archive`
+reportó "carpeta del *change* movida al archivo", pero dejó `openspec/changes/api-facturas-asientos/`
+intacta y solo copió un `archive-report.md` no convencional (sin precedente en los ítems #1-#9)
+junto a `exploration.md`. Verificado con `find`: faltaban `proposal.md`, `design.md`, `tasks.md`,
+`apply-progress.md`, `verify-report.md` y `specs/`. Se movió manualmente todo al patrón real
+—idéntico al del ítem #9— y se eliminó `archive-report.md` por no tener precedente en el proyecto.
+
+**Ledger nativo (`gentle-ai sdd-attempt`):** 8 intentos en total (uno abierto sin código en una
+sesión previa, cerrado como `interrupted`; 4 reseteos por exceso del presupuesto de 200-400 líneas
+por fase, mismo patrón ya aprobado en ítems anteriores). RDD (revisión nativa) sigue deshabilitado
+en este *clone* —condición estructural ya documentada en "Condiciones del entorno"—, no se
+reactivó ni se fabricó una aprobación.
+
+19 desviaciones documentadas en `apply-progress.md`, ninguna bloqueante (no contradicen ningún
+`MUST` de los specs), pendientes de *sign-off* del *product owner* cuando se revisen.
+
+Cero regresión confirmada sobre `SmartNet.Contable.Core.Tests` (ítem #8, REGLAS.md): 41/41 sin
+cambio.
+
+---
+
+## ⬜ Ítems 10, 12 a 17 — sin ciclo SDD abierto
 
 Las fases de cada ítem **se definen cuando arranca su ciclo SDD**, no antes. Ponerlas aquí ahora
 sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ítem, y ninguno existe.
@@ -1063,7 +1139,6 @@ sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ít
 | # | Ítem | Depende de | Contexto obligatorio | Estado |
 |---|---|---|---|---|
 | 10 | Notas de crédito | #8 | ⚠ `REGLAS.md` §5, §7 | ⬜ |
-| 11 | API de facturas y asientos | #7, #8 | — | ⬜ |
 | 12 | Detalle y validación | #11 | — | ⬜ |
 | 13 | Bandeja e incidencias | #11 | — | ⬜ |
 | 14 | Outbox y mensajería | #11 | — | ⬜ |
