@@ -57,13 +57,13 @@ Chain strategy: feature-branch-chain
 - [x] 3.10 RED: `TipoCambioVenta` on `AsientoRespuesta` equals frozen `TipoCambioCongelado.Venta`; PEN-only → null; #11 fields unchanged
 - [x] 3.11 GREEN: MODIFY `AsientoEndpoints.cs` response mapping — add `TipoCambioVenta` (D4, no store change)
 
-## Phase 4: SPA Auth Shell
+## Phase 4: SPA Auth Shell — COMPLETE (5/5, PR4)
 
-- [ ] 4.1 RED: guard unit test — unauthenticated navigation redirected, authenticated allowed
-- [ ] 4.2 GREEN: CREATE `SmartNet/spa/src/app/shared/auth.guard.ts`
-- [ ] 4.3 RED: interceptor unit test — 401 response clears session/redirects, no body leak
-- [ ] 4.4 GREEN: CREATE `SmartNet/spa/src/app/shared/http-error.interceptor.ts` + `problema.model.ts`
-- [ ] 4.5 GREEN: MODIFY `app.config.ts` / `app.routes.ts` — wire interceptor + guard, add `detalle/:id` route
+- [x] 4.1 RED: guard unit test — unauthenticated navigation redirected, authenticated allowed
+- [x] 4.2 GREEN: CREATE `SmartNet/spa/src/app/shared/auth.guard.ts`
+- [x] 4.3 RED: interceptor unit test — 401 response clears session/redirects, no body leak
+- [x] 4.4 GREEN: CREATE `SmartNet/spa/src/app/shared/http-error.interceptor.ts` + `problema.model.ts`
+- [x] 4.5 GREEN: MODIFY `app.config.ts` / `app.routes.ts` — wire interceptor + guard on `bandeja`. `detalle/:id` route deferred to PR5 (Phase 5, out of this batch's scope) since it would import a component that does not exist yet.
 
 ## Phase 5: SPA Detalle Feature
 
