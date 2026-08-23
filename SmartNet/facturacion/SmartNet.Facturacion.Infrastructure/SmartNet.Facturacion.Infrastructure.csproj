@@ -1,0 +1,24 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- design.md "SmartNet.Facturacion.Infrastructure" file-changes row, same pin as
+       SmartNet.Inbox.Infrastructure/SmartNet.TiposCambio.Infrastructure. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Data.SqlClient" Version="7.0.2" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SmartNet.Facturacion.Core\SmartNet.Facturacion.Core.csproj" />
+    <!-- PR 5 (Phase 5, SinTipoCambio gap closure): wires the existing item #3/#11
+         ITipoCambioRepository port + SqlTipoCambioRepository adapter into
+         SqlUnidadDeTrabajo.CargarAsientoAsync / ServicioDeFacturas.AbrirAsync's D4 gate. -->
+    <ProjectReference Include="..\..\tipos-de-cambio\SmartNet.TiposCambio.Core\SmartNet.TiposCambio.Core.csproj" />
+    <ProjectReference Include="..\..\tipos-de-cambio\SmartNet.TiposCambio.Infrastructure\SmartNet.TiposCambio.Infrastructure.csproj" />
+  </ItemGroup>
+
+</Project>
