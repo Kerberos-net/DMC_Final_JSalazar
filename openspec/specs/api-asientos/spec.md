@@ -86,6 +86,70 @@ rev.3).
 - **When** `POST /api/asientos/{id}/anular` is called again
 - **Then** the response is `409 Conflict` — terminal state, no transition possible
 
+### Requirement: `GET /api/asientos/{id}` returns the asiento
+
+The endpoint MUST return the asiento's current state, líneas, `ETag` (for
+subsequent `If-Match` edits), and `TipoCambioVenta` when applicable.
+
+#### Scenario: Fetching an existing asiento
+- **Given** an asiento identified by `id` exists
+- **When** `GET /api/asientos/{id}` is called
+- **Then** the response is `200 OK` with the asiento body, its líneas, and
+  an `ETag` matching its current `Version`
+
+#### Scenario: Unknown asiento id returns 404
+- **Given** no asiento exists with the given `id`
+- **When** `GET /api/asientos/{id}` is called
+- **Then** the response is `404 Not Found`
+
+### Requirement: Factura resolves to its vigente asiento over HTTP
+
+The API MUST expose a way to resolve a `FacturaId` to its current
+(non-`ANULADO`) `AsientoContableId`, using the existing
+`IUnidadDeTrabajo.ObtenerAsientoVigenteIdAsync` lookup. No new resolution
+rule is introduced.
+
+#### Scenario: Factura with a vigente asiento
+- **Given** a factura with a non-`ANULADO` asiento
+- **When** the factura→asiento resolution is requested for that factura
+- **Then** the response identifies that asiento's id
+
+#### Scenario: Factura with no asiento yet
+- **Given** a factura that has not been opened (`abrir` not yet called)
+- **When** the factura→asiento resolution is requested
+- **Then** the response indicates no vigente asiento exists, distinctly from
+  a 404 on an unknown factura
+
+### Requirement: `TipoCambioVenta` is exposed in the asiento response
+
+Per ADR 0018 pt.1 (foreign-currency liabilities convert at tipo de cambio
+**venta**, not compra), `AsientoRespuesta` MUST include a `TipoCambioVenta`
+field sourced from the persisted `TipoCambioCongelado.Venta` frozen at
+asiento generation/confirmation time. The field MUST NOT be sourced from or
+renamed to a "compra" rate.
+
+#### Scenario: Foreign-currency asiento exposes its frozen venta rate
+- **Given** an asiento generated for a factura in foreign currency, using a
+  frozen `TipoCambioCongelado`
+- **When** the asiento is fetched (`GET /api/asientos/{id}`,
+  `GET /api/facturas/{id}/asiento`, or returned by `PATCH`/`validar`)
+- **Then** the response body includes `TipoCambioVenta` equal to the frozen
+  `TipoCambioCongelado.Venta` value used for that asiento
+
+#### Scenario: Local-currency (PEN) asiento has no applicable rate
+- **Given** an asiento for a factura already in PEN, with no
+  `TipoCambioCongelado` applied
+- **When** the asiento is fetched
+- **Then** `TipoCambioVenta` is `null`/absent, not a fabricated or default
+  value
+
+#### Scenario: Field addition does not break existing consumers
+- **Given** an existing `/api/asientos/{id}` response consumer built against
+  BACKLOG #11's contract
+- **When** `TipoCambioVenta` is added to the response body
+- **Then** all previously existing fields remain unchanged in name, type,
+  and meaning
+
 ### Requirement: InvarianteIncumplida maps to RFC 9457 422 problem+json
 
 Each `InvarianteContable` member surfaced through `InvariantesDeConfirmacion` (Global 1
