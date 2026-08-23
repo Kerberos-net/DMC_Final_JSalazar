@@ -15,6 +15,7 @@
         <td>
           @if (fila.item.estadoConsumo === 'PROMOVIDO') {
             <span data-testid="factura-id">Factura #{{ fila.item.facturaId }}</span>
+            <a data-testid="ir-a-detalle" [routerLink]="['/detalle', fila.item.facturaId]">Ver detalle</a>
           } @else if (fila.item.estadoConsumo === 'DESCARTADO') {
             <span data-testid="motivo-descarte">{{ fila.item.motivoDescarte }}</span>
           } @else {

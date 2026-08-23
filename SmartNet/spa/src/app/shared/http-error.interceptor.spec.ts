@@ -64,6 +64,27 @@ describe('httpErrorInterceptor', () => {
     expect(navigateSpy).not.toHaveBeenCalled();
   });
 
+  it('does NOT clear the session or redirect on a 401 from POST /api/sesion (login failure, not session expiry)', async () => {
+    let leaked: unknown;
+    http.post('/api/sesion', { nombreUsuario: 'x', clave: 'y' }).subscribe({
+      error: (err) => {
+        leaked = err;
+      },
+    });
+
+    const req = httpMock.expectOne('/api/sesion');
+    req.flush(
+      { type: 't', title: 'Credenciales inválidas', status: 401, detail: 'El usuario o la clave no son válidos.' },
+      { status: 401, statusText: 'Unauthorized' }
+    );
+
+    await Promise.resolve();
+
+    expect(limpiarSpy).not.toHaveBeenCalled();
+    expect(navigateSpy).not.toHaveBeenCalled();
+    expect(JSON.stringify(leaked)).toContain('no son válidos');
+  });
+
   it('propagates the error without leaking the raw response body to the caller', async () => {
     let leaked: unknown;
     http.get('/api/facturas/42').subscribe({

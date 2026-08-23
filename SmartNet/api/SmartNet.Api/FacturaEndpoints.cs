@@ -73,8 +73,9 @@ public static class FacturaEndpoints
             return Results.Ok(new FacturaAsientoRespuesta(null, null));
         }
 
+        var lineas = await uow.CargarLineasPersistidasAsync(asiento.AsientoContableId, ct);
         http.Response.Headers.ETag = TokenDeConcurrencia.Codificar(asiento.Version);
-        return Results.Ok(new FacturaAsientoRespuesta(asiento.AsientoContableId, AsientoRespuesta.De(asiento)));
+        return Results.Ok(new FacturaAsientoRespuesta(asiento.AsientoContableId, AsientoRespuesta.De(asiento, lineas)));
     }
 
     private static async Task<IResult> PatchFacturaAsync(

@@ -1,3 +1,4 @@
+using System.Linq;
 using System.Net;
 using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
@@ -376,6 +377,31 @@ public sealed class AsientoEndpointsTests : SesionEndpointsTestBase
         Assert.Equal(TokenDeConcurrencia.Codificar(version), response.Headers.ETag!.Tag);
         var cuerpo = await response.Content.ReadFromJsonAsync<AsientoRespuesta>();
         Assert.Equal(asientoId, cuerpo!.AsientoContableId);
+    }
+
+    /// <summary>PR5 (BACKLOG #12, Phase 5) — cierra un gap de Phase 3: <c>AsientoRespuesta</c> nunca
+    /// exponía <c>Lineas</c>, así que la pantalla de detalle no tenía forma de leer los
+    /// <see cref="LineaPersistida.LineaId"/> que necesita para editar/eliminar por id (spec.md
+    /// api-asientos: "never position"). <c>IUnidadDeTrabajo.CargarLineasPersistidasAsync</c> ya
+    /// existía (Phase 3, PR 3) pero ningún endpoint lo llamaba.</summary>
+    [Fact]
+    public async Task GetAsiento_ExposesLineasWithTheirStableLineaId()
+    {
+        var facturaId = await Db.InsertarFacturaAsync();
+        var asientoId = await Db.InsertarAsientoBorradorBalanceadoAsync(facturaId);
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var response = await client.GetAsync($"/api/asientos/{asientoId}");
+
+        var cuerpo = await response.Content.ReadFromJsonAsync<AsientoRespuesta>();
+        Assert.Equal(3, cuerpo!.Lineas.Count);
+        Assert.All(cuerpo.Lineas, l => Assert.True(l.LineaId > 0));
+        var primera = cuerpo.Lineas.Single(l => l.Orden == 1);
+        Assert.Equal("PRINCIPAL", primera.Bloque);
+        Assert.Equal("D", primera.Tipo);
+        Assert.Equal(100.00m, primera.Debe);
+        Assert.Equal("639915", primera.CuentaCodigo);
     }
 
     [Fact]

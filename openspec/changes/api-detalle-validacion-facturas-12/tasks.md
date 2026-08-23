@@ -65,14 +65,16 @@ Chain strategy: feature-branch-chain
 - [x] 4.4 GREEN: CREATE `SmartNet/spa/src/app/shared/http-error.interceptor.ts` + `problema.model.ts`
 - [x] 4.5 GREEN: MODIFY `app.config.ts` / `app.routes.ts` — wire interceptor + guard on `bandeja`. `detalle/:id` route deferred to PR5 (Phase 5, out of this batch's scope) since it would import a component that does not exist yet.
 
-## Phase 5: SPA Detalle Feature
+## Phase 5: SPA Detalle Feature — COMPLETE (16/16, PR5)
 
-- [ ] 5.1 RED: data-access service tests (factura/asiento/documento clients) — request shape, `If-Match` header, ETag propagation
-- [ ] 5.2 GREEN: CREATE `SmartNet/spa/src/app/detalle/data-access/**` services (signals, `providedIn: 'root'`), extending `inbox` pattern
-- [ ] 5.3 RED: `computed()` cuadre recompute on línea edit; type→UX mapping test (412 vs 422 vs 409 — D6)
-- [ ] 5.4 GREEN: CREATE `SmartNet/spa/src/app/detalle/feature/detalle-page` — side-by-side layout, guardar avance, validar orchestration (dual-ETag sequencing — D7)
-- [ ] 5.5 GREEN: CREATE `SmartNet/spa/src/app/detalle/ui/{visor-documento,factura-form,asiento-lineas,conflicto-banner}` — inline edit, delete-with-confirm, same-origin iframe viewer, conflict banner (D6)
-- [ ] 5.6 RED→GREEN: delete-confirm cancel leaves state unchanged; 412 → reload discards local edits; 422/409 → edits kept, inline/banner errors shown
+- [x] 5.0 GREEN (gap closure, not in original scope): `AsientoRespuesta` never exposed `Lineas` (Phase 3 gap) — added `LineaRespuesta`/`Lineas` to `AsientoEndpoints.cs`'s `AsientoRespuesta`, wired via `IUnidadDeTrabajo.CargarLineasPersistidasAsync` in `GetAsientoAsync`, `ResponderConAsientoActualizadoAsync`, and `FacturaEndpoints.GetAsientoDeFacturaAsync` — Phase 5 cannot edit líneas by `LineaId` without it
+- [x] 5.1 RED: data-access service tests (factura/asiento/documento clients) — request shape, `If-Match` header, ETag propagation
+- [x] 5.2 GREEN: CREATE `SmartNet/spa/src/app/detalle/data-access/**` services (signals, `providedIn: 'root'`), extending `inbox` pattern
+- [x] 5.3 RED: `computed()` cuadre recompute on línea edit; type→UX mapping test (412 vs 422 vs 409 — D6)
+- [x] 5.4 GREEN: CREATE `SmartNet/spa/src/app/detalle/feature/detalle-page` — side-by-side layout, guardar avance, validar orchestration (dual-ETag sequencing — D7)
+- [x] 5.5 GREEN: CREATE `SmartNet/spa/src/app/detalle/ui/{visor-documento,factura-form,asiento-lineas,conflicto-banner}` — inline edit, delete-with-confirm, same-origin iframe viewer, conflict banner (D6)
+- [x] 5.6 RED→GREEN: delete-confirm cancel leaves state unchanged; 412 → reload discards local edits; 422/409 → edits kept, inline/banner errors shown
+- [x] 5.7 RED→GREEN (owner-added task, PR5): CREATE `SmartNet/spa/src/app/login/feature/login-page` — `/login` form (`NombreUsuario`/`Clave`), calls `POST /api/sesion` via `SessionService.iniciarSesion()`, on success navigates to `?returnUrl=` or `/bandeja`, on 401 shows the `ProblemaDetails.detail`; extended `SessionService`, `authGuard` (now carries `returnUrl`), and `httpErrorInterceptor` (exempts the login POST's own 401 from the global session-expiry handling) to support it
 
 ## Phase 6: Documentation
 

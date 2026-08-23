@@ -1,0 +1,18 @@
+@if (problema(); as p) {
+  <div class="conflicto-banner" role="alert" [attr.data-testid]="'problema-' + p.status">
+    <p>{{ p.title }}</p>
+    <p>{{ p.detail }}</p>
+
+    @if (p.errors; as errores) {
+      <ul>
+        @for (grupo of errores | keyvalue; track grupo.key) {
+          <li>{{ grupo.key }}: {{ grupo.value.join(', ') }}</li>
+        }
+      </ul>
+    }
+
+    @if (esConflictoDeConcurrencia) {
+      <button type="button" data-testid="recargar" (click)="recargar.emit()">Recargar</button>
+    }
+  </div>
+}

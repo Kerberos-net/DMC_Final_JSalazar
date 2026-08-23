@@ -30,8 +30,19 @@ describe('authGuard', () => {
     );
 
     expect(verificarSpy).toHaveBeenCalled();
-    expect(createUrlTreeSpy).toHaveBeenCalledWith(['/login']);
+    expect(createUrlTreeSpy).toHaveBeenCalledWith(['/login'], { queryParams: { returnUrl: undefined } });
     expect(resultado).toBe(loginTree);
+  });
+
+  it('carries the attempted URL as returnUrl so LoginPage can navigate back after success', async () => {
+    verificarSpy.mockResolvedValue(false);
+    createUrlTreeSpy.mockReturnValue({} as UrlTree);
+
+    await TestBed.runInInjectionContext(() =>
+      authGuard({} as never, { url: '/detalle/42' } as never)
+    );
+
+    expect(createUrlTreeSpy).toHaveBeenCalledWith(['/login'], { queryParams: { returnUrl: '/detalle/42' } });
   });
 
   it('allows the navigation when the session check succeeds', async () => {

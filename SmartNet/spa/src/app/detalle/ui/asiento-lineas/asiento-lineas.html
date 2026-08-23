@@ -1,0 +1,104 @@
+<table class="asiento-lineas">
+  <thead>
+    <tr>
+      <th>Bloque</th>
+      <th>Tipo</th>
+      <th>Cuenta</th>
+      <th>Debe</th>
+      <th>Haber</th>
+      @if (editable()) {
+        <th>Acciones</th>
+      }
+    </tr>
+  </thead>
+  <tbody>
+    @for (linea of lineas(); track linea.lineaId) {
+      @if (editandoId() === linea.lineaId) {
+        <tr [attr.data-testid]="'linea-' + linea.lineaId">
+          <td>{{ linea.bloque }}</td>
+          <td>{{ linea.tipo }}</td>
+          <td>{{ linea.cuentaCodigo }}</td>
+          <td>
+            <input
+              [attr.data-testid]="'editar-debe-' + linea.lineaId"
+              type="number"
+              [value]="borradorEdicion().debe"
+              (input)="onCampoEdicion('debe', $any($event.target).value)"
+            />
+          </td>
+          <td>
+            <input
+              [attr.data-testid]="'editar-haber-' + linea.lineaId"
+              type="number"
+              [value]="borradorEdicion().haber"
+              (input)="onCampoEdicion('haber', $any($event.target).value)"
+            />
+          </td>
+          <td>
+            <button [attr.data-testid]="'confirmar-edicion-' + linea.lineaId" type="button" (click)="confirmarEdicion(linea)">
+              Confirmar
+            </button>
+            <button type="button" (click)="cancelarEdicion()">Cancelar</button>
+          </td>
+        </tr>
+      } @else {
+        <tr [attr.data-testid]="'linea-' + linea.lineaId">
+          <td>{{ linea.bloque }}</td>
+          <td>{{ linea.tipo }}</td>
+          <td>{{ linea.cuentaCodigo }}</td>
+          <td>{{ linea.debe }}</td>
+          <td>{{ linea.haber }}</td>
+          @if (editable()) {
+            <td>
+              @if (pendienteEliminarId() === linea.lineaId) {
+                <span role="alert">¿Confirmar eliminación?</span>
+                <button [attr.data-testid]="'confirmar-eliminar-' + linea.lineaId" type="button" (click)="confirmarEliminar(linea.lineaId)">
+                  Sí
+                </button>
+                <button [attr.data-testid]="'cancelar-eliminar-' + linea.lineaId" type="button" (click)="cancelarEliminar()">
+                  No
+                </button>
+              } @else {
+                <button [attr.data-testid]="'editar-' + linea.lineaId" type="button" (click)="iniciarEdicion(linea)">
+                  Editar
+                </button>
+                <button [attr.data-testid]="'eliminar-' + linea.lineaId" type="button" (click)="pedirEliminar(linea.lineaId)">
+                  Eliminar
+                </button>
+              }
+            </td>
+          }
+        </tr>
+      }
+    }
+  </tbody>
+</table>
+
+@if (editable()) {
+  @if (agregandoNueva()) {
+    <div class="nueva-linea">
+      <input
+        data-testid="nueva-cuentaCodigo"
+        placeholder="Cuenta"
+        [value]="borradorNueva().cuentaCodigo"
+        (input)="onCampoNueva('cuentaCodigo', $any($event.target).value)"
+      />
+      <input
+        data-testid="nueva-debe"
+        type="number"
+        [value]="borradorNueva().debe"
+        (input)="onCampoNueva('debe', $any($event.target).value)"
+      />
+      <input
+        data-testid="nueva-haber"
+        type="number"
+        [value]="borradorNueva().haber"
+        (input)="onCampoNueva('haber', $any($event.target).value)"
+      />
+      <button data-testid="confirmar-nueva" type="button" (click)="confirmarAgregar()">Agregar</button>
+      <button type="button" (click)="cancelarAgregar()">Cancelar</button>
+    </div>
+  } @else {
+    <button data-testid="agregar-linea" type="button" (click)="iniciarAgregar()">Agregar línea</button>
+  }
+}

@@ -1,0 +1,32 @@
+<section class="login-page">
+  <h1>Iniciar sesión</h1>
+
+  @if (problema(); as p) {
+    <p role="alert">{{ p.detail }}</p>
+  }
+
+  <form (submit)="$event.preventDefault(); enviar()">
+    <label>
+      Usuario
+      <input
+        data-testid="nombreUsuario"
+        [value]="nombreUsuario()"
+        (input)="nombreUsuario.set($any($event.target).value)"
+        autocomplete="username"
+      />
+    </label>
+
+    <label>
+      Contraseña
+      <input
+        data-testid="clave"
+        type="password"
+        [value]="clave()"
+        (input)="clave.set($any($event.target).value)"
+        autocomplete="current-password"
+      />
+    </label>
+
+    <button data-testid="enviar" type="submit" [disabled]="enviando()">Ingresar</button>
+  </form>
+</section>

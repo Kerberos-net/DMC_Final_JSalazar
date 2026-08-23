@@ -1,0 +1,30 @@
+<form class="factura-form">
+  <p><span>Comprobante:</span> {{ factura().tipoComprobante }} {{ factura().numero }}</p>
+  <p><span>Estado:</span> {{ factura().estado }}</p>
+  <p><span>Total:</span> {{ factura().totalOrig }} {{ factura().moneda }}</p>
+  <p><span>Fecha de emisión:</span> {{ factura().fechaEmision }}</p>
+
+  @if (tipoCambioVenta(); as tipoCambio) {
+    <p data-testid="tipo-cambio-venta"><span>Tipo de cambio venta:</span> {{ tipoCambio }}</p>
+  }
+
+  <label>
+    Proveedor
+    <input
+      data-testid="campo-proveedorCodigo"
+      [value]="factura().proveedorCodigo"
+      [disabled]="!editable()"
+      (input)="onCampoInput('proveedorCodigo', $any($event.target).value)"
+    />
+  </label>
+
+  <label>
+    RUC proveedor
+    <input
+      data-testid="campo-rucProveedor"
+      [value]="factura().rucProveedor"
+      [disabled]="!editable()"
+      (input)="onCampoInput('rucProveedor', $any($event.target).value)"
+    />
+  </label>
+</form>

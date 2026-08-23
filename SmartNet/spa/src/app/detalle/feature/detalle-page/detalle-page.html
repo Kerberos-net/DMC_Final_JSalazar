@@ -1,0 +1,49 @@
+<section class="detalle-page">
+  @if (loading()) {
+    <p data-testid="detalle-loading">Cargando…</p>
+  }
+
+  <app-conflicto-banner
+    [problema]="problema()"
+    [categoria]="categoriaProblema()"
+    (recargar)="recargar()"
+  />
+
+  <div class="detalle-layout">
+    <app-visor-documento [documentos]="documentos()" />
+
+    @if (factura(); as f) {
+      <div class="detalle-formulario">
+        <app-factura-form
+          [factura]="f"
+          [tipoCambioVenta]="asiento()?.tipoCambioVenta ?? null"
+          [editable]="f.estado !== 'VALIDADA'"
+          (cambios)="onCambiosFactura($event)"
+        />
+
+        @if (asiento(); as a) {
+          <app-asiento-lineas
+            [lineas]="a.lineas"
+            [editable]="a.estado !== 'CONFIRMADO'"
+            (editarLinea)="onEditarLinea($event)"
+            (agregarLinea)="onAgregarLinea($event)"
+            (eliminarLinea)="onEliminarLinea($event)"
+          />
+        }
+
+        <button type="button" data-testid="guardar-avance" (click)="guardarAvance()">Guardar avance</button>
+
+        <label>
+          Fecha de corte contable
+          <input
+            data-testid="fecha-corte-contable"
+            type="date"
+            [value]="fechaCorteContable()"
+            (input)="fechaCorteContable.set($any($event.target).value)"
+          />
+        </label>
+        <button type="button" data-testid="validar" (click)="validar(fechaCorteContable())">Validar</button>
+      </div>
+    }
+  </div>
+</section>

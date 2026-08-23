@@ -15,14 +15,23 @@ import { SessionService } from './session.service';
  * is an auth failure, not a business error) and MUST NOT reach the DOM. Every other status
  * passes through unchanged so the detalle feature (BACKLOG #12 Phase 5) can read its
  * `ProblemaDetails` body (422/409/412) to drive its own UX.
+ *
+ * EXCEPTION (BACKLOG #12 Phase 5, LoginPage): `POST /api/sesion` (the login submission itself)
+ * IS exempted from this handling. A 401 from THAT specific request is a "wrong credentials"
+ * business response WITH a `ProblemaDetails` body (`SesionEndpoints.PostSesionAsync` — design.md
+ * Decision 6), not a "session expired" signal -- stripping its body/redirecting to `/login` (where
+ * the user already is) would make login failures silently unreadable.
  */
+const ES_LOGIN = (req: { url: string; method: string }): boolean =>
+  req.url === '/api/sesion' && req.method === 'POST';
+
 export const httpErrorInterceptor: HttpInterceptorFn = (req, next) => {
   const session = inject(SessionService);
   const router = inject(Router);
 
   return next(req).pipe(
     catchError((error: unknown) => {
-      if (error instanceof HttpErrorResponse && error.status === 401) {
+      if (error instanceof HttpErrorResponse && error.status === 401 && !ES_LOGIN(req)) {
         session.limpiar();
         void router.navigate(['/login']);
 

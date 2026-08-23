@@ -63,4 +63,31 @@ describe('SessionService', () => {
     expect(service.usuario()).toBeNull();
     expect(service.autenticado()).toBe(false);
   });
+
+  it('iniciarSesion() POSTs the credentials and sets the user on success (204)', async () => {
+    const promise = service.iniciarSesion('ana.torres', 's3cr3t');
+
+    const req = httpMock.expectOne('/api/sesion');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.body).toEqual({ nombreUsuario: 'ana.torres', clave: 's3cr3t' });
+    req.flush(null, { status: 204, statusText: 'No Content' });
+
+    await promise;
+    expect(service.usuario()).toBe('ana.torres');
+    expect(service.autenticado()).toBe(true);
+  });
+
+  it('iniciarSesion() rethrows and leaves the user null on 401 (invalid credentials)', async () => {
+    const promise = service.iniciarSesion('ana.torres', 'wrong');
+
+    const req = httpMock.expectOne('/api/sesion');
+    req.flush(
+      { type: 't', title: 'Credenciales inválidas', status: 401, detail: 'd' },
+      { status: 401, statusText: 'Unauthorized' }
+    );
+
+    await expect(promise).rejects.toBeTruthy();
+    expect(service.usuario()).toBeNull();
+    expect(service.autenticado()).toBe(false);
+  });
 });

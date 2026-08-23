@@ -36,4 +36,16 @@ export class SessionService {
   limpiar(): void {
     this.usuarioSignal.set(null);
   }
+
+  /** `POST /api/sesion` (BACKLOG #12's login page, `SesionEndpoints.PostSesionAsync`) --
+   * 204 No Content on success, 401 problem+json on ANY failure (design.md Decision 6: "every login
+   * failure returns the identical 401 problem document"). On success the cookie is already set by
+   * the server response (`Set-Cookie`, same-origin) -- this only mirrors `nombreUsuario` locally,
+   * matching what a following `GET /api/sesion` would report. On failure, rethrows for the caller
+   * (LoginPage) to read the `ProblemaDetails` body -- this endpoint is exempted from
+   * `httpErrorInterceptor`'s global 401 body-stripping/redirect (see that file). */
+  async iniciarSesion(nombreUsuario: string, clave: string): Promise<void> {
+    await firstValueFrom(this.http.post<void>('/api/sesion', { nombreUsuario, clave }));
+    this.usuarioSignal.set(nombreUsuario);
+  }
 }
