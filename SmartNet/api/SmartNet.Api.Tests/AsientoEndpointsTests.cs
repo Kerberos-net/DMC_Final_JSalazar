@@ -358,4 +358,77 @@ public sealed class AsientoEndpointsTests : SesionEndpointsTestBase
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
+
+    // --- GET /api/asientos/{id} (tasks.md 3.8/3.9, spec.md asiento-lectura-api) ---
+
+    [Fact]
+    public async Task GetAsiento_ForAnExistingAsiento_Returns200_WithBodyAndEtag()
+    {
+        var facturaId = await Db.InsertarFacturaAsync();
+        var asientoId = await Db.InsertarAsientoBorradorBalanceadoAsync(facturaId);
+        var version = await Db.ObtenerVersionAsientoAsync(asientoId);
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var response = await client.GetAsync($"/api/asientos/{asientoId}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(TokenDeConcurrencia.Codificar(version), response.Headers.ETag!.Tag);
+        var cuerpo = await response.Content.ReadFromJsonAsync<AsientoRespuesta>();
+        Assert.Equal(asientoId, cuerpo!.AsientoContableId);
+    }
+
+    [Fact]
+    public async Task GetAsiento_ForAnUnknownId_Returns404()
+    {
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var response = await client.GetAsync("/api/asientos/999999");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task GetAsiento_WithoutACookie_Returns401()
+    {
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+
+        var response = await client.GetAsync("/api/asientos/1");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    // --- TipoCambioVenta on AsientoRespuesta (tasks.md 3.10/3.11, design D4) ---
+
+    [Fact]
+    public async Task GetAsiento_ForAForeignCurrencyFactura_ExposesTheFrozenTipoCambioVenta()
+    {
+        var facturaId = await Db.InsertarFacturaAsync(moneda: "USD");
+        var asientoId = await Db.InsertarAsientoBorradorBalanceadoAsync(facturaId);
+        await Db.ExecuteNonQueryAsync(
+            $"UPDATE fact.AsientoContable SET TipoCambioVenta = 3.755 WHERE AsientoContableId = {asientoId};");
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var response = await client.GetAsync($"/api/asientos/{asientoId}");
+
+        var cuerpo = await response.Content.ReadFromJsonAsync<AsientoRespuesta>();
+        Assert.Equal(3.755m, cuerpo!.TipoCambioVenta);
+    }
+
+    [Fact]
+    public async Task GetAsiento_ForAPenFactura_HasNoTipoCambioVenta()
+    {
+        var facturaId = await Db.InsertarFacturaAsync(moneda: "PEN");
+        var asientoId = await Db.InsertarAsientoBorradorBalanceadoAsync(facturaId);
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var response = await client.GetAsync($"/api/asientos/{asientoId}");
+
+        var cuerpo = await response.Content.ReadFromJsonAsync<AsientoRespuesta>();
+        Assert.Null(cuerpo!.TipoCambioVenta);
+    }
 }

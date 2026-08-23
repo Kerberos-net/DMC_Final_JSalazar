@@ -412,6 +412,101 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
         return filasAfectadas > 0 ? ResultadoEscritura.Aplicado : ResultadoEscritura.NoEncontrado;
     }
 
+    // --- PR 3 (Phase 3, BACKLOG #12) additions: lectura read-only para lista unificada / visor
+    // (IUnidadDeTrabajo.cs). Ningún SELECT contra fact.DocumentoRecibido en este archivo. ---
+
+    public async Task<IReadOnlyList<DocumentoFacturaPersistido>> CargarDocumentosFacturaAsync(long facturaId, CancellationToken ct)
+    {
+        await using var command = CrearComando(
+            """
+            SELECT DocumentoFacturaId, FacturaId, NombreArchivo, MimeType, RutaRelativa, TamanoBytes, CreadoEn
+            FROM fact.DocumentoFactura
+            WHERE FacturaId = @facturaId
+            ORDER BY DocumentoFacturaId;
+            """);
+        command.Parameters.AddWithValue("@facturaId", facturaId);
+
+        var documentos = new List<DocumentoFacturaPersistido>();
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            documentos.Add(MapearDocumentoFactura(reader));
+        }
+
+        return documentos;
+    }
+
+    public async Task<IReadOnlyList<AdjuntoManual>> CargarAdjuntosDeFacturaAsync(long facturaId, CancellationToken ct)
+    {
+        await using var command = CrearComando(
+            """
+            SELECT AdjuntoManualId, FacturaId, NombreArchivo, RutaRelativa, MimeType, TamanoBytes,
+                   SubidoPorUsuarioId, SubidoEn, EliminadoEn
+            FROM fact.AdjuntoManual
+            WHERE FacturaId = @facturaId AND EliminadoEn IS NULL
+            ORDER BY AdjuntoManualId;
+            """);
+        command.Parameters.AddWithValue("@facturaId", facturaId);
+
+        var adjuntos = new List<AdjuntoManual>();
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            adjuntos.Add(MapearAdjunto(reader));
+        }
+
+        return adjuntos;
+    }
+
+    public async Task<DocumentoFacturaPersistido?> CargarDocumentoFacturaPorIdAsync(long documentoFacturaId, CancellationToken ct)
+    {
+        await using var command = CrearComando(
+            """
+            SELECT DocumentoFacturaId, FacturaId, NombreArchivo, MimeType, RutaRelativa, TamanoBytes, CreadoEn
+            FROM fact.DocumentoFactura
+            WHERE DocumentoFacturaId = @id;
+            """);
+        command.Parameters.AddWithValue("@id", documentoFacturaId);
+
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        return await reader.ReadAsync(ct) ? MapearDocumentoFactura(reader) : null;
+    }
+
+    public async Task<AdjuntoManual?> CargarAdjuntoPorIdAsync(long adjuntoManualId, CancellationToken ct)
+    {
+        await using var command = CrearComando(
+            """
+            SELECT AdjuntoManualId, FacturaId, NombreArchivo, RutaRelativa, MimeType, TamanoBytes,
+                   SubidoPorUsuarioId, SubidoEn, EliminadoEn
+            FROM fact.AdjuntoManual
+            WHERE AdjuntoManualId = @id AND EliminadoEn IS NULL;
+            """);
+        command.Parameters.AddWithValue("@id", adjuntoManualId);
+
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        return await reader.ReadAsync(ct) ? MapearAdjunto(reader) : null;
+    }
+
+    private static DocumentoFacturaPersistido MapearDocumentoFactura(SqlDataReader reader) => new(
+        DocumentoFacturaId: reader.GetInt64(0),
+        FacturaId: reader.GetInt64(1),
+        NombreArchivo: reader.GetString(2).TrimEnd(),
+        MimeType: reader.GetString(3).TrimEnd(),
+        RutaRelativa: reader.GetString(4).TrimEnd(),
+        TamanoBytes: reader.GetInt64(5),
+        CreadoEn: new DateTimeOffset(DateTime.SpecifyKind(reader.GetDateTime(6), DateTimeKind.Utc)));
+
+    private static AdjuntoManual MapearAdjunto(SqlDataReader reader) => new(
+        AdjuntoManualId: reader.GetInt64(0),
+        FacturaId: reader.GetInt64(1),
+        NombreArchivo: reader.GetString(2).TrimEnd(),
+        RutaRelativa: reader.GetString(3).TrimEnd(),
+        MimeType: reader.GetString(4).TrimEnd(),
+        TamanoBytes: reader.GetInt64(5),
+        SubidoPorUsuarioId: reader.GetInt64(6),
+        SubidoEn: new DateTimeOffset(DateTime.SpecifyKind(reader.GetDateTime(7), DateTimeKind.Utc)),
+        EliminadoEn: reader.IsDBNull(8) ? null : new DateTimeOffset(DateTime.SpecifyKind(reader.GetDateTime(8), DateTimeKind.Utc)));
+
     // --- PR 3 (Phase 3) additions: líneas por LineaId (IUnidadDeTrabajo.cs) ---
 
     public async Task<IReadOnlyList<LineaPersistida>> CargarLineasPersistidasAsync(long asientoContableId, CancellationToken ct)

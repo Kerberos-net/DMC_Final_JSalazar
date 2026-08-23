@@ -366,4 +366,48 @@ public sealed class FacturaEndpointsTests : SesionEndpointsTestBase
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
+
+    // --- factura -> asiento resolution (tasks.md 3.8/3.9, spec.md asiento-lectura-api, design D3) ---
+
+    [Fact]
+    public async Task GetAsientoDeFactura_ForAFacturaWithAVigenteAsiento_ReturnsItsIdAndEtag()
+    {
+        var facturaId = await Db.InsertarFacturaAsync();
+        var asientoId = await Db.InsertarAsientoBorradorBalanceadoAsync(facturaId);
+        var version = await Db.ObtenerVersionAsientoAsync(asientoId);
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var response = await client.GetAsync($"/api/facturas/{facturaId}/asiento");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(TokenDeConcurrencia.Codificar(version), response.Headers.ETag!.Tag);
+        var cuerpo = await response.Content.ReadFromJsonAsync<FacturaAsientoRespuesta>();
+        Assert.Equal(asientoId, cuerpo!.AsientoContableId);
+    }
+
+    [Fact]
+    public async Task GetAsientoDeFactura_ForAFacturaWithNoAsientoYet_IndicatesNoVigenteAsiento_DistinctFrom404()
+    {
+        var facturaId = await Db.InsertarFacturaAsync();
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var response = await client.GetAsync($"/api/facturas/{facturaId}/asiento");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var cuerpo = await response.Content.ReadFromJsonAsync<FacturaAsientoRespuesta>();
+        Assert.Null(cuerpo!.AsientoContableId);
+    }
+
+    [Fact]
+    public async Task GetAsientoDeFactura_ForAnUnknownFactura_Returns404()
+    {
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var response = await client.GetAsync("/api/facturas/999999/asiento");
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
 }

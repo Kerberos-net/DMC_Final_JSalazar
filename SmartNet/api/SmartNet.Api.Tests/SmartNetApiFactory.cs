@@ -24,6 +24,7 @@ internal sealed class SmartNetApiFactory : WebApplicationFactory<Program>
 {
     private readonly string _connectionString;
     private readonly string _keyRingPath;
+    private readonly string _storageRoot;
     private readonly TimeProvider? _timeProvider;
     private readonly IPasswordHasher? _passwordHasher;
 
@@ -31,13 +32,21 @@ internal sealed class SmartNetApiFactory : WebApplicationFactory<Program>
         string connectionString,
         string? keyRingPath = null,
         TimeProvider? timeProvider = null,
-        IPasswordHasher? passwordHasher = null)
+        IPasswordHasher? passwordHasher = null,
+        string? storageRoot = null)
     {
         _connectionString = connectionString;
         _keyRingPath = keyRingPath ?? Path.Combine(Path.GetTempPath(), "smartnet-api-tests-keyring", Guid.NewGuid().ToString("N"));
         _timeProvider = timeProvider;
         _passwordHasher = passwordHasher;
+        // task 3.5 (design D2) -- a fresh throwaway directory per factory instance, same shape as
+        // the key-ring default above: tests that need real bytes on disk (threat-matrix orphan-row
+        // and happy-path scenarios) create files under this exact path via Db-independent helpers.
+        _storageRoot = storageRoot ?? Path.Combine(Path.GetTempPath(), "smartnet-api-tests-storage", Guid.NewGuid().ToString("N"));
+        Directory.CreateDirectory(_storageRoot);
     }
+
+    public string StorageRoot => _storageRoot;
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -47,6 +56,7 @@ internal sealed class SmartNetApiFactory : WebApplicationFactory<Program>
             {
                 [ApiConnectionOptions.ConnectionStringKey] = _connectionString,
                 [ApiKeyRingOptions.KeyRingPathKey] = _keyRingPath,
+                [DocumentoStorageOptions.StorageRootKey] = _storageRoot,
             });
         });
 

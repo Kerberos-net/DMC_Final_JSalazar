@@ -134,6 +134,7 @@ var app = builder.Build();
 // (post-Build, reflecting any WebApplicationFactory override), never a silent default.
 _ = ApiConnectionOptions.Resolve(app.Configuration);
 _ = ApiKeyRingOptions.Resolve(app.Configuration);
+_ = DocumentoStorageOptions.Resolve(app.Configuration);
 
 // design.md Decision 6 / ADR 0012: same-origin behind the reverse proxy is a precondition, not
 // an assumption -- there is deliberately no app.UseCors(...) call anywhere in this file
@@ -147,6 +148,7 @@ app.MapFacturaEndpoints();
 app.MapAsientoEndpoints();
 app.MapTipoCambioEndpoints();
 app.MapIntegracionEndpoints();
+app.MapDocumentoEndpoints();
 
 app.Run();
 

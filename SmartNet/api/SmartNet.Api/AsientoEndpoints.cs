@@ -18,6 +18,7 @@ public static class AsientoEndpoints
 {
     public static IEndpointRouteBuilder MapAsientoEndpoints(this IEndpointRouteBuilder app)
     {
+        app.MapGet("/api/asientos/{id:long}", (Delegate)GetAsientoAsync).RequireAuthorization();
         app.MapPatch("/api/asientos/{id:long}", (Delegate)PatchAsientoAsync).RequireAuthorization();
         app.MapPost("/api/asientos/{id:long}/lineas", (Delegate)AgregarLineaAsync).RequireAuthorization();
         app.MapPatch("/api/asientos/{id:long}/lineas/{lineaId:long}", (Delegate)ActualizarLineaAsync).RequireAuthorization();
@@ -26,6 +27,22 @@ public static class AsientoEndpoints
         app.MapPost("/api/asientos/{id:long}/anular", (Delegate)AnularAsync).RequireAuthorization();
 
         return app;
+    }
+
+    /// <summary>tasks.md 3.8/3.9, spec.md asiento-lectura-api — lectura pura, sin comando: mismo
+    /// patrón de <c>FacturaEndpoints.GetFacturaAsync</c> (ETag en el encabezado, nunca en el
+    /// cuerpo).</summary>
+    private static async Task<IResult> GetAsientoAsync(long id, HttpContext http, IFacturacionStore store, CancellationToken ct)
+    {
+        await using var uow = await store.AbrirAsync(ct);
+        var asiento = await uow.CargarAsientoAsync(id, ct);
+        if (asiento is null)
+        {
+            return Results.NotFound();
+        }
+
+        http.Response.Headers.ETag = TokenDeConcurrencia.Codificar(asiento.Version);
+        return Results.Ok(AsientoRespuesta.De(asiento));
     }
 
     private static async Task<IResult> PatchAsientoAsync(
@@ -192,13 +209,25 @@ internal sealed record LineaCreadaRespuesta(long LineaId);
 
 internal sealed record ReabrirAnularRequest(string? Motivo);
 
-/// <summary>Forma de respuesta de <c>PATCH /api/asientos/{id}</c> y de los comandos de línea/
-/// reabrir/anular (todos devuelven el asiento actualizado, igual que <c>FacturaRespuesta</c>).</summary>
+/// <summary>Forma de respuesta de <c>GET</c>/<c>PATCH /api/asientos/{id}</c> y de los comandos de
+/// línea/reabrir/anular (todos devuelven el asiento actualizado, igual que <c>FacturaRespuesta</c>).
+///
+/// <see cref="TipoCambioVenta"/> — tasks.md 3.10/3.11, design D4 (BACKLOG #12): la tasa de venta
+/// congelada al generar/confirmar el asiento (<c>fact.AsientoContable.TipoCambioVenta</c>, ADR 0018
+/// pt.1 — nunca "compra"), ya persistida desde #11 (<c>SqlUnidadDeTrabajo.cs</c>) y ya cargada en
+/// <see cref="AsientoContable.TipoCambioVenta"/> -- este campo solo la expone, sin tocar el store.
+/// <c>null</c> para una factura en PEN, nunca un valor fabricado.
+///
+/// DEVIACIÓN DOCUMENTADA de la spec delta `factura-respuesta-asiento-respuesta.md` (que pide el
+/// campo en AMBAS `FacturaRespuesta` y `AsientoRespuesta`): design.md D4 corrige explícitamente la
+/// propuesta -- `FacturaPersistida` no tiene esa columna, y exponer una tasa DISTINTA junto a la
+/// congelada dejaría dos tasas divergiendo en pantalla. Se sigue design.md (la corrección
+/// documentada), no la spec delta sin corregir; ver apply-progress para el detalle.</summary>
 internal sealed record AsientoRespuesta(
     long AsientoContableId, string Estado, string? NumeroAsiento, string ProveedorCodigo, DateOnly FechaContable,
-    string? MotivoDescripcion)
+    string? MotivoDescripcion, decimal? TipoCambioVenta)
 {
     public static AsientoRespuesta De(AsientoPersistido asiento) => new(
         asiento.AsientoContableId, asiento.Estado, asiento.NumeroAsiento, asiento.Asiento.ProveedorCodigo,
-        asiento.Asiento.FechaContable, asiento.Asiento.MotivoDescripcion);
+        asiento.Asiento.FechaContable, asiento.Asiento.MotivoDescripcion, asiento.Asiento.TipoCambioVenta);
 }

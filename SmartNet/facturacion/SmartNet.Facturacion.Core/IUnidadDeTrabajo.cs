@@ -101,4 +101,28 @@ public interface IUnidadDeTrabajo : IAsyncDisposable
     /// Core solo llama esto para monedas distintas de PEN -- CasoConflicto.SinTipoCambio nunca se
     /// evalúa para facturas en moneda local.</summary>
     Task<bool> ExisteTipoCambioVigenteAsync(DateOnly fecha, CancellationToken ct);
+
+    // --- PR 3 (Phase 3, BACKLOG #12): lectura read-only para la lista unificada de documentos y el
+    // visor (spec.md documentos-lista-unificada-api / documento-contenido-api, design D1). Ningún
+    // miembro nuevo toca fact.DocumentoRecibido -- el proyecto .NET-owned fact.DocumentoFactura
+    // (schema 016) y fact.AdjuntoManual son las únicas dos fuentes (ADR 0003 §Privadas). ---
+
+    /// <summary>Todos los <c>fact.DocumentoFactura</c> (proyección de documentos ingeridos por
+    /// Python, poblada en promoción) de una factura, en el orden en que fueron creados.</summary>
+    Task<IReadOnlyList<DocumentoFacturaPersistido>> CargarDocumentosFacturaAsync(long facturaId, CancellationToken ct);
+
+    /// <summary>Todos los <c>fact.AdjuntoManual</c> NO eliminados (<c>EliminadoEn IS NULL</c>) de una
+    /// factura -- un adjunto borrado lógicamente desaparece de la lista unificada (D6/ADR 0013 "borrado
+    /// con rastro": el rastro vive en <c>AuditoriaCorreccion</c>, no en la lista visible).</summary>
+    Task<IReadOnlyList<AdjuntoManual>> CargarAdjuntosDeFacturaAsync(long facturaId, CancellationToken ct);
+
+    /// <summary>Un <c>fact.DocumentoFactura</c> por id, o <c>null</c> si no existe -- lo que
+    /// <c>GET /api/documentos/{id}/contenido</c> necesita para resolver un id de origen "ingesta"
+    /// (design D2) antes de servir bytes.</summary>
+    Task<DocumentoFacturaPersistido?> CargarDocumentoFacturaPorIdAsync(long documentoFacturaId, CancellationToken ct);
+
+    /// <summary>Un <c>fact.AdjuntoManual</c> por id, o <c>null</c> si no existe O si ya fue
+    /// eliminado lógicamente (mismo criterio que <see cref="CargarAdjuntosDeFacturaAsync"/>: un
+    /// adjunto eliminado no es servible, aunque la fila siga físicamente en la tabla).</summary>
+    Task<AdjuntoManual?> CargarAdjuntoPorIdAsync(long adjuntoManualId, CancellationToken ct);
 }

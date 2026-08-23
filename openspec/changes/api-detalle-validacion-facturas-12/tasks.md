@@ -43,19 +43,19 @@ Chain strategy: feature-branch-chain
 - [x] 2.3 RED: test asserting promoción issues no SELECT against `fact.DocumentoRecibido` (ADR 0003 symmetry)
 - [x] 2.4 REFACTOR: confirm no cross-partition read path; tidy repository mapping
 
-## Phase 3: .NET Read Endpoints
+## Phase 3: .NET Read Endpoints — COMPLETE (11/11, PR3)
 
-- [ ] 3.1 RED: threat-matrix — `../` in `RutaRelativa` → 404 (path traversal)
-- [ ] 3.2 RED: threat-matrix — non-allow-listed MIME → `application/octet-stream` + `X-Content-Type-Options: nosniff`
-- [ ] 3.3 RED: threat-matrix — unauthenticated `GET /contenido` → 401, no bytes
-- [ ] 3.4 RED: threat-matrix — orphan row (missing file) → 404, path never echoed
-- [ ] 3.5 GREEN: CREATE `SmartNet/api/SmartNet.Api/DocumentoEndpoints.cs` — `GET /api/documentos/{id}/contenido` (path containment, MIME allow-list, nosniff, inline disposition — D2)
-- [ ] 3.6 RED: lista unificada — merges `fact.DocumentoFactura` + `AdjuntoManual`, no duplicates; empty ≠ error; pre-016 factura degrades to `AdjuntoManual`-only
-- [ ] 3.7 GREEN: extend `DocumentoEndpoints.cs` — unified list, strictly read-only over .NET-owned tables
-- [ ] 3.8 RED: `GET /api/asientos/{id}` returns body+ETag; unknown id → 404; factura→asiento distinguishes "no vigente asiento" from unknown-factura 404
-- [ ] 3.9 GREEN: MODIFY `AsientoEndpoints.cs` — add `GET /api/asientos/{id}` + factura→asiento resolution (D3)
-- [ ] 3.10 RED: `TipoCambioVenta` on `AsientoRespuesta` equals frozen `TipoCambioCongelado.Venta`; PEN-only → null; #11 fields unchanged
-- [ ] 3.11 GREEN: MODIFY `AsientoEndpoints.cs` response mapping — add `TipoCambioVenta` (D4, no store change)
+- [x] 3.1 RED: threat-matrix — `../` in `RutaRelativa` → 404 (path traversal)
+- [x] 3.2 RED: threat-matrix — non-allow-listed MIME → `application/octet-stream` + `X-Content-Type-Options: nosniff`
+- [x] 3.3 RED: threat-matrix — unauthenticated `GET /contenido` → 401, no bytes
+- [x] 3.4 RED: threat-matrix — orphan row (missing file) → 404, path never echoed
+- [x] 3.5 GREEN: CREATE `SmartNet/api/SmartNet.Api/DocumentoEndpoints.cs` — `GET /api/documentos/{id}/contenido` (path containment, MIME allow-list, nosniff, inline disposition — D2)
+- [x] 3.6 RED: lista unificada — merges `fact.DocumentoFactura` + `AdjuntoManual`, no duplicates; empty ≠ error; pre-016 factura degrades to `AdjuntoManual`-only
+- [x] 3.7 GREEN: extend `DocumentoEndpoints.cs` — unified list, strictly read-only over .NET-owned tables
+- [x] 3.8 RED: `GET /api/asientos/{id}` returns body+ETag; unknown id → 404; factura→asiento distinguishes "no vigente asiento" from unknown-factura 404
+- [x] 3.9 GREEN: MODIFY `AsientoEndpoints.cs` — add `GET /api/asientos/{id}` + factura→asiento resolution (D3)
+- [x] 3.10 RED: `TipoCambioVenta` on `AsientoRespuesta` equals frozen `TipoCambioCongelado.Venta`; PEN-only → null; #11 fields unchanged
+- [x] 3.11 GREEN: MODIFY `AsientoEndpoints.cs` response mapping — add `TipoCambioVenta` (D4, no store change)
 
 ## Phase 4: SPA Auth Shell
 
