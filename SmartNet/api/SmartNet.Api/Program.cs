@@ -4,8 +4,12 @@ using Microsoft.AspNetCore.DataProtection.Repositories;
 using SmartNet.Api;
 using SmartNet.Auth.Core;
 using SmartNet.Auth.Infrastructure;
+using SmartNet.Facturacion.Core;
+using SmartNet.Facturacion.Infrastructure;
 using SmartNet.Inbox.Core;
 using SmartNet.Inbox.Infrastructure;
+using SmartNet.TiposCambio.Core;
+using SmartNet.TiposCambio.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -36,6 +40,42 @@ builder.Services.AddSingleton<IPromocionRepository>(sp =>
     new SqlPromocionRepository(ApiConnectionOptions.Resolve(sp.GetRequiredService<IConfiguration>())));
 builder.Services.AddSingleton<IBandejaRepository>(sp =>
     new SqlBandejaRepository(ApiConnectionOptions.Resolve(sp.GetRequiredService<IConfiguration>())));
+
+// BACKLOG #11 Phase 2 composition root: SmartNet.Facturacion.Infrastructure (PR 1) behind
+// SmartNet.Facturacion.Core's ports (design D8) -- same lazy-resolution pattern as every repo
+// above. ServicioDeFacturas is AddScoped per design D8 (it holds no per-request state; Scoped
+// simply matches the documented decision instead of Singleton like the plain repos).
+//
+// PR 5 (Phase 5, SinTipoCambio gap closure): resolves the SAME ITipoCambioRepository singleton
+// registered below for TipoCambioEndpoints (sp.GetRequiredService works regardless of
+// registration order -- DI factories run lazily on first resolution), instead of constructing a
+// second SqlTipoCambioRepository instance over the same connection string.
+builder.Services.AddSingleton<IFacturacionStore>(sp =>
+    new SqlFacturacionStore(
+        ApiConnectionOptions.Resolve(sp.GetRequiredService<IConfiguration>()),
+        sp.GetRequiredService<ITipoCambioRepository>()));
+builder.Services.AddScoped<ServicioDeFacturas>();
+
+// BACKLOG #11 Phase 3 (PR 3) composition root: ServicioDeAsientos over the same IFacturacionStore
+// above -- AddScoped for the same reason as ServicioDeFacturas (design D8, no per-request state).
+builder.Services.AddScoped<ServicioDeAsientos>();
+
+// BACKLOG #11 Phase 4 (PR 4) composition root: POST /api/tipos-cambio is a thin HTTP wrapper over
+// item #4's existing SqlTipoCambioRepository -- same lazy-resolution pattern as every repo above,
+// registered directly (no IUnidadDeTrabajo involvement: fact.TipoCambio's own composite PK is the
+// only concurrency guard this route needs, design TipoCambioEndpoints.cs comment).
+builder.Services.AddSingleton<ITipoCambioRepository>(sp =>
+    new SqlTipoCambioRepository(ApiConnectionOptions.Resolve(sp.GetRequiredService<IConfiguration>())));
+
+// BACKLOG #11 Phase 4 composition root: ServicioDeIntegraciones (Core, PR 1) over the
+// ICommandQueueRepository/IEstadoIntegracionRepository adapters (Infrastructure, PR 1) -- design D7
+// "sincronizar/reconectar/reprocesar enqueue only". ServicioDeIntegraciones is AddScoped for the
+// same reason as ServicioDeFacturas/ServicioDeAsientos above (design D8, no per-request state).
+builder.Services.AddSingleton<ICommandQueueRepository>(sp =>
+    new SqlCommandQueueRepository(ApiConnectionOptions.Resolve(sp.GetRequiredService<IConfiguration>())));
+builder.Services.AddSingleton<IEstadoIntegracionRepository>(sp =>
+    new SqlEstadoIntegracionRepository(ApiConnectionOptions.Resolve(sp.GetRequiredService<IConfiguration>())));
+builder.Services.AddScoped<ServicioDeIntegraciones>();
 
 // design D7: PeriodicTimer(1 min) with the DI-registered TimeProvider.System above -- so a test
 // that substitutes a FakeTimeProvider via SmartNetApiFactory could drive it deterministically the
@@ -103,6 +143,10 @@ app.UseAuthorization();
 
 app.MapSesionEndpoints();
 app.MapBandejaEndpoints();
+app.MapFacturaEndpoints();
+app.MapAsientoEndpoints();
+app.MapTipoCambioEndpoints();
+app.MapIntegracionEndpoints();
 
 app.Run();
 

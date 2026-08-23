@@ -15,6 +15,14 @@
     <ProjectReference Include="..\..\auth\SmartNet.Auth.Infrastructure\SmartNet.Auth.Infrastructure.csproj" />
     <ProjectReference Include="..\..\inbox\SmartNet.Inbox.Core\SmartNet.Inbox.Core.csproj" />
     <ProjectReference Include="..\..\inbox\SmartNet.Inbox.Infrastructure\SmartNet.Inbox.Infrastructure.csproj" />
+    <!-- BACKLOG #11 Phase 2: same shape as the pair above: Core (pure, PurityScan-guarded) +
+         Infrastructure (SQL adapters), never SmartNet.Db.Runner. -->
+    <ProjectReference Include="..\..\facturacion\SmartNet.Facturacion.Core\SmartNet.Facturacion.Core.csproj" />
+    <ProjectReference Include="..\..\facturacion\SmartNet.Facturacion.Infrastructure\SmartNet.Facturacion.Infrastructure.csproj" />
+    <!-- BACKLOG #11 Phase 4: HTTP wrapper over the existing carga-manual repository (item #4),
+         same Core/Infrastructure pair shape as above, never SmartNet.Db.Runner. -->
+    <ProjectReference Include="..\..\tipos-de-cambio\SmartNet.TiposCambio.Core\SmartNet.TiposCambio.Core.csproj" />
+    <ProjectReference Include="..\..\tipos-de-cambio\SmartNet.TiposCambio.Infrastructure\SmartNet.TiposCambio.Infrastructure.csproj" />
   </ItemGroup>
 
   <!-- Makes the top-level-statements Program class visible to WebApplicationFactory<Program> in
