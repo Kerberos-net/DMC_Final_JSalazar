@@ -1,9 +1,6 @@
-# Spec: api-incidencias-integraciones (BACKLOG #11)
+# Delta for api-incidencias-integraciones
 
-New capability — commands that queue background work (ADR 0004) and the integrations status
-projection, per ADR 0008. .NET MUST NOT call Python directly (ADR 0003 partition).
-
-## Capability: `api-incidencias-integraciones`
+## MODIFIED Requirements
 
 ### Requirement: reprocesar/sincronizar/reconectar enqueue CommandQueue rows, never call Python
 

@@ -1,6 +1,7 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.Testing;
 using SmartNet.Db.TestBootstrap;
 using SmartNet.Inbox.Core;
@@ -84,7 +85,7 @@ public sealed class BandejaEndpointsTests : SesionEndpointsTestBase
     }
 
     [Fact]
-    public async Task GetBandeja_WithAValidCookie_ReturnsPromotedAndDiscardedRows()
+    public async Task GetBandeja_WithAValidCookie_ReturnsEnvelopeWithPromotedRow()
     {
         var procesamientoIdPromovido = await Db.InsertarProcesamientoAsync(gmailMessageId: "msg-bandeja-promovido");
         var inboxEventIdPromovido = await Db.InsertarInboxEventAsync(procesamientoIdPromovido, "{}");
@@ -97,27 +98,22 @@ public sealed class BandejaEndpointsTests : SesionEndpointsTestBase
         await promocionRepository.DescartarAsync(
             inboxEventIdDescartado, "Faltan campos requeridos: monto", CancellationToken.None);
 
-        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
-        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
-        var loginResponse = await client.PostAsJsonAsync(
-            "/api/sesion", new LoginRequest(NombreUsuario, ClavePlanaCorrecta));
-        var cookie = ExtractSessionCookie(loginResponse)!;
-        client.DefaultRequestHeaders.Add("Cookie", cookie);
+        using var client = await ObtenerClienteAutenticadoAsync();
 
-        var response = await client.GetAsync("/api/bandeja");
+        var response = await client.GetAsync("/api/bandeja?estado=PROMOVIDO");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var items = await response.Content.ReadFromJsonAsync<List<BandejaItem>>(ResponseJsonOptions);
-        Assert.NotNull(items);
-        var promovido = items!.Single(i => i.InboxEventId == inboxEventIdPromovido);
+        var pagina = await response.Content.ReadFromJsonAsync<PaginaBandeja<BandejaItem>>(ResponseJsonOptions);
+        Assert.NotNull(pagina);
+        Assert.Equal(1, pagina!.Pagina);
+        Assert.Equal(20, pagina.TamanioPagina);
+        Assert.Equal(1, pagina.TotalPaginas);
+        var promovido = pagina.Items.Single(i => i.InboxEventId == inboxEventIdPromovido);
         Assert.Equal("PROMOVIDO", promovido.EstadoConsumo);
+        Assert.Equal("FACTURA", promovido.Origen);
         Assert.NotNull(promovido.FacturaId);
         Assert.NotNull(promovido.Indicadores);
-
-        var descartado = items.Single(i => i.InboxEventId == inboxEventIdDescartado);
-        Assert.Equal("DESCARTADO", descartado.EstadoConsumo);
-        Assert.Equal("Faltan campos requeridos: monto", descartado.MotivoDescarte);
-        Assert.Null(descartado.FacturaId);
+        Assert.DoesNotContain(pagina.Items, i => i.InboxEventId == inboxEventIdDescartado);
     }
 
     [Fact]
@@ -128,20 +124,108 @@ public sealed class BandejaEndpointsTests : SesionEndpointsTestBase
         var promocionRepository = new SqlPromocionRepository(Db.ConnectionString);
         await promocionRepository.DescartarAsync(inboxEventId, "Faltan campos requeridos: numero", CancellationToken.None);
 
-        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
-        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
-        var loginResponse = await client.PostAsJsonAsync(
-            "/api/sesion", new LoginRequest(NombreUsuario, ClavePlanaCorrecta));
-        var cookie = ExtractSessionCookie(loginResponse)!;
-        client.DefaultRequestHeaders.Add("Cookie", cookie);
+        using var client = await ObtenerClienteAutenticadoAsync();
 
         var response = await client.GetAsync("/api/bandeja?estado=DESCARTADO&orden=desc");
 
         Assert.Equal(HttpStatusCode.OK, response.StatusCode);
-        var items = await response.Content.ReadFromJsonAsync<List<BandejaItem>>(ResponseJsonOptions);
-        Assert.NotNull(items);
-        Assert.All(items!, i => Assert.Equal("DESCARTADO", i.EstadoConsumo));
-        Assert.Contains(items!, i => i.InboxEventId == inboxEventId);
+        var pagina = await response.Content.ReadFromJsonAsync<PaginaBandeja<BandejaItem>>(ResponseJsonOptions);
+        Assert.NotNull(pagina);
+        Assert.All(pagina!.Items, i => Assert.Equal("DESCARTADO", i.EstadoConsumo));
+        Assert.Contains(pagina.Items, i => i.InboxEventId == inboxEventId);
+    }
+
+    // Task 4.4 -- default view (no `estado`) excludes terminal rows. Deliberately does NOT set up a
+    // still-PENDIENTE row here: `PromocionBackgroundService` (BACKLOG #6/#7, unrelated to #13) runs
+    // its first poll tick the instant a NEW `WebApplicationFactory` boots and eagerly
+    // promotes/discards every `PENDIENTE` `fact.InboxEvent` row it finds via
+    // `PayloadInboxParser.Parse` -- a stub `Payload: "{}"` (this file's fixture shape) throws
+    // `KeyNotFoundException` there and crashes/stops the whole test host (`HostOptions.
+    // BackgroundServiceExceptionBehavior = StopHost`), well before this test's own HTTP call runs.
+    // The PENDIENTE-inclusion half of the default-view rule is proven without that host at
+    // `SmartNet.Inbox.Infrastructure.Tests.SqlBandejaRepositoryTests.
+    // ListarAsync_DefaultView_ExcludesTerminalRows_WhenEstadoIsOmitted` (design.md Testing
+    // Strategy already assigns default-view coverage to Core/Infra, not API). This test only needs
+    // rows already resolved (`PROMOVIDO`/`DESCARTADO`) before the factory boots, which is safe.
+    [Fact]
+    public async Task GetBandeja_DefaultView_ExcludesPromotedAndDiscardedRows()
+    {
+        var procesamientoIdPromovido = await Db.InsertarProcesamientoAsync(gmailMessageId: "msg-bandeja-promovido-terminal");
+        var inboxEventIdPromovido = await Db.InsertarInboxEventAsync(procesamientoIdPromovido, "{}");
+        var promocionRepository = new SqlPromocionRepository(Db.ConnectionString);
+        await promocionRepository.PromoverAsync(
+            inboxEventIdPromovido, procesamientoIdPromovido, MuestraFacturaPromovida(), MuestraDocumentoPromovido(), CancellationToken.None);
+
+        var procesamientoIdDescartado = await Db.InsertarProcesamientoAsync(gmailMessageId: "msg-bandeja-descartado-terminal");
+        var inboxEventIdDescartado = await Db.InsertarInboxEventAsync(procesamientoIdDescartado, "{}");
+        await promocionRepository.DescartarAsync(
+            inboxEventIdDescartado, "Faltan campos requeridos: monto", CancellationToken.None);
+
+        using var client = await ObtenerClienteAutenticadoAsync();
+
+        var response = await client.GetAsync("/api/bandeja");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var pagina = await response.Content.ReadFromJsonAsync<PaginaBandeja<BandejaItem>>(ResponseJsonOptions);
+        Assert.NotNull(pagina);
+        Assert.DoesNotContain(pagina!.Items, i => i.InboxEventId == inboxEventIdPromovido);
+        Assert.DoesNotContain(pagina.Items, i => i.InboxEventId == inboxEventIdDescartado);
+    }
+
+    [Theory]
+    [InlineData("0")]
+    [InlineData("-1")]
+    [InlineData("no-numerico")]
+    public async Task GetBandeja_InvalidPagina_Returns400ProblemDetails(string pagina)
+    {
+        using var client = await ObtenerClienteAutenticadoAsync();
+
+        var response = await client.GetAsync($"/api/bandeja?pagina={pagina}");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problema = await response.Content.ReadFromJsonAsync<ProblemDetails>(ResponseJsonOptions);
+        Assert.NotNull(problema);
+        Assert.Equal(400, problema!.Status);
+    }
+
+    [Fact]
+    public async Task GetBandeja_DesdeAfterHasta_Returns400ProblemDetails()
+    {
+        using var client = await ObtenerClienteAutenticadoAsync();
+
+        var response = await client.GetAsync("/api/bandeja?desde=2026-02-01&hasta=2026-01-01");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problema = await response.Content.ReadFromJsonAsync<ProblemDetails>(ResponseJsonOptions);
+        Assert.NotNull(problema);
+        Assert.Equal(400, problema!.Status);
+    }
+
+    // Tracked so DisposeAsync can dispose every factory created via ObtenerClienteAutenticadoAsync --
+    // a factory with no other live reference is eligible for GC mid-test, which disposes its
+    // TestServer and turns in-flight requests into ObjectDisposedException.
+    private readonly List<SmartNetApiFactory> _factoriesCreadas = new();
+
+    public override async Task DisposeAsync()
+    {
+        foreach (var factory in _factoriesCreadas)
+        {
+            await factory.DisposeAsync();
+        }
+
+        await base.DisposeAsync();
+    }
+
+    private async Task<HttpClient> ObtenerClienteAutenticadoAsync()
+    {
+        var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        _factoriesCreadas.Add(factory);
+        var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+        var loginResponse = await client.PostAsJsonAsync(
+            "/api/sesion", new LoginRequest(NombreUsuario, ClavePlanaCorrecta));
+        var cookie = ExtractSessionCookie(loginResponse)!;
+        client.DefaultRequestHeaders.Add("Cookie", cookie);
+        return client;
     }
 
     private static DocumentoPromovido MuestraDocumentoPromovido() =>

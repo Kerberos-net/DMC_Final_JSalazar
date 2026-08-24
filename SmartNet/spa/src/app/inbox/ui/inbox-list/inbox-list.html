@@ -5,6 +5,7 @@
       <th>Estado</th>
       <th>Detalle</th>
       <th>Indicadores</th>
+      <th>Acciones</th>
     </tr>
   </thead>
   <tbody>
@@ -13,7 +14,7 @@
         <td>{{ fila.item.creadoEn | date: 'short' }}</td>
         <td>{{ fila.item.estadoConsumo }}</td>
         <td>
-          @if (fila.item.estadoConsumo === 'PROMOVIDO') {
+          @if (fila.item.origen === 'FACTURA') {
             <span data-testid="factura-id">Factura #{{ fila.item.facturaId }}</span>
             <a data-testid="ir-a-detalle" [routerLink]="['/detalle', fila.item.facturaId]">Ver detalle</a>
           } @else if (fila.item.estadoConsumo === 'DESCARTADO') {
@@ -21,10 +22,29 @@
           } @else {
             <span>Pendiente de promoción</span>
           }
+
+          @if (fila.item.errores.length > 0) {
+            <details>
+              <summary>Historial de errores ({{ fila.item.errores.length }})</summary>
+              <app-panel-errores [errores]="fila.item.errores" />
+            </details>
+          }
         </td>
         <td>
           @for (chip of fila.chips; track chip.clave) {
             <span data-testid="indicador-chip" class="chip">{{ chip.etiqueta }}</span>
+          }
+        </td>
+        <td>
+          @if (fila.item.errores.length > 0) {
+            <button
+              type="button"
+              [attr.data-testid]="'reprocesar-' + fila.item.inboxEventId"
+              [disabled]="reprocesarDeshabilitado(fila)"
+              (click)="onReprocesar(fila)"
+            >
+              Reprocesar
+            </button>
           }
         </td>
       </tr>

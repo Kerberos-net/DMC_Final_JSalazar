@@ -598,6 +598,46 @@ public sealed class PermissionMatrixTests
     }
 
     // ---------------------------------------------------------------------------------------
+    // BACKLOG #13, Phase 1 (task 1.1/1.2) — 018_permiso_lectura_procesamiento_error.sql,
+    // design.md D1: fact_api's original DENY SELECT on fact.ProcesamientoError (008) is revoked
+    // and replaced with GRANT SELECT so the bandeja endpoint can read the panel de errores;
+    // INSERT/UPDATE/DELETE stay explicitly DENY'd to fact_api (Python remains the sole writer,
+    // ADR 0003 asymmetric-read reclassification).
+    // ---------------------------------------------------------------------------------------
+    [Fact]
+    public async Task UsrApi_CanSelect_ProcesamientoError_ButStaysDenied_OnInsertUpdateDelete()
+    {
+        await using var db = await MigratedDatabaseWithUsers();
+        var procesamientoId = await SeedProcesamiento(db);
+        await db.ExecuteNonQueryAsync(
+            $"INSERT INTO fact.ProcesamientoError (ProcesamientoId, Integracion, Mensaje, Clasificacion, OcurridoEn) " +
+            $"VALUES ({procesamientoId}, 'GMAIL', 'error', 'TRANSITORIO', SYSUTCDATETIME());");
+
+        await AssertSucceedsRead(db, UsrApi, "SELECT COUNT(*) FROM fact.ProcesamientoError;");
+
+        await AssertDenied(db, UsrApi,
+            $"INSERT INTO fact.ProcesamientoError (ProcesamientoId, Integracion, Mensaje, Clasificacion, OcurridoEn) " +
+            $"VALUES ({procesamientoId}, 'GMAIL', 'otro', 'TRANSITORIO', SYSUTCDATETIME());");
+        await AssertDenied(db, UsrApi,
+            $"UPDATE fact.ProcesamientoError SET Mensaje = 'x' WHERE ProcesamientoId = {procesamientoId};");
+        await AssertDenied(db, UsrApi,
+            $"DELETE FROM fact.ProcesamientoError WHERE ProcesamientoId = {procesamientoId};");
+    }
+
+    // Prior DENY assertions untouched: usr_worker keeps full SELECT/INSERT/UPDATE on
+    // fact.ProcesamientoError (already covered by UsrWorker_HasFullAccess_OnItsOwnPrivateTables
+    // above); this test only re-confirms the other cross-boundary DENYs on fact_api are
+    // unaffected by 018 (Procesamiento/DatosExtraidos stay denied).
+    [Fact]
+    public async Task UsrApi_StaysDenied_OnProcesamientoAndDatosExtraidos_AfterSchema018()
+    {
+        await using var db = await MigratedDatabaseWithUsers();
+
+        await AssertDenied(db, UsrApi, "SELECT COUNT(*) FROM fact.Procesamiento;");
+        await AssertDenied(db, UsrApi, "SELECT COUNT(*) FROM fact.DatosExtraidos;");
+    }
+
+    // ---------------------------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------------------------
     private static async Task<TestDatabaseFixture> MigratedDatabaseWithUsers()

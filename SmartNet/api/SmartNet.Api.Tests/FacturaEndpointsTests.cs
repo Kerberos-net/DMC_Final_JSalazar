@@ -408,8 +408,10 @@ public sealed class FacturaEndpointsTests : SesionEndpointsTestBase
         var facturaId = resultado.FacturaId;
 
         var bandejaRepository = new SqlBandejaRepository(Db.ConnectionString);
-        var bandeja = await bandejaRepository.ListarAsync(estado: null, orden: "desc", CancellationToken.None);
-        var itemBandeja = bandeja.Single(i => i.InboxEventId == inboxEventId);
+        var filtrosBandeja = new FiltrosBandeja(
+            Estado: "PROMOVIDO", Desde: null, Hasta: null, Proveedor: null, Orden: "desc", Pagina: 1);
+        var bandeja = await bandejaRepository.ListarAsync(filtrosBandeja, CancellationToken.None);
+        var itemBandeja = bandeja.Items.Single(i => i.InboxEventId == inboxEventId);
 
         await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
         using var client = await AuthenticatedClientAsync(factory);

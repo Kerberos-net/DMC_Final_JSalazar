@@ -14,6 +14,37 @@
   </label>
 
   <label>
+    Desde
+    <input
+      type="date"
+      data-testid="desde-input"
+      [value]="desde() ?? ''"
+      (change)="onDesdeChange($any($event.target).value)"
+    />
+  </label>
+
+  <label>
+    Hasta
+    <input
+      type="date"
+      data-testid="hasta-input"
+      [value]="hasta() ?? ''"
+      (change)="onHastaChange($any($event.target).value)"
+    />
+  </label>
+
+  <label>
+    Proveedor
+    <input
+      type="text"
+      data-testid="proveedor-input"
+      [value]="proveedor() ?? ''"
+      (change)="onProveedorChange($any($event.target).value)"
+      (keydown.enter)="onProveedorChange($any($event.target).value)"
+    />
+  </label>
+
+  <label>
     Orden por fecha
     <select
       data-testid="orden-select"
