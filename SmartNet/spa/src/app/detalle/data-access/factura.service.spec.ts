@@ -23,6 +23,10 @@ describe('FacturaService', () => {
     fechaEmision: '2026-08-10',
     motivo: null,
     afectacion: 'Gravada',
+    esProveedorGenerico: false,
+    posibleDuplicado: false,
+    tieneCamposNoExtraidos: false,
+    afectacionMixta: false,
   };
 
   beforeEach(() => {
@@ -64,6 +68,25 @@ describe('FacturaService', () => {
     req.flush(actualizada, { headers: { ETag: '"v2"' } });
 
     await guardarPromise;
+    expect(service.factura()).toEqual(actualizada);
+    expect(service.etag()).toBe('"v2"');
+  });
+
+  it('confirmarAfectacion() posts to /confirmar-afectacion with If-Match and updates state', async () => {
+    const cargaPromise = service.cargar(42);
+    httpMock.expectOne('/api/facturas/42').flush(factura, { headers: { ETag: '"v1"' } });
+    await cargaPromise;
+
+    const confirmarPromise = service.confirmarAfectacion(42, true);
+
+    const req = httpMock.expectOne('/api/facturas/42/confirmar-afectacion');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.headers.get('If-Match')).toBe('"v1"');
+    expect(req.request.body).toEqual({ esMixta: true });
+    const actualizada = { ...factura, afectacionMixta: true };
+    req.flush(actualizada, { headers: { ETag: '"v2"' } });
+
+    await confirmarPromise;
     expect(service.factura()).toEqual(actualizada);
     expect(service.etag()).toBe('"v2"');
   });

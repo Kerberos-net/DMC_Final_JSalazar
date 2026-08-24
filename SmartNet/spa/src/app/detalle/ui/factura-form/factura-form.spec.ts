@@ -15,6 +15,10 @@ describe('FacturaForm', () => {
     fechaEmision: '2026-08-10',
     motivo: null,
     afectacion: 'Gravada',
+    esProveedorGenerico: false,
+    posibleDuplicado: false,
+    tieneCamposNoExtraidos: false,
+    afectacionMixta: false,
   };
 
   const createComponent = (f: FacturaRespuesta, tipoCambioVenta: number | null = null, editable = true) => {
@@ -65,5 +69,60 @@ describe('FacturaForm', () => {
     const fixture = createComponent(factura, null, false);
     const input: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="campo-rucProveedor"]');
     expect(input.disabled).toBe(true);
+  });
+
+  /* tasks.md 4.6 (RED first), spa-visual-detalle-validacion: bloqueante iff
+   * posibleDuplicado || esProveedorGenerico; informativa iff tieneCamposNoExtraidos ||
+   * afectacionMixta === null. */
+  describe('indicator alert bindings', () => {
+    it('renders .alerta--bloqueante for a duplicate invoice', () => {
+      const fixture = createComponent({ ...factura, posibleDuplicado: true });
+      expect(fixture.nativeElement.querySelector('.alerta--bloqueante')).toBeTruthy();
+    });
+
+    it('renders .alerta--bloqueante for an unregistered provider (P00000)', () => {
+      const fixture = createComponent({ ...factura, esProveedorGenerico: true });
+      expect(fixture.nativeElement.querySelector('.alerta--bloqueante')).toBeTruthy();
+    });
+
+    it('renders .alerta--informativa for OCR fields not extracted', () => {
+      const fixture = createComponent({ ...factura, tieneCamposNoExtraidos: true });
+      expect(fixture.nativeElement.querySelector('.alerta--informativa')).toBeTruthy();
+    });
+
+    it('renders .alerta--informativa for an unverified afectación (afectacionMixta === null)', () => {
+      const fixture = createComponent({ ...factura, afectacionMixta: null });
+      expect(fixture.nativeElement.querySelector('.alerta--informativa')).toBeTruthy();
+    });
+
+    it('renders neither alert treatment when no indicator is active', () => {
+      const fixture = createComponent(factura);
+      expect(fixture.nativeElement.querySelector('.alerta--bloqueante')).toBeNull();
+      expect(fixture.nativeElement.querySelector('.alerta--informativa')).toBeNull();
+    });
+  });
+
+  /* tasks.md 4.8 (RED+GREEN): afectación-confirmation control visible iff
+   * AfectacionMixta === null; confirming emits `confirmarAfectacion`. */
+  describe('afectación confirmation control', () => {
+    it('is visible when afectacionMixta is null (unverified)', () => {
+      const fixture = createComponent({ ...factura, afectacionMixta: null });
+      expect(fixture.nativeElement.querySelector('[data-testid="confirmar-afectacion"]')).toBeTruthy();
+    });
+
+    it('is not rendered once afectacionMixta has a value', () => {
+      const fixture = createComponent({ ...factura, afectacionMixta: true });
+      expect(fixture.nativeElement.querySelector('[data-testid="confirmar-afectacion"]')).toBeNull();
+    });
+
+    it('emits confirmarAfectacion with the chosen esMixta value', () => {
+      const fixture = createComponent({ ...factura, afectacionMixta: null });
+      let emitido: unknown = 'sin-emitir';
+      fixture.componentInstance.confirmarAfectacion.subscribe((v) => (emitido = v));
+
+      (fixture.nativeElement.querySelector('[data-testid="confirmar-afectacion-mixta"]') as HTMLButtonElement).click();
+
+      expect(emitido).toBe(true);
+    });
   });
 });

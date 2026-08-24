@@ -25,6 +25,10 @@ describe('DetallePage', () => {
     fechaEmision: '2026-08-10',
     motivo: null,
     afectacion: 'Gravada',
+    esProveedorGenerico: false,
+    posibleDuplicado: false,
+    tieneCamposNoExtraidos: false,
+    afectacionMixta: false,
   };
 
   const asiento: AsientoRespuesta = {
