@@ -11,9 +11,9 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | **11 de 18 cerrados** (BACKLOG.md ahora tiene 18 ítems: el #18 "Ajuste visual del diseño SPA" nació al cerrar el sub-cambio visual del #12, 2026-08-24) |
-| Ciclo SDD activo | Ninguno — último cerrado: ítem #12 + sub-cambio visual SPA |
-| Última fase cerrada | Ítem #12 (Detalle y validación), 7 fases, 46/46 tareas cerradas, verify PASS sin CRITICAL (689 .NET + 72 SPA + 190 Python en verde, tras aislar y reconfirmar los fallos transitorios de contención de bases de prueba en paralelo), smoke E2E manual (bandeja → guardar avance → validar → conflicto 412) verificado por el usuario — ítem #12 cerrado 2026-08-23; sub-cambio visual SPA (diseño tokens, tema, visuales, lectura auditoría) cerrado 2026-08-24 |
+| Ítems del backlog | **12 de 18 cerrados** (BACKLOG.md tiene 18 ítems: el #18 "Ajuste visual del diseño SPA" nació al cerrar el sub-cambio visual del #12, 2026-08-24) |
+| Ciclo SDD activo | Ninguno — último cerrado: ítem #13 (Bandeja e incidencias) |
+| Última fase cerrada | Ítem #13 (Bandeja e incidencias), 6 fases, 51/51 tareas cerradas, verify PASS sin CRITICAL/WARNING (2 SUGGESTIONS no bloqueantes), suite completa en verde tras aislar y reconfirmar un fallo transitorio de contención de bases de prueba en `SmartNet.Db.Runner.Tests` — ítem #13 cerrado 2026-08-24 |
 
 ---
 
@@ -1228,7 +1228,91 @@ Engram desactualizado, no el estado real del archivo.
 
 ---
 
-## ⬜ Ítems 10, 13 a 18 — sin ciclo SDD abierto
+## ✅ 13. Bandeja e incidencias
+
+Vista lógica combinada de `GET /api/bandeja` ampliada al contrato completo de ADR 0008 (`estado`,
+`desde`, `hasta`, `proveedor`, `pagina`, `orden`), discriminador `origen` por fila (`FACTURA` |
+`INCIDENCIA`) combinado enteramente server-side (ADR 0008/0003: "Angular nunca combina fuentes"),
+panel de errores sobre `fact.ProcesamientoError`, y acción reprocesar con confirmación obligatoria
+reutilizando el endpoint `POST /api/incidencias/{id}/reprocesar` ya entregado por el ítem #11.
+Depende del ítem #11 (completo).
+
+**Entrega:** un solo PR (`size:exception`), aprobado explícitamente por el dueño del proyecto en
+vez de los 4 PRs encadenados (DB/permisos+ADR → Core+Infrastructure → Api → SPA) que sugería el
+pronóstico de `sdd-tasks`.
+
+**Ciclo SDD:** `openspec/changes/archive/2026-08-24-item-13-bandeja-incidencias/` · **51 de 51 tareas cerradas** — ✅ **CERRADO 2026-08-24**
+
+| Fase | Alcance | Tareas | Estado |
+|---|---|---|---|
+| 1 | DB — migración `018_permiso_lectura_procesamiento_error.sql` + enmienda ADR 0003 | 5/5 | ✅ |
+| 2 | `SmartNet.Inbox.Core` — dominio puro (`OrigenBandeja`, `PoliticaDeReprocesamiento`, envelope de paginación) | 10/10 | ✅ |
+| 3 | `SmartNet.Inbox.Infrastructure` — `SqlBandejaRepository` reescrito en un solo *batch* SQL | 9/9 | ✅ |
+| 4 | `SmartNet.Api` — `BandejaEndpoints` (*binding*/validación de filtros) | 6/6 | ✅ |
+| 5 | SPA `inbox/` — filtros, `panel-errores`, `confirmar-reproceso` | 18/18 | ✅ |
+| 6 | Verificación: suite completa + *cross-check* de *edge cases* de spec | 3/3 | ✅ |
+
+Pronóstico de revisión: alto riesgo de presupuesto de 400 líneas (~520-650 estimadas); PRs
+encadenados recomendados, `ask-on-risk`. El dueño del proyecto eligió explícitamente **un solo PR**
+con `size:exception` en vez de partir la entrega. Detalle completo en `tasks.md`.
+
+### Pruebas
+
+Verificación independiente ejecutando cada proyecto por separado (nunca `dotnet test SmartNet.sln`
+de un tirón como medida única — mismo hallazgo que items anteriores sobre contención SQL en
+paralelo):
+
+| Suite | Resultado | Nota |
+|---|---|---|
+| `SmartNet.Inbox.Core.Tests` | 49/49 | Incluye `PurityScanTests` (ADR 0019, `OrigenBandeja.cs` sin infraestructura) |
+| `SmartNet.Inbox.Infrastructure.Tests` | 41/41 | Corre `AS usr_api` contra SQL Server real — prueba el *grant* D1 al nivel del motor, no mockeado |
+| `SmartNet.Api.Tests` | 132/132 | *Binding*, forma del *envelope*, errores `400` |
+| `SmartNet.Db.Runner.Tests` | 134/134 (aislado) | 2 fallos al correr `SmartNet.sln` completo en paralelo, distintos en cada corrida ("database does not exist" en `DisposeAsync`) — mismo patrón de contención ya documentado en ítems anteriores, no regresión de #13 |
+| `SmartNet.Contable.Core.Tests` | 41/41 | Intocado — confirma ADR 0019 |
+| SPA (`npx ng test --watch=false`) | 162/162 | `npx vitest run` directo da falso negativo masivo (bypassea el *builder* de Angular, `localStorage is not defined`) — el comando correcto es `ng test`, no `vitest run` a secas |
+| `npx ng build` | limpio | Sin *warnings* de *budget* |
+
+### Lo verificado al cerrar
+
+**Hallazgo real encontrado por el diseño, no supuesto.** `fact_api` tenía un `DENY SELECT`
+explícito sobre `fact.ProcesamientoError` desde el ítem #1
+(`SmartNet/db/schema/008_usuarios_y_permisos.sql:85`) — la propuesta había asumido, siguiendo la
+prosa de ADR 0003, que .NET ya podía leer esa tabla. Verificado directamente contra el DDL antes de
+llevarlo al usuario: **`DENY` gana sobre `GRANT`** en SQL Server, así que sin resolverlo el panel de
+errores era inconstruible. Ningún test ratificado dependía de esa denegación en particular (los
+tests de `PermissionMatrixTests` protegían `fact.Procesamiento`/`fact.DatosExtraidos`, no
+`ProcesamientoError`) — era defensa en profundidad de más, no una decisión contable deliberada. El
+dueño del proyecto ratificó otorgar `SELECT` (manteniendo denegados los verbos de escritura), vía
+`018_permiso_lectura_procesamiento_error.sql` + **ADR 0003 Revisión 6**, mismo patrón que
+`fact.Configuracion`.
+
+**Un *batch* de `sdd-apply` se interrumpió por un error de sesión (403, no de código).** Antes de
+descartar o rehacer el trabajo a ciegas, se verificó el *working tree* directamente con `dotnet
+build`/`dotnet test`: la Fase 3 (Infrastructure) ya estaba completa y en verde (40/40 en ese
+momento, luego 41/41 con la fase de verificación final), así que se marcó como cerrada en `tasks.md`
+y se continuó desde ahí en el siguiente *batch*, en vez de re-implementarla.
+
+**El primer borrador del `archive-report` traía un hecho de negocio incorrecto**, corregido antes de
+comitear: decía "entrega vía 4 PRs encadenados", cuando la decisión real y ratificada fue un solo
+PR con `size:exception` (confusión entre la *sugerencia* inicial del pronóstico de `sdd-tasks` y lo
+que efectivamente se decidió). El "*move*" del cambio a `openspec/changes/archive/` tampoco fue
+real — quedó una copia duplicada de la carpeta original sin `archive-report.md`, detectada por
+`diff -rq` y eliminada.
+
+Dos desviaciones documentadas por `sdd-apply`, ninguna oculta: (1) el test de vista por defecto a
+nivel API solo cubre la mitad "excluye filas resueltas" (un `PromocionBackgroundService`
+preexistente rompe el *host* de pruebas con una fila `PENDIENTE` de payload *stub*) — la mitad
+"incluye `PENDIENTE`" quedó cubierta en la capa Infrastructure; (2) `checksums.txt` no traía la
+entrada de la migración `018`, atrapado por la propia suite de *checksums* del proyecto y corregido
+de forma aditiva.
+
+`sdd-verify`: 0 CRITICAL, 0 WARNING, 2 SUGGESTIONS no bloqueantes (nombre de test dedicado para
+"proveedor sin coincidencias"; el re-*enable* de reprocesar depende del próximo *refetch* en vez de
+un *timer* de reloj — *tradeoff* interina ya aceptada, a reemplazar cuando exista el ítem #14).
+
+---
+
+## ⬜ Ítems 10, 14 a 18 — sin ciclo SDD abierto
 
 Las fases de cada ítem **se definen cuando arranca su ciclo SDD**, no antes. Ponerlas aquí ahora
 sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ítem, y ninguno existe.
@@ -1236,7 +1320,6 @@ sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ít
 | # | Ítem | Depende de | Contexto obligatorio | Estado |
 |---|---|---|---|---|
 | 10 | Notas de crédito | #8 | ⚠ `REGLAS.md` §5, §7 | ⬜ |
-| 13 | Bandeja e incidencias | #11 | — | ⬜ |
 | 14 | Outbox y mensajería | #11 | — | ⬜ |
 | 15 | Publicación a Drive | #14 | — | ⬜ |
 | 16 | Publicación a Sheets | #14 | — | ⬜ |
