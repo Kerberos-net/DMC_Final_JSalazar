@@ -49,36 +49,36 @@ Chain strategy: pending
 
 ## Phase 3: SPA — Tokens and theme (PR 2)
 
-- [ ] 3.1 RED: create `spa/src/app/shared/tema.service.spec.ts` — `resolverTema` per D1 truth table; invalid `localStorage` value → `'sistema'`; stub `matchMedia` (jsdom gotcha)
-- [ ] 3.2 RED: create `spa/src/app/shared/contraste.spec.ts` — asserts every documented token pair (light + dark) meets its 4.5:1/3:1 floor from design.md's palette table
-- [ ] 3.3 GREEN: create `spa/src/app/shared/contraste.ts` — pure WCAG 2.x `contraste(hexA, hexB)` function
-- [ ] 3.4 GREEN: create `spa/src/app/shared/tema.service.ts` — signal-based `TemaService`, `resolverTema()`, `aplicarTemaInicial()`, writes `document.documentElement.dataset.tema`
-- [ ] 3.5 Wire `aplicarTemaInicial()` in `spa/src/main.ts` before `bootstrapApplication` (no-flash requirement)
-- [ ] 3.6 Rewrite `spa/src/styles.css` with `@layer tokens, base, primitives` — both theme token blocks (hex values from design.md), `color-scheme`, shared primitives (`.btn`, `.campo`, `.chip`, `.tabla`, `.alerta`, `.panel`, `.banner`)
-- [ ] 3.7 Update `spa/src/index.html` — `lang="es"`, real `<title>`
-- [ ] 3.8 Update `spa/src/app/app.html`/`app.css` — minimal shell header with native `<select>` theme control bound to `TemaService`
-- [ ] 3.9 RED+GREEN: `localStorage` tampered-value test in `tema.service.spec.ts` — confirms fallback to `'sistema'` (threat-matrix client-input-trust row)
+- [x] 3.1 RED: create `spa/src/app/shared/tema.service.spec.ts` — `resolverTema` per D1 truth table; invalid `localStorage` value → `'sistema'`; stub `matchMedia` (jsdom gotcha)
+- [x] 3.2 RED: create `spa/src/app/shared/contraste.spec.ts` — asserts every documented token pair (light + dark) meets its 4.5:1/3:1 floor from design.md's palette table
+- [x] 3.3 GREEN: create `spa/src/app/shared/contraste.ts` — pure WCAG 2.x `contraste(hexA, hexB)` function
+- [x] 3.4 GREEN: create `spa/src/app/shared/tema.service.ts` — signal-based `TemaService`, `resolverTema()`, `aplicarTemaInicial()`, writes `document.documentElement.dataset.tema`
+- [x] 3.5 Wire `aplicarTemaInicial()` in `spa/src/main.ts` before `bootstrapApplication` (no-flash requirement)
+- [x] 3.6 Rewrite `spa/src/styles.css` with `@layer tokens, base, primitives` — both theme token blocks (hex values from design.md), `color-scheme`, shared primitives (`.btn`, `.campo`, `.chip`, `.tabla`, `.alerta`, `.panel`, `.banner`)
+- [x] 3.7 Update `spa/src/index.html` — `lang="es"`, real `<title>`
+- [x] 3.8 Update `spa/src/app/app.html`/`app.css` — minimal shell header with native `<select>` theme control bound to `TemaService`
+- [x] 3.9 RED+GREEN: `localStorage` tampered-value test in `tema.service.spec.ts` — confirms fallback to `'sistema'` (threat-matrix client-input-trust row)
 
 ## Phase 4: SPA — Component visuals and data wiring (PR 2)
 
-- [ ] 4.1 Apply `styleUrl` CSS to `login-page.{ts,html,css}` — centered card, 401 message uses `.alerta`
-- [ ] 4.2 Create `spa/.../detalle/models/historial.model.ts` mirroring `EntradaAuditoriaRespuesta`; extend `factura.model.ts` with the 4 indicator fields
-- [ ] 4.3 RED: create `spa/.../detalle/data-access/historial.service.spec.ts` (ADR 0009 signals pattern)
-- [ ] 4.4 GREEN: create `spa/.../detalle/data-access/historial.service.ts` calling `GET /api/facturas/{id}/historial`
-- [ ] 4.5 Create presentational `spa/.../detalle/ui/historial-correccion/*` — native `<details>`/`<summary>` panel, closed by default, no history → non-error empty state
-- [ ] 4.6 RED: component test — `.alerta--bloqueante` iff `posibleDuplicado || esProveedorGenerico`; `.alerta--informativa` iff `tieneCamposNoExtraidos || afectacionMixta === null`
-- [ ] 4.7 GREEN: apply `styleUrl` + indicator bindings to `factura-form.{ts,html,css}` — estado chip, P00000/duplicado → bloqueante, campos no extraídos → informativo
-- [ ] 4.8 RED+GREEN: add afectación-confirmation control to `factura-form` — visible iff `AfectacionMixta === null`; confirm action calls `POST /confirmar-afectacion`
-- [ ] 4.9 Apply `styleUrl` to `asiento-lineas.{ts,html,css}` — tabular alignment (`tabular-nums`), wire `historial-correccion` panel
-- [ ] 4.10 Apply `styleUrl` to `visor-documento.{ts,html,css}` — iframe fill, native `<select>` follows theme via `color-scheme`
-- [ ] 4.11 RED: component test — `.banner--conflicto` (412, violeta) vs `.banner--error` (422, rojo), distinct icon shape
-- [ ] 4.12 GREEN: apply `styleUrl` to `conflicto-banner.{ts,html,css}` per D3/threat-matrix redundancy (placement + shape + label, color never sole carrier)
-- [ ] 4.13 Wire `detalle-page.{ts,html,css}` — fetch historial via `historial.service.ts`, pass `[historial]`/indicators down; 2-col grid, sticky visor, collapses <1100px
-- [ ] 4.14 Review `spa/angular.json` `anyComponentStyle` budgets; run `ng build --configuration production` and confirm no component CSS exceeds 8kB (D6)
+- [x] 4.1 Apply `styleUrl` CSS to `login-page.{ts,html,css}` — centered card, 401 message uses `.alerta`
+- [x] 4.2 Create `spa/.../detalle/models/historial.model.ts` mirroring `EntradaAuditoriaRespuesta`; extend `factura.model.ts` with the 4 indicator fields
+- [x] 4.3 RED: create `spa/.../detalle/data-access/historial.service.spec.ts` (ADR 0009 signals pattern)
+- [x] 4.4 GREEN: create `spa/.../detalle/data-access/historial.service.ts` calling `GET /api/facturas/{id}/historial`
+- [x] 4.5 Create presentational `spa/.../detalle/ui/historial-correccion/*` — native `<details>`/`<summary>` panel, closed by default, no history → non-error empty state
+- [x] 4.6 RED: component test — `.alerta--bloqueante` iff `posibleDuplicado || esProveedorGenerico`; `.alerta--informativa` iff `tieneCamposNoExtraidos || afectacionMixta === null`
+- [x] 4.7 GREEN: apply `styleUrl` + indicator bindings to `factura-form.{ts,html,css}` — estado chip, P00000/duplicado → bloqueante, campos no extraídos → informativo
+- [x] 4.8 RED+GREEN: add afectación-confirmation control to `factura-form` — visible iff `AfectacionMixta === null`; confirm action calls `POST /confirmar-afectacion`
+- [x] 4.9 Apply `styleUrl` to `asiento-lineas.{ts,html,css}` — tabular alignment (`tabular-nums`), wire `historial-correccion` panel
+- [x] 4.10 Apply `styleUrl` to `visor-documento.{ts,html,css}` — iframe fill, native `<select>` follows theme via `color-scheme`
+- [x] 4.11 RED: component test — `.banner--conflicto` (412, violeta) vs `.banner--error` (422, rojo), distinct icon shape
+- [x] 4.12 GREEN: apply `styleUrl` to `conflicto-banner.{ts,html,css}` per D3/threat-matrix redundancy (placement + shape + label, color never sole carrier)
+- [x] 4.13 Wire `detalle-page.{ts,html,css}` — fetch historial via `historial.service.ts`, pass `[historial]`/indicators down; 2-col grid, sticky visor, collapses <1100px
+- [x] 4.14 Review `spa/angular.json` `anyComponentStyle` budgets; run `ng build --configuration production` and confirm no component CSS exceeds 8kB (D6)
 
 ## Phase 5: Cross-cutting verification
 
 - [ ] 5.1 Run `dotnet test` full suite (Core + Infrastructure + Api) — confirm no regression in existing `FacturaEndpointsTests`/`SqlUnidadDeTrabajoTests`
-- [ ] 5.2 Run `ng test` full suite — confirm no regression in existing detalle/login specs
+- [x] 5.2 Run `ng test` full suite — confirm no regression in existing detalle/login specs (140/140 pass)
 - [ ] 5.3 Manual E2E smoke: login → detalle with real audit history + indicators, light/dark toggle, 412 vs 422 distinction, confirmar-afectación round-trip
 - [ ] 5.4 Confirm `PermissionMatrixTests` and `SchemaShapeTests` pass unmodified (no privilege/schema drift)

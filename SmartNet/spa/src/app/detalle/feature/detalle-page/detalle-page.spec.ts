@@ -74,6 +74,7 @@ describe('DetallePage', () => {
       .expectOne('/api/facturas/42/asiento')
       .flush({ asientoContableId: 7, asiento } as FacturaAsientoRespuesta, { headers: { ETag: '"a1"' } });
     httpMock.expectOne('/api/facturas/42/documentos').flush([]);
+    httpMock.expectOne('/api/facturas/42/historial').flush([]);
     await Promise.resolve();
     await Promise.resolve();
     fixture.detectChanges();
@@ -129,10 +130,33 @@ describe('DetallePage', () => {
       .expectOne('/api/facturas/42/asiento')
       .flush({ asientoContableId: 7, asiento: confirmado }, { headers: { ETag: '"a2"' } });
     httpMock.expectOne('/api/facturas/42/documentos').flush([]);
+    httpMock.expectOne('/api/facturas/42/historial').flush([]);
     await validarPromise;
     fixture.detectChanges();
 
     expect(fixture.componentInstance.problema()).toBeNull();
     expect(fixture.componentInstance.factura()?.estado).toBe('VALIDADA');
+  });
+
+  /* tasks.md 4.13 -- fetches historial via `HistorialService` and passes it down. */
+  it('loads the historial for the factura on init', async () => {
+    const fixture = await crearPagina();
+
+    expect(fixture.componentInstance.historial()).toEqual([]);
+  });
+
+  /* tasks.md 4.8 -- forwards `factura-form`'s confirmarAfectacion to FacturaService. */
+  it('onConfirmarAfectacion() calls FacturaService.confirmarAfectacion with If-Match', async () => {
+    const fixture = await crearPagina();
+
+    const promesa = fixture.componentInstance.onConfirmarAfectacion(true);
+    const req = httpMock.expectOne('/api/facturas/42/confirmar-afectacion');
+    expect(req.request.headers.get('If-Match')).toBe('"f1"');
+    expect(req.request.body).toEqual({ esMixta: true });
+    const actualizada = { ...factura, afectacionMixta: true };
+    req.flush(actualizada, { headers: { ETag: '"f3"' } });
+
+    await promesa;
+    expect(fixture.componentInstance.factura()?.afectacionMixta).toBe(true);
   });
 });
