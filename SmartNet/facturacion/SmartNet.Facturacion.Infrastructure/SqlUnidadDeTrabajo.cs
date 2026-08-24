@@ -275,7 +275,8 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
         await using var command = CrearComando(
             """
             SELECT FacturaId, Estado, ProveedorCodigo, RucProveedor, TipoComprobante, Numero, TotalOrig,
-                   Moneda, FechaEmision, Motivo, Afectacion, Version
+                   Moneda, FechaEmision, Motivo, Afectacion, Version,
+                   EsProveedorGenerico, PosibleDuplicado, TieneCamposNoExtraidos, AfectacionMixta
             FROM fact.Factura
             WHERE FacturaId = @facturaId;
             """);
@@ -299,7 +300,11 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
             FechaEmision: DateOnly.FromDateTime(reader.GetDateTime(8)),
             Motivo: reader.IsDBNull(9) ? null : reader.GetInt32(9),
             Afectacion: reader.IsDBNull(10) ? null : reader.GetString(10).TrimEnd(),
-            Version: (byte[])reader[11]);
+            Version: (byte[])reader[11],
+            EsProveedorGenerico: reader.GetBoolean(12),
+            PosibleDuplicado: reader.GetBoolean(13),
+            TieneCamposNoExtraidos: reader.GetBoolean(14),
+            AfectacionMixta: reader.IsDBNull(15) ? null : reader.GetBoolean(15));
     }
 
     public async Task<ResultadoEscritura> GuardarFacturaAsync(
@@ -332,6 +337,35 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
 
         await using var verificacion = CrearComando("SELECT COUNT(*) FROM fact.Factura WHERE FacturaId = @id;");
         verificacion.Parameters.AddWithValue("@id", id);
+        var existe = (int)(await verificacion.ExecuteScalarAsync(ct))! > 0;
+
+        return existe ? ResultadoEscritura.VersionEnConflicto : ResultadoEscritura.NoEncontrado;
+    }
+
+    // --- diseno-visual-spa-item-12 (design D10) addition: escritura CAS dedicada de
+    // AfectacionMixta -- GuardarFacturaAsync's UPDATE de arriba deliberadamente no la toca. ---
+
+    public async Task<ResultadoEscritura> ConfirmarAfectacionAsync(
+        long facturaId, byte[] versionEsperada, bool esMixta, CancellationToken ct)
+    {
+        await using var command = CrearComando(
+            """
+            UPDATE fact.Factura
+            SET AfectacionMixta = @afectacionMixta
+            WHERE FacturaId = @id AND Version = @versionEsperada;
+            """);
+        command.Parameters.AddWithValue("@afectacionMixta", esMixta);
+        command.Parameters.AddWithValue("@id", facturaId);
+        command.Parameters.AddWithValue("@versionEsperada", versionEsperada);
+
+        var filasAfectadas = await command.ExecuteNonQueryAsync(ct);
+        if (filasAfectadas > 0)
+        {
+            return ResultadoEscritura.Aplicado;
+        }
+
+        await using var verificacion = CrearComando("SELECT COUNT(*) FROM fact.Factura WHERE FacturaId = @id;");
+        verificacion.Parameters.AddWithValue("@id", facturaId);
         var existe = (int)(await verificacion.ExecuteScalarAsync(ct))! > 0;
 
         return existe ? ResultadoEscritura.VersionEnConflicto : ResultadoEscritura.NoEncontrado;

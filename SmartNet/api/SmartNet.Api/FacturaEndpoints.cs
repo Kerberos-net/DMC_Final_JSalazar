@@ -23,6 +23,8 @@ public static class FacturaEndpoints
         app.MapPost("/api/facturas/{id:long}/abrir", (Delegate)AbrirAsync).RequireAuthorization();
         app.MapPost("/api/facturas/{id:long}/validar", (Delegate)ValidarAsync).RequireAuthorization();
         app.MapPost("/api/facturas/{id:long}/descartar", (Delegate)DescartarAsync).RequireAuthorization();
+        app.MapPost("/api/facturas/{id:long}/confirmar-afectacion", (Delegate)ConfirmarAfectacionAsync)
+            .RequireAuthorization();
         app.MapPost("/api/facturas/{id:long}/adjuntos", (Delegate)RegistrarAdjuntoAsync).RequireAuthorization();
         app.MapDelete("/api/facturas/{id:long}/adjuntos/{adjuntoId:long}", (Delegate)EliminarAdjuntoAsync)
             .RequireAuthorization();
@@ -129,6 +131,24 @@ public static class FacturaEndpoints
         return resultado is ResultadoComando.Aplicado ? Results.Ok() : ProblemasDeNegocio.Map(resultado);
     }
 
+    /// <summary>diseno-visual-spa-item-12 (design D10) -- mismo shape CAS que <see cref="DescartarAsync"/>:
+    /// If-Match obligatorio, delega en <see cref="ServicioDeFacturas.ConfirmarAfectacionAsync"/>.
+    /// El gate <c>CasoConflicto.AfectacionNoVerificada</c> permanece deliberadamente dormido -- esta
+    /// ruta solo registra la afirmación del asistente, no desbloquea ni bloquea <c>validar</c>.</summary>
+    private static async Task<IResult> ConfirmarAfectacionAsync(
+        long id, ConfirmarAfectacionRequest cuerpo, HttpContext http, ServicioDeFacturas servicio, TimeProvider tiempo,
+        CancellationToken ct)
+    {
+        if (!IfMatch.Requerido(http, out var version, out var error))
+        {
+            return error!;
+        }
+
+        var resultado = await servicio.ConfirmarAfectacionAsync(
+            id, version, cuerpo.EsMixta, ResolverUsuarioId(http), tiempo.GetUtcNow(), ct);
+        return resultado is ResultadoComando.Aplicado ? Results.Ok() : ProblemasDeNegocio.Map(resultado);
+    }
+
     private static async Task<IResult> RegistrarAdjuntoAsync(
         long id, RegistrarAdjuntoRequest cuerpo, HttpContext http, ServicioDeFacturas servicio, TimeProvider tiempo,
         CancellationToken ct)
@@ -188,14 +208,23 @@ internal sealed record RegistrarAdjuntoRequest(string NombreArchivo, string Ruta
 
 internal sealed record EliminarAdjuntoRequest(string? Motivo);
 
-/// <summary>Forma de respuesta de <c>GET</c>/<c>PATCH /api/facturas/{id}</c>.</summary>
+/// <summary>diseno-visual-spa-item-12 (design D10, REGLAS.md §8 "La factura mixta") -- la
+/// afirmación del asistente tras revisar el documento: <c>true</c> si declara más de un código de
+/// afectación, <c>false</c> si confirma uno solo. Nunca se infiere del lado del servidor.</summary>
+internal sealed record ConfirmarAfectacionRequest(bool EsMixta);
+
+/// <summary>Forma de respuesta de <c>GET</c>/<c>PATCH /api/facturas/{id}</c>. diseno-visual-spa-
+/// item-12 (design D9, spec.md api-facturas delta): las 4 columnas indicadoras van AL FINAL,
+/// proyección puramente aditiva -- ningún campo existente cambia de nombre, tipo o significado.</summary>
 internal sealed record FacturaRespuesta(
     long FacturaId, string Estado, string ProveedorCodigo, string? RucProveedor, string TipoComprobante,
-    string? Numero, decimal TotalOrig, string Moneda, DateOnly FechaEmision, int? Motivo, string? Afectacion)
+    string? Numero, decimal TotalOrig, string Moneda, DateOnly FechaEmision, int? Motivo, string? Afectacion,
+    bool EsProveedorGenerico, bool PosibleDuplicado, bool TieneCamposNoExtraidos, bool? AfectacionMixta)
 {
     public static FacturaRespuesta De(FacturaPersistida factura) => new(
         factura.FacturaId, factura.Estado, factura.ProveedorCodigo, factura.RucProveedor, factura.TipoComprobante,
-        factura.Numero, factura.TotalOrig, factura.Moneda, factura.FechaEmision, factura.Motivo, factura.Afectacion);
+        factura.Numero, factura.TotalOrig, factura.Moneda, factura.FechaEmision, factura.Motivo, factura.Afectacion,
+        factura.EsProveedorGenerico, factura.PosibleDuplicado, factura.TieneCamposNoExtraidos, factura.AfectacionMixta);
 }
 
 /// <summary>Forma de respuesta de <c>GET /api/facturas/{id}/asiento</c> (design D3) --

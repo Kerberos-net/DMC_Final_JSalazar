@@ -24,7 +24,18 @@ public sealed record FacturaPersistida(
     DateOnly FechaEmision,
     int? Motivo,
     string? Afectacion,
-    byte[] Version)
+    byte[] Version,
+    // diseno-visual-spa-item-12 (design D9) — mismas cuatro columnas que fact.Factura ya persiste y
+    // que SqlBandejaRepository.ListarAsync (#13) ya lee; CargarFacturaAsync simplemente no las
+    // seleccionaba. TRAILING con default: mantiene fuente-compatibles los ~20 call sites existentes
+    // que ya usan argumentos con nombre (ninguno posicional hoy, verificado), y a FakeUnidadDeTrabajo
+    // (SmartNet.Facturacion.Core.Tests), que no construye este record directamente pero sí lo
+    // reasigna vía FacturaACargar en varios tests -- un quinto/sexto/séptimo/octavo parámetro nuevo
+    // sin default rompería cualquier construcción existente que no los provea.
+    bool EsProveedorGenerico = false,
+    bool PosibleDuplicado = false,
+    bool TieneCamposNoExtraidos = false,
+    bool? AfectacionMixta = null)
 {
     public const string PendienteValidacion = "PENDIENTE_VALIDACION";
     public const string Validada = "VALIDADA";

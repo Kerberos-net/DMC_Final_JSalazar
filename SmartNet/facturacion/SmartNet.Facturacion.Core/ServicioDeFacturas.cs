@@ -372,6 +372,44 @@ public sealed class ServicioDeFacturas
         return new ResultadoComando.Aplicado();
     }
 
+    /// <summary>
+    /// diseno-visual-spa-item-12 (design D10) -- <c>POST /api/facturas/{id}/confirmar-afectacion</c>:
+    /// CAS DEDICADO sobre <c>fact.Factura.AfectacionMixta</c> (<see cref="IUnidadDeTrabajo.
+    /// ConfirmarAfectacionAsync"/>, no <see cref="GuardarFacturaAsync"/> -- ese UPDATE nunca toca esa
+    /// columna, design D9), SIEMPRE audita <c>CONFIRMACION_AFECTACION</c> (D6: es una de las siete
+    /// <c>Accion</c> de la tabla, no una excepción). Deliberadamente NO evalúa ni conecta
+    /// <see cref="CasoConflicto.AfectacionNoVerificada"/> -- el gate permanece dormido en esta
+    /// entrega (ver Open Questions de design.md); esto solo registra la afirmación del asistente.
+    /// </summary>
+    public async Task<ResultadoComando> ConfirmarAfectacionAsync(
+        long facturaId, byte[] versionEsperada, bool esMixta, long usuarioId, DateTimeOffset ahora, CancellationToken ct)
+    {
+        await using var uow = await _store.AbrirAsync(ct);
+
+        var factura = await uow.CargarFacturaAsync(facturaId, ct);
+        if (factura is null)
+        {
+            return new ResultadoComando.NoEncontrado();
+        }
+
+        var escritura = await uow.ConfirmarAfectacionAsync(facturaId, versionEsperada, esMixta, ct);
+        var resultadoEscritura = TraducirResultadoEscrituraFactura(escritura);
+        if (resultadoEscritura is not null)
+        {
+            return resultadoEscritura;
+        }
+
+        await uow.RegistrarAuditoriaAsync(
+            new EntradaAuditoria(
+                EntradaAuditoria.EntidadTipos.Factura, facturaId, EntradaAuditoria.Acciones.ConfirmacionAfectacion,
+                Campo: nameof(FacturaPersistida.AfectacionMixta), ValorOriginal: factura.AfectacionMixta?.ToString(),
+                ValorNuevo: esMixta.ToString(), Motivo: null, usuarioId, ahora),
+            ct);
+
+        await uow.CommitAsync(ct);
+        return new ResultadoComando.Aplicado();
+    }
+
     private static (FacturaPersistida Actualizada, IReadOnlyList<EntradaAuditoria> Entradas) AplicarCorreccion(
         FacturaPersistida original, CorreccionFactura cambios, long usuarioId, DateTimeOffset ahora)
     {

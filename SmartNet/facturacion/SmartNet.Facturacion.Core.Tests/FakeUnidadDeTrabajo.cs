@@ -205,6 +205,19 @@ public sealed class FakeUnidadDeTrabajo : IUnidadDeTrabajo
         Llamadas.Add(nameof(CargarAdjuntoPorIdAsync));
         return Task.FromResult(AdjuntoPorId);
     }
+
+    // --- diseno-visual-spa-item-12 addition ---
+
+    public ResultadoEscritura ResultadoDeConfirmarAfectacion { get; set; } = ResultadoEscritura.Aplicado;
+    public bool? UltimaAfectacionMixtaConfirmada { get; private set; }
+
+    public Task<ResultadoEscritura> ConfirmarAfectacionAsync(
+        long facturaId, byte[] versionEsperada, bool esMixta, CancellationToken ct)
+    {
+        Llamadas.Add(nameof(ConfirmarAfectacionAsync));
+        UltimaAfectacionMixtaConfirmada = esMixta;
+        return Task.FromResult(ResultadoDeConfirmarAfectacion);
+    }
 }
 
 /// <summary>Fábrica que siempre devuelve la misma <see cref="FakeUnidadDeTrabajo"/> — deja a la
