@@ -77,6 +77,12 @@ builder.Services.AddSingleton<IEstadoIntegracionRepository>(sp =>
     new SqlEstadoIntegracionRepository(ApiConnectionOptions.Resolve(sp.GetRequiredService<IConfiguration>())));
 builder.Services.AddScoped<ServicioDeIntegraciones>();
 
+// diseno-visual-spa-item-12 (BACKLOG #12 reabierto) composition root: design D7 -- historial de
+// corrección es un read-only dedicado, no un miembro de IUnidadDeTrabajo -- misma forma lazy que
+// IEstadoIntegracionRepository arriba.
+builder.Services.AddSingleton<IAuditoriaRepository>(sp =>
+    new SqlAuditoriaRepository(ApiConnectionOptions.Resolve(sp.GetRequiredService<IConfiguration>())));
+
 // design D7: PeriodicTimer(1 min) with the DI-registered TimeProvider.System above -- so a test
 // that substitutes a FakeTimeProvider via SmartNetApiFactory could drive it deterministically the
 // same way SmartNet.Inbox.Infrastructure.Tests.PromocionBackgroundServiceTests already does for
@@ -149,6 +155,7 @@ app.MapAsientoEndpoints();
 app.MapTipoCambioEndpoints();
 app.MapIntegracionEndpoints();
 app.MapDocumentoEndpoints();
+app.MapAuditoriaEndpoints();
 
 app.Run();
 
