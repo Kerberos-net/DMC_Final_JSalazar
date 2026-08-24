@@ -1,11 +1,11 @@
-<table class="asiento-lineas">
+<table class="tabla asiento-lineas">
   <thead>
     <tr>
       <th>Bloque</th>
       <th>Tipo</th>
       <th>Cuenta</th>
-      <th>Debe</th>
-      <th>Haber</th>
+      <th class="tabular-nums">Debe</th>
+      <th class="tabular-nums">Haber</th>
       @if (editable()) {
         <th>Acciones</th>
       }
@@ -22,6 +22,7 @@
             <input
               [attr.data-testid]="'editar-debe-' + linea.lineaId"
               type="number"
+              class="tabular-nums"
               [value]="borradorEdicion().debe"
               (input)="onCampoEdicion('debe', $any($event.target).value)"
             />
@@ -30,15 +31,16 @@
             <input
               [attr.data-testid]="'editar-haber-' + linea.lineaId"
               type="number"
+              class="tabular-nums"
               [value]="borradorEdicion().haber"
               (input)="onCampoEdicion('haber', $any($event.target).value)"
             />
           </td>
           <td>
-            <button [attr.data-testid]="'confirmar-edicion-' + linea.lineaId" type="button" (click)="confirmarEdicion(linea)">
+            <button class="btn" [attr.data-testid]="'confirmar-edicion-' + linea.lineaId" type="button" (click)="confirmarEdicion(linea)">
               Confirmar
             </button>
-            <button type="button" (click)="cancelarEdicion()">Cancelar</button>
+            <button class="btn btn--secundario" type="button" (click)="cancelarEdicion()">Cancelar</button>
           </td>
         </tr>
       } @else {
@@ -46,8 +48,8 @@
           <td>{{ linea.bloque }}</td>
           <td>{{ linea.tipo }}</td>
           <td>{{ linea.cuentaCodigo }}</td>
-          <td>{{ linea.debe }}</td>
-          <td>{{ linea.haber }}</td>
+          <td class="tabular-nums">{{ linea.debe }}</td>
+          <td class="tabular-nums">{{ linea.haber }}</td>
           @if (editable()) {
             <td>
               @if (pendienteEliminarId() === linea.lineaId) {
@@ -86,19 +88,23 @@
       <input
         data-testid="nueva-debe"
         type="number"
+        class="tabular-nums"
         [value]="borradorNueva().debe"
         (input)="onCampoNueva('debe', $any($event.target).value)"
       />
       <input
         data-testid="nueva-haber"
         type="number"
+        class="tabular-nums"
         [value]="borradorNueva().haber"
         (input)="onCampoNueva('haber', $any($event.target).value)"
       />
-      <button data-testid="confirmar-nueva" type="button" (click)="confirmarAgregar()">Agregar</button>
-      <button type="button" (click)="cancelarAgregar()">Cancelar</button>
+      <button class="btn" data-testid="confirmar-nueva" type="button" (click)="confirmarAgregar()">Agregar</button>
+      <button class="btn btn--secundario" type="button" (click)="cancelarAgregar()">Cancelar</button>
     </div>
   } @else {
-    <button data-testid="agregar-linea" type="button" (click)="iniciarAgregar()">Agregar línea</button>
+    <button class="btn btn--secundario" data-testid="agregar-linea" type="button" (click)="iniciarAgregar()">Agregar línea</button>
   }
 }
+
+<app-historial-correccion [historial]="historial()" />

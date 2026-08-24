@@ -1,5 +1,6 @@
 @if (documentos().length > 1) {
   <select
+    class="campo"
     data-testid="selector-documento"
     [value]="seleccionado()?.id"
     (change)="onSeleccionar($any($event.target).value)"
@@ -13,5 +14,5 @@
 @if (urlSegura(); as url) {
   <iframe [src]="url" title="Documento de la factura" class="visor-documento"></iframe>
 } @else {
-  <p data-testid="sin-documentos">Esta factura no tiene documentos asociados.</p>
+  <p class="panel panel--vacio" data-testid="sin-documentos">Esta factura no tiene documentos asociados.</p>
 }

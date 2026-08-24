@@ -16,6 +16,7 @@ import { ProblemaDetails } from '../../../shared/problema.model';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './login-page.html',
+  styleUrl: './login-page.css',
 })
 export class LoginPage {
   private readonly session = inject(SessionService);

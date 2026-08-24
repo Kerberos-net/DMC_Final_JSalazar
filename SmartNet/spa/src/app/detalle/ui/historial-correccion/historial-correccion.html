@@ -1,0 +1,21 @@
+<details class="historial-correccion">
+  <summary>Historial de corrección ({{ historial().length }})</summary>
+
+  @if (historial().length === 0) {
+    <p class="panel panel--vacio" data-testid="historial-vacio">Sin correcciones registradas.</p>
+  } @else {
+    <ul class="historial-correccion__lista">
+      @for (entrada of historial(); track entrada.ocurridoEn + entrada.campo) {
+        <li data-testid="historial-entrada">
+          <span class="historial-correccion__campo">{{ entrada.campo ?? entrada.accion }}</span>
+          <span class="historial-correccion__valores">
+            {{ entrada.valorOriginal ?? '—' }} → {{ entrada.valorNuevo ?? '—' }}
+          </span>
+          <time class="historial-correccion__fecha tabular-nums" [attr.datetime]="entrada.ocurridoEn">
+            {{ entrada.ocurridoEn }}
+          </time>
+        </li>
+      }
+    </ul>
+  }
+</details>

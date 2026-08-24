@@ -1,5 +1,7 @@
 import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
 import { Bloque, LineaAsientoRequest, LineaRespuesta, TipoLinea } from '../../models/asiento.model';
+import { EntradaAuditoriaRespuesta } from '../../models/historial.model';
+import { HistorialCorreccion } from '../historial-correccion/historial-correccion';
 
 interface BorradorLinea {
   bloque: Bloque;
@@ -35,12 +37,16 @@ function aLineaRequest(orden: number, borrador: BorradorLinea): LineaAsientoRequ
 @Component({
   selector: 'app-asiento-lineas',
   standalone: true,
+  imports: [HistorialCorreccion],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './asiento-lineas.html',
+  styleUrl: './asiento-lineas.css',
 })
 export class AsientoLineas {
   readonly lineas = input.required<readonly LineaRespuesta[]>();
   readonly editable = input(true);
+  /** tasks.md 4.9 -- wires the D4 `<details>` panel; empty by default when no historial loaded yet. */
+  readonly historial = input<readonly EntradaAuditoriaRespuesta[]>([]);
 
   readonly editarLinea = output<{ lineaId: number; linea: LineaAsientoRequest }>();
   readonly agregarLinea = output<LineaAsientoRequest>();

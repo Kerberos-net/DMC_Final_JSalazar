@@ -4,6 +4,7 @@ import { ActivatedRoute } from '@angular/router';
 import { FacturaService } from '../../data-access/factura.service';
 import { AsientoService } from '../../data-access/asiento.service';
 import { DocumentoService } from '../../data-access/documento.service';
+import { HistorialService } from '../../data-access/historial.service';
 import { calcularCuadre } from '../../data-access/cuadre';
 import { categorizarProblema } from '../../data-access/problema-ux';
 import { CorreccionFacturaRequest } from '../../models/factura.model';
@@ -28,16 +29,19 @@ import { ConflictoBanner } from '../../ui/conflicto-banner/conflicto-banner';
   imports: [FacturaForm, AsientoLineas, VisorDocumento, ConflictoBanner],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './detalle-page.html',
+  styleUrl: './detalle-page.css',
 })
 export class DetallePage {
   private readonly route = inject(ActivatedRoute);
   private readonly facturaService = inject(FacturaService);
   private readonly asientoService = inject(AsientoService);
   private readonly documentoService = inject(DocumentoService);
+  private readonly historialService = inject(HistorialService);
 
   readonly factura = this.facturaService.factura;
   readonly asiento = this.asientoService.asiento;
   readonly documentos = this.documentoService.documentos;
+  readonly historial = this.historialService.entradas;
   readonly loading = computed(
     () => this.facturaService.loading() || this.asientoService.loading() || this.documentoService.loading()
   );
@@ -75,6 +79,7 @@ export class DetallePage {
       this.facturaService.cargar(this.facturaId),
       this.asientoService.cargarPorFactura(this.facturaId),
       this.documentoService.cargar(this.facturaId),
+      this.historialService.cargar(this.facturaId),
     ]);
   }
 
@@ -140,6 +145,17 @@ export class DetallePage {
       await this.facturaService.validar(this.facturaId, fechaCorteContable);
       this.problema.set(null);
       await this.cargarTodo();
+    } catch (err) {
+      this.manejarError(err);
+    }
+  }
+
+  /** design D10, tasks.md 4.8 -- forwards `factura-form`'s `confirmarAfectacion` output; only
+   * registers the assistant's assertion, does NOT unblock `validar` (gate stays dormant). */
+  async onConfirmarAfectacion(esMixta: boolean): Promise<void> {
+    try {
+      await this.facturaService.confirmarAfectacion(this.facturaId, esMixta);
+      this.problema.set(null);
     } catch (err) {
       this.manejarError(err);
     }

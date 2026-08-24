@@ -1,6 +1,7 @@
 import { TestBed } from '@angular/core/testing';
 import { AsientoLineas } from './asiento-lineas';
 import { LineaRespuesta } from '../../models/asiento.model';
+import { EntradaAuditoriaRespuesta } from '../../models/historial.model';
 
 describe('AsientoLineas', () => {
   const lineaD: LineaRespuesta = {
@@ -123,5 +124,32 @@ describe('AsientoLineas', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="editar-1"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-testid="eliminar-1"]')).toBeNull();
     expect(fixture.nativeElement.querySelector('[data-testid="agregar-linea"]')).toBeNull();
+  });
+
+  /* tasks.md 4.9: wires `<app-historial-correccion>` -- panel stays closed by default (D4). */
+  it('wires the historial-correccion panel with the received historial input', () => {
+    const fixture = TestBed.createComponent(AsientoLineas);
+    fixture.componentRef.setInput('lineas', [lineaD, lineaH]);
+    fixture.componentRef.setInput('editable', true);
+    const historial: EntradaAuditoriaRespuesta[] = [
+      {
+        entidadTipo: 'ASIENTO',
+        entidadId: 7,
+        accion: 'CORRECCION',
+        campo: 'cuentaCodigo',
+        valorOriginal: '639910',
+        valorNuevo: '639915',
+        motivo: null,
+        usuarioId: 1,
+        ocurridoEn: '2026-08-20T15:00:00Z',
+      },
+    ];
+    fixture.componentRef.setInput('historial', historial);
+    fixture.detectChanges();
+
+    const details: HTMLDetailsElement = fixture.nativeElement.querySelector('app-historial-correccion details');
+    expect(details).toBeTruthy();
+    expect(details.open).toBe(false);
+    expect(fixture.nativeElement.textContent).toContain('639915');
   });
 });

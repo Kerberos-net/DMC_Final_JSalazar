@@ -2,6 +2,10 @@
  * Mirrors `SmartNet.Api.FacturaRespuesta` / `CorreccionFacturaRequest` (BACKLOG #11's
  * `FacturaEndpoints.cs` — GET/PATCH `/api/facturas/{id}`). ASP.NET Core's default
  * `System.Text.Json` options camelCase the C# PascalCase property names.
+ *
+ * diseno-visual-spa-item-12 (design D9): the 4 trailing indicator fields are a purely additive
+ * projection — `esProveedorGenerico`/`posibleDuplicado` drive `.alerta--bloqueante`;
+ * `tieneCamposNoExtraidos`/`afectacionMixta === null` drive `.alerta--informativa`.
  */
 export interface FacturaRespuesta {
   readonly facturaId: number;
@@ -15,6 +19,10 @@ export interface FacturaRespuesta {
   readonly fechaEmision: string;
   readonly motivo: number | null;
   readonly afectacion: string | null;
+  readonly esProveedorGenerico: boolean;
+  readonly posibleDuplicado: boolean;
+  readonly tieneCamposNoExtraidos: boolean;
+  readonly afectacionMixta: boolean | null;
 }
 
 /** Cuerpo de `PATCH /api/facturas/{id}` — todos los campos opcionales (corrección parcial). */

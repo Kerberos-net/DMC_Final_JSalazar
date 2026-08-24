@@ -14,6 +14,7 @@ import { CategoriaProblema } from '../../data-access/problema-ux';
   imports: [KeyValuePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './conflicto-banner.html',
+  styleUrl: './conflicto-banner.css',
 })
 export class ConflictoBanner {
   readonly problema = input<ProblemaDetails | null>(null);

@@ -55,6 +55,22 @@ export class FacturaService {
     await firstValueFrom(this.http.post<void>(`/api/facturas/${id}/validar`, null, { params }));
   }
 
+  /** `POST /api/facturas/{id}/confirmar-afectacion` (design D10) -- misma forma CAS que
+   * `guardar()`: `If-Match` obligatorio, respuesta trae la `FacturaRespuesta` completa + nuevo
+   * ETag. Solo registra la afirmación del asistente; NO desbloquea `validar` (gate dormido). */
+  async confirmarAfectacion(id: number, esMixta: boolean): Promise<void> {
+    const etag = this.etagRequerido();
+    const respuesta = await firstValueFrom(
+      this.http.post<FacturaRespuesta>(
+        `/api/facturas/${id}/confirmar-afectacion`,
+        { esMixta },
+        { headers: { 'If-Match': etag }, observe: 'response' }
+      )
+    );
+    this.facturaSignal.set(respuesta.body);
+    this.etagSignal.set(respuesta.headers.get('ETag'));
+  }
+
   private etagRequerido(): string {
     const etag = this.etagSignal();
     if (etag === null) {

@@ -1,1 +1,19 @@
+<header class="app-shell__header">
+  <span class="app-shell__marca">Gestor de Facturas de Compra</span>
+
+  <label class="app-shell__tema">
+    Tema
+    <select
+      class="campo"
+      data-testid="selector-tema"
+      [value]="tema.preferencia()"
+      (change)="onCambiarTema($any($event.target).value)"
+    >
+      <option value="sistema">Sistema</option>
+      <option value="claro">Claro</option>
+      <option value="oscuro">Oscuro</option>
+    </select>
+  </label>
+</header>
+
 <router-outlet></router-outlet>

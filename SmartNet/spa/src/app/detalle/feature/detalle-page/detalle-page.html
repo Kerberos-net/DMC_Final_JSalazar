@@ -10,7 +10,7 @@
   />
 
   <div class="detalle-layout">
-    <app-visor-documento [documentos]="documentos()" />
+    <app-visor-documento class="detalle-layout__visor" [documentos]="documentos()" />
 
     @if (factura(); as f) {
       <div class="detalle-formulario">
@@ -19,30 +19,38 @@
           [tipoCambioVenta]="asiento()?.tipoCambioVenta ?? null"
           [editable]="f.estado !== 'VALIDADA'"
           (cambios)="onCambiosFactura($event)"
+          (confirmarAfectacion)="onConfirmarAfectacion($event)"
         />
 
         @if (asiento(); as a) {
           <app-asiento-lineas
             [lineas]="a.lineas"
             [editable]="a.estado !== 'CONFIRMADO'"
+            [historial]="historial()"
             (editarLinea)="onEditarLinea($event)"
             (agregarLinea)="onAgregarLinea($event)"
             (eliminarLinea)="onEliminarLinea($event)"
           />
         }
 
-        <button type="button" data-testid="guardar-avance" (click)="guardarAvance()">Guardar avance</button>
+        <div class="detalle-formulario__acciones">
+          <button class="btn btn--secundario" type="button" data-testid="guardar-avance" (click)="guardarAvance()">
+            Guardar avance
+          </button>
 
-        <label>
-          Fecha de corte contable
-          <input
-            data-testid="fecha-corte-contable"
-            type="date"
-            [value]="fechaCorteContable()"
-            (input)="fechaCorteContable.set($any($event.target).value)"
-          />
-        </label>
-        <button type="button" data-testid="validar" (click)="validar(fechaCorteContable())">Validar</button>
+          <label class="campo">
+            Fecha de corte contable
+            <input
+              data-testid="fecha-corte-contable"
+              type="date"
+              [value]="fechaCorteContable()"
+              (input)="fechaCorteContable.set($any($event.target).value)"
+            />
+          </label>
+          <button class="btn" type="button" data-testid="validar" (click)="validar(fechaCorteContable())">
+            Validar
+          </button>
+        </div>
       </div>
     }
   </div>
