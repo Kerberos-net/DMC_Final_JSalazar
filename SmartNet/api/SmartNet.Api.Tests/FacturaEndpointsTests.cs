@@ -3,6 +3,8 @@ using System.Net.Http.Json;
 using Microsoft.AspNetCore.Mvc.Testing;
 using SmartNet.Db.TestBootstrap;
 using SmartNet.Facturacion.Core;
+using SmartNet.Inbox.Core;
+using SmartNet.Inbox.Infrastructure;
 
 namespace SmartNet.Api.Tests;
 
@@ -352,6 +354,168 @@ public sealed class FacturaEndpointsTests : SesionEndpointsTestBase
         var response = await client.SendAsync(request);
 
         Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    // --- diseno-visual-spa-item-12 (design D9): FacturaRespuesta projects the 4 indicator columns ---
+
+    [Fact]
+    public async Task GetFactura_IncludesTheFourIndicatorFields_MatchingTheirPersistedValues()
+    {
+        var facturaId = await Db.InsertarFacturaAsync();
+        await Db.FijarIndicadoresFacturaAsync(
+            facturaId, esProveedorGenerico: true, posibleDuplicado: true, tieneCamposNoExtraidos: false, afectacionMixta: null);
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var response = await client.GetAsync($"/api/facturas/{facturaId}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var cuerpo = await response.Content.ReadFromJsonAsync<FacturaRespuesta>();
+        Assert.NotNull(cuerpo);
+        Assert.True(cuerpo!.EsProveedorGenerico);
+        Assert.True(cuerpo.PosibleDuplicado);
+        Assert.False(cuerpo.TieneCamposNoExtraidos);
+        Assert.Null(cuerpo.AfectacionMixta);
+    }
+
+    [Fact]
+    public async Task GetFactura_IndicatorFieldsMatchTheBandejaProjection_ForTheSameRow()
+    {
+        var procesamientoId = await Db.InsertarProcesamientoAsync(gmailMessageId: "msg-parity-1");
+        var inboxEventId = await Db.InsertarInboxEventAsync(procesamientoId, "{}");
+        var promocionRepository = new SqlPromocionRepository(Db.ConnectionString);
+        var facturaPromovida = new FacturaPromovida(
+            ProveedorCodigo: "P00000",
+            TipoComprobante: "01",
+            Numero: "F001-PARITY",
+            RucProveedor: "20100000001",
+            TotalOrig: 1180.00m,
+            Moneda: "PEN",
+            FechaEmision: new DateOnly(2026, 8, 10),
+            Indicadores: new IndicadoresFactura(
+                EsProveedorGenerico: true,
+                PosibleDuplicado: true,
+                TieneCamposNoExtraidos: false,
+                FechaEnDomingo: false,
+                AfectacionMixta: false),
+            Extracciones: Array.Empty<FacturaExtraccionPromovida>(),
+            Estado: "PENDIENTE_VALIDACION");
+        var resultado = await promocionRepository.PromoverAsync(
+            inboxEventId, procesamientoId, facturaPromovida,
+            new DocumentoPromovido(DocumentoRecibidoId: 1, NombreArchivo: "f.pdf", MimeType: "application/pdf",
+                RutaRelativa: "/f.pdf", TamanoBytes: 10),
+            CancellationToken.None);
+        var facturaId = resultado.FacturaId;
+
+        var bandejaRepository = new SqlBandejaRepository(Db.ConnectionString);
+        var bandeja = await bandejaRepository.ListarAsync(estado: null, orden: "desc", CancellationToken.None);
+        var itemBandeja = bandeja.Single(i => i.InboxEventId == inboxEventId);
+
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var response = await client.GetAsync($"/api/facturas/{facturaId}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var cuerpo = await response.Content.ReadFromJsonAsync<FacturaRespuesta>();
+        Assert.NotNull(cuerpo);
+        Assert.NotNull(itemBandeja.Indicadores);
+        Assert.Equal(itemBandeja.Indicadores!.EsProveedorGenerico, cuerpo!.EsProveedorGenerico);
+        Assert.Equal(itemBandeja.Indicadores.PosibleDuplicado, cuerpo.PosibleDuplicado);
+        Assert.Equal(itemBandeja.Indicadores.TieneCamposNoExtraidos, cuerpo.TieneCamposNoExtraidos);
+        Assert.Equal(itemBandeja.Indicadores.AfectacionMixta, cuerpo.AfectacionMixta);
+    }
+
+    // --- diseno-visual-spa-item-12 (design D10): POST /confirmar-afectacion, gate stays dormant ---
+
+    [Fact]
+    public async Task ConfirmarAfectacion_WithoutIfMatch_Returns428()
+    {
+        var facturaId = await Db.InsertarFacturaAsync();
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var response = await client.PostAsJsonAsync(
+            $"/api/facturas/{facturaId}/confirmar-afectacion", new ConfirmarAfectacionRequest(EsMixta: false));
+
+        Assert.Equal((HttpStatusCode)428, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ConfirmarAfectacion_WithAStaleIfMatch_Returns412_AndLeavesAfectacionMixtaUnchanged()
+    {
+        var facturaId = await Db.InsertarFacturaAsync();
+        var etagObsoleto = TokenDeConcurrencia.Codificar(new byte[] { 0, 0, 0, 0, 0, 0, 0, 1 });
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/facturas/{facturaId}/confirmar-afectacion")
+        {
+            Content = JsonContent.Create(new ConfirmarAfectacionRequest(EsMixta: false)),
+        };
+        request.Headers.TryAddWithoutValidation("If-Match", etagObsoleto);
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.PreconditionFailed, response.StatusCode);
+        var afectacionMixta = await Db.ExecuteScalarAsync<bool?>(
+            $"SELECT AfectacionMixta FROM fact.Factura WHERE FacturaId = {facturaId};");
+        Assert.Null(afectacionMixta);
+    }
+
+    [Fact]
+    public async Task ConfirmarAfectacion_WithAMatchingIfMatch_SetsAfectacionMixta_AndWritesConfirmacionAfectacionAudit()
+    {
+        var facturaId = await Db.InsertarFacturaAsync();
+        var etag = TokenDeConcurrencia.Codificar(await Db.ObtenerVersionFacturaAsync(facturaId));
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/facturas/{facturaId}/confirmar-afectacion")
+        {
+            Content = JsonContent.Create(new ConfirmarAfectacionRequest(EsMixta: false)),
+        };
+        request.Headers.TryAddWithoutValidation("If-Match", etag);
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var afectacionMixta = await Db.ExecuteScalarAsync<bool?>(
+            $"SELECT AfectacionMixta FROM fact.Factura WHERE FacturaId = {facturaId};");
+        Assert.False(afectacionMixta);
+        var accion = await Db.ExecuteScalarAsync<string>(
+            $"SELECT Accion FROM fact.AuditoriaCorreccion WHERE EntidadTipo = 'FACTURA' AND EntidadId = {facturaId};");
+        Assert.Equal("CONFIRMACION_AFECTACION", accion!.TrimEnd());
+    }
+
+    [Fact]
+    public async Task ConfirmarAfectacion_ForAnUnknownFactura_Returns404()
+    {
+        var etag = TokenDeConcurrencia.Codificar(new byte[] { 0, 0, 0, 0, 0, 0, 0, 1 });
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, "/api/facturas/999999/confirmar-afectacion")
+        {
+            Content = JsonContent.Create(new ConfirmarAfectacionRequest(EsMixta: false)),
+        };
+        request.Headers.TryAddWithoutValidation("If-Match", etag);
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ConfirmarAfectacion_WithoutACookie_Returns401()
+    {
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+
+        var response = await client.PostAsJsonAsync(
+            "/api/facturas/1/confirmar-afectacion", new ConfirmarAfectacionRequest(EsMixta: false));
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
     // --- 401 guard (matches BandejaEndpointsTests' precedent) ---

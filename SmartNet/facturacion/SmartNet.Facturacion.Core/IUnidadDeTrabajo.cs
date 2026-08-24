@@ -125,4 +125,17 @@ public interface IUnidadDeTrabajo : IAsyncDisposable
     /// eliminado lógicamente (mismo criterio que <see cref="CargarAdjuntosDeFacturaAsync"/>: un
     /// adjunto eliminado no es servible, aunque la fila siga físicamente en la tabla).</summary>
     Task<AdjuntoManual?> CargarAdjuntoPorIdAsync(long adjuntoManualId, CancellationToken ct);
+
+    // --- diseno-visual-spa-item-12 (BACKLOG #12 reabierto, design D10): confirmación explícita de
+    // afectación tributaria (REGLAS.md §8 "La factura mixta" -- el asistente confirma tras mirar el
+    // documento). Escritura CAS DEDICADA porque GuardarFacturaAsync's UPDATE nunca toca
+    // AfectacionMixta a propósito (design D9: las 4 columnas indicadoras son de solo lectura para un
+    // PATCH normal, así un round-trip PATCH nunca las pisa). El gate CasoConflicto.
+    // AfectacionNoVerificada permanece DORMIDO -- este método solo escribe la columna y deja la
+    // auditoría/commit al llamador (mismo patrón que GuardarFacturaAsync). ---
+
+    /// <summary>Escritura CAS de <c>fact.Factura.AfectacionMixta</c> únicamente -- mismo contrato de
+    /// <see cref="ResultadoEscritura"/> que <see cref="GuardarFacturaAsync"/>.</summary>
+    Task<ResultadoEscritura> ConfirmarAfectacionAsync(
+        long facturaId, byte[] versionEsperada, bool esMixta, CancellationToken ct);
 }

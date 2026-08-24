@@ -86,6 +86,82 @@ public sealed class SqlUnidadDeTrabajoFacturaTests : IAsyncLifetime
         Assert.Equal(FacturaPersistida.Descartada, estado!.TrimEnd());
     }
 
+    // --- diseno-visual-spa-item-12 (design D9): las 4 columnas indicadoras, ya persistidas por
+    // fact.Factura/#13, ahora proyectadas por CargarFacturaAsync. ---
+
+    [Fact]
+    public async Task CargarFacturaAsync_RoundTripsTheFourIndicatorColumns()
+    {
+        var facturaId = await _db.InsertarFacturaAsync();
+        await _db.ExecuteNonQueryAsync(
+            $"""
+             UPDATE fact.Factura
+             SET EsProveedorGenerico = 1, PosibleDuplicado = 1, TieneCamposNoExtraidos = 1, AfectacionMixta = NULL
+             WHERE FacturaId = {facturaId};
+             """);
+        var store = new SqlFacturacionStore(_db.ConnectionString);
+        await using var uow = await store.AbrirAsync(CancellationToken.None);
+
+        var cargada = await uow.CargarFacturaAsync(facturaId, CancellationToken.None);
+
+        Assert.NotNull(cargada);
+        Assert.True(cargada!.EsProveedorGenerico);
+        Assert.True(cargada.PosibleDuplicado);
+        Assert.True(cargada.TieneCamposNoExtraidos);
+        Assert.Null(cargada.AfectacionMixta);
+    }
+
+    [Fact]
+    public async Task CargarFacturaAsync_RoundTripsAfectacionMixta_WhenVerifiedFalse()
+    {
+        var facturaId = await _db.InsertarFacturaAsync();
+        await _db.ExecuteNonQueryAsync(
+            $"UPDATE fact.Factura SET AfectacionMixta = 0 WHERE FacturaId = {facturaId};");
+        var store = new SqlFacturacionStore(_db.ConnectionString);
+        await using var uow = await store.AbrirAsync(CancellationToken.None);
+
+        var cargada = await uow.CargarFacturaAsync(facturaId, CancellationToken.None);
+
+        Assert.NotNull(cargada);
+        Assert.False(cargada!.EsProveedorGenerico);
+        Assert.False(cargada.PosibleDuplicado);
+        Assert.False(cargada.TieneCamposNoExtraidos);
+        Assert.False(cargada.AfectacionMixta);
+    }
+
+    [Fact]
+    public async Task GuardarFacturaAsync_ViaPatch_DoesNotClobberTheFourIndicatorColumns()
+    {
+        var facturaId = await _db.InsertarFacturaAsync();
+        await _db.ExecuteNonQueryAsync(
+            $"""
+             UPDATE fact.Factura
+             SET EsProveedorGenerico = 1, PosibleDuplicado = 1, TieneCamposNoExtraidos = 1, AfectacionMixta = 1
+             WHERE FacturaId = {facturaId};
+             """);
+        var version = await _db.ObtenerVersionFacturaAsync(facturaId);
+        var store = new SqlFacturacionStore(_db.ConnectionString);
+
+        await using (var uow = await store.AbrirAsync(CancellationToken.None))
+        {
+            var cargada = (await uow.CargarFacturaAsync(facturaId, CancellationToken.None))!;
+            var escritura = await uow.GuardarFacturaAsync(
+                facturaId, version, cargada with { RucProveedor = "20999999999" }, CancellationToken.None);
+            await uow.CommitAsync(CancellationToken.None);
+            Assert.Equal(ResultadoEscritura.Aplicado, escritura);
+        }
+
+        await using var segundoUow = await store.AbrirAsync(CancellationToken.None);
+        var releida = await segundoUow.CargarFacturaAsync(facturaId, CancellationToken.None);
+
+        Assert.NotNull(releida);
+        Assert.True(releida!.EsProveedorGenerico);
+        Assert.True(releida.PosibleDuplicado);
+        Assert.True(releida.TieneCamposNoExtraidos);
+        Assert.True(releida.AfectacionMixta);
+        Assert.Equal("20999999999", releida.RucProveedor!.TrimEnd());
+    }
+
     [Fact]
     public async Task ObtenerAsientoVigenteIdAsync_ReturnsNull_WhenTheFacturaHasNoAsiento()
     {

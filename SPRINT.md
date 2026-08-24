@@ -11,9 +11,9 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | **10 de 17 cerrados** |
-| Ciclo SDD activo | Ninguno — último cerrado: ítem #11 |
-| Última fase cerrada | Ítem #11 (API de facturas y asientos), 5 fases encadenadas (commits), 29/29 tareas cerradas, primer verify PASS WITH WARNINGS con 1 CRITICAL (gap SinTipoCambio) cerrado en una fase 5 de seguimiento, segundo verify PASS sin CRITICAL, 253/253 tests, build limpio — ítem #11 cerrado 2026-08-23 |
+| Ítems del backlog | **11 de 17 cerrados** |
+| Ciclo SDD activo | Ninguno — último cerrado: ítem #12 |
+| Última fase cerrada | Ítem #12 (Detalle y validación), 7 fases, 46/46 tareas cerradas, verify PASS sin CRITICAL (689 .NET + 72 SPA + 190 Python en verde, tras aislar y reconfirmar los fallos transitorios de contención de bases de prueba en paralelo), smoke E2E manual (bandeja → guardar avance → validar → conflicto 412) verificado por el usuario — ítem #12 cerrado 2026-08-23 |
 
 ---
 
@@ -1131,7 +1131,75 @@ cambio.
 
 ---
 
-## ⬜ Ítems 10, 12 a 17 — sin ciclo SDD abierto
+## ✅ 12. Detalle y validación
+
+Pantalla lado a lado (factura ↔ asiento), edición inline de líneas por `LineaId`, guardar avance,
+validar, visor de documentos same-origin. Proyección `fact.DocumentoFactura` .NET-owned (nunca un
+`SELECT` cruzado a `fact.DocumentoRecibido`, ADR 0003), lista unificada de documentos, resolución
+factura→asiento, `TipoCambioVenta` congelado expuesto en `AsientoRespuesta`. Añade además el shell
+de autenticación de la SPA (*guard*, interceptor 401, cookie) y la pantalla `/login`, no prevista en
+el `tasks.md` original pero necesaria para que el resto fuera navegable. Depende del ítem #11
+(completo).
+
+**Entrega:** 6 fases (PR1→PR6 sugeridos, no verificado si se abrieron como PRs separados o se
+integraron directo a la rama `feat/detalle-validacion-12`).
+
+**Ciclo SDD:** `openspec/changes/archive/2026-08-23-api-detalle-validacion-facturas-12/` · **46 de 46 tareas cerradas** — ✅ **CERRADO 2026-08-23**
+
+| Fase | Alcance | Tareas | Estado |
+|---|---|---|---|
+| 1 | Esquema `016_documento_factura.sql` + payload de ingesta Python + espejo `EventoInbox` | 6/6 | ✅ |
+| 2 | Persistencia de la promoción a `fact.DocumentoFactura` | 4/4 | ✅ |
+| 3 | Endpoints .NET de lectura: contenido de documento, lista unificada, `GET /api/asientos/{id}`, resolución factura→asiento, `TipoCambioVenta` | 11/11 | ✅ |
+| 4 | Shell de autenticación SPA: `authGuard`, `httpErrorInterceptor` | 5/5 | ✅ |
+| 5 | Feature de detalle SPA (data-access/feature/ui) + pantalla `/login` (añadida por el *owner*, fuera del alcance original) | 16/16 | ✅ |
+| 6 | ADR 0013 Revisión 3 (`fact.DocumentoFactura` es proyección .NET-owned, no lectura cruzada) + enmienda de specs | 2/2 | ✅ |
+| 7 | Verificación: suite completa + smoke E2E manual | 2/2 | ✅ |
+
+Pronóstico de revisión: alto riesgo de presupuesto de 400 líneas (1400-2000 líneas estimadas); PRs
+encadenados recomendados, `ask-on-risk`. Detalle completo en `tasks.md`.
+
+### Pruebas
+
+Verificación independiente (`sdd-verify`) ejecutó las tres suites completas, no solo lectura
+estática del código:
+
+| Suite | Resultado | Nota |
+|---|---|---|
+| `.NET` (`dotnet test SmartNet.sln`) | 689/689 | Fallos transitorios de contención SQL bajo ejecución en paralelo (distintos en cada corrida), reejecutados en aislamiento: 100% verdes |
+| `SPA` (`ng test --watch=false`) | 72/72 | Sin incidencias |
+| `Python` (`pytest`) | 190 passed, 1 skipped | Un fallo transitorio de login `pyodbc` (mismo patrón de contención), reejecutado en aislamiento: verde |
+
+### Lo verificado al cerrar
+
+`DocumentoEndpoints.cs` nunca lee `fact.DocumentoRecibido` — confirmado por código y por
+`PermissionMatrixTests` (`GRANT SELECT, INSERT` a `fact_api`, `DENY` a `fact_worker` sobre
+`fact.DocumentoFactura`, `016_documento_factura.sql`). `TipoCambioVenta` vive solo en
+`AsientoRespuesta`, nunca en `FacturaRespuesta` (design D4), confirmado por inspección directa de
+ambos archivos. El flujo 412/422/409 de `detalle-page.ts` + `problema-ux.ts` implementa los tres
+escenarios del spec: 412 recarga y descarta ediciones locales, 422/409 conserva ediciones y muestra
+error inline/banner — confirmado por el usuario en smoke manual con dos pestañas concurrentes.
+
+**Sin fila semilla de datos tras migrar.** `fact.Usuario` y toda la cadena
+`Email`→`DocumentoRecibido`→`Procesamiento`→`Factura`→`InboxEvent` quedan vacías por diseño; no hay
+ningún `INSERT` versionado que las pueble. El primer usuario se crea con `smartnet-admin usuario
+crear`; una factura de prueba requiere insertar manualmente la cadena completa de FKs hasta
+`InboxEvent` — `GET /api/bandeja` (`SqlBandejaRepository`) hace `FROM fact.InboxEvent LEFT JOIN
+fact.Factura`, así que la tabla que gobierna el listado es `InboxEvent`, no `Factura`; un *insert*
+aislado en `Factura` no es visible en la bandeja.
+
+**Discrepancia real encontrada al archivar, corregida antes de comitear.** El *working tree* traía
+un cambio ajeno a la feature (`SmartNet/spa/angular.json`, un `analytics id` que Angular CLI
+insertó solo al correr `ng test`/`ng serve`); revertido antes de archivar para no colar ruido en el
+*commit* de cierre.
+
+Una desviación no bloqueante documentada por `sdd-verify`: `problema-ux.ts` simplifica el
+discriminador D6 del *design* (distinguir por `type` URI) a un *switch* por *status code* — cubre
+los mismos tres escenarios del spec, queda anotado para quien lea `design.md` después.
+
+---
+
+## ⬜ Ítems 10, 13 a 17 — sin ciclo SDD abierto
 
 Las fases de cada ítem **se definen cuando arranca su ciclo SDD**, no antes. Ponerlas aquí ahora
 sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ítem, y ninguno existe.
@@ -1139,7 +1207,6 @@ sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ít
 | # | Ítem | Depende de | Contexto obligatorio | Estado |
 |---|---|---|---|---|
 | 10 | Notas de crédito | #8 | ⚠ `REGLAS.md` §5, §7 | ⬜ |
-| 12 | Detalle y validación | #11 | — | ⬜ |
 | 13 | Bandeja e incidencias | #11 | — | ⬜ |
 | 14 | Outbox y mensajería | #11 | — | ⬜ |
 | 15 | Publicación a Drive | #14 | — | ⬜ |
