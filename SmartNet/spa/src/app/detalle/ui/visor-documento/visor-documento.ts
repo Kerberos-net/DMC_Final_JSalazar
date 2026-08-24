@@ -14,6 +14,7 @@ import { DocumentoRespuesta } from '../../models/documento.model';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './visor-documento.html',
+  styleUrl: './visor-documento.css',
 })
 export class VisorDocumento {
   private readonly sanitizer = inject(DomSanitizer);

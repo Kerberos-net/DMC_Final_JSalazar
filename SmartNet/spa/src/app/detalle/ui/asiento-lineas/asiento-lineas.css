@@ -1,0 +1,14 @@
+.asiento-lineas {
+  margin-bottom: var(--space-3);
+}
+
+.nueva-linea {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.nueva-linea input {
+  flex: 1;
+}

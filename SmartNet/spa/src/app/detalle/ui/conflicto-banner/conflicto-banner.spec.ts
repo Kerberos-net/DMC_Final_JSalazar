@@ -53,6 +53,48 @@ describe('ConflictoBanner', () => {
     expect(fixture.nativeElement.querySelector('[data-testid="recargar"]')).toBeNull();
   });
 
+  /* tasks.md 4.11 (RED first), spa-visual-detalle-validacion "412 vs. 422 visually distinct":
+   * dedicated token/class + distinct icon shape, never sharing color. */
+  it('412 renders .banner--conflicto (violeta), not .banner--error', () => {
+    const problema: ProblemaDetails = {
+      type: 'https://smartnet.local/problemas/precondicion-fallida',
+      title: 't',
+      status: 412,
+      detail: 'd',
+    };
+    const fixture = createComponent(problema, 'conflicto-concurrencia');
+
+    expect(fixture.nativeElement.querySelector('.banner--conflicto')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.banner--error')).toBeNull();
+  });
+
+  it('422 renders .banner--error (rojo), not .banner--conflicto', () => {
+    const problema: ProblemaDetails = {
+      type: 'https://smartnet.local/problemas/asiento-descuadrado',
+      title: 't',
+      status: 422,
+      detail: 'd',
+    };
+    const fixture = createComponent(problema, 'invariante');
+
+    expect(fixture.nativeElement.querySelector('.banner--error')).toBeTruthy();
+    expect(fixture.nativeElement.querySelector('.banner--conflicto')).toBeNull();
+  });
+
+  it('412 and 422 use distinct inline SVG icon shapes (redundant channel, not color alone)', () => {
+    const conflicto = createComponent(
+      { type: 't', title: 't', status: 412, detail: 'd' },
+      'conflicto-concurrencia'
+    );
+    const error = createComponent({ type: 't', title: 't', status: 422, detail: 'd' }, 'invariante');
+
+    const iconoConflicto = conflicto.nativeElement.querySelector('svg')?.getAttribute('data-icono');
+    const iconoError = error.nativeElement.querySelector('svg')?.getAttribute('data-icono');
+    expect(iconoConflicto).toBeTruthy();
+    expect(iconoError).toBeTruthy();
+    expect(iconoConflicto).not.toBe(iconoError);
+  });
+
   it('emits recargar when the reload button is clicked', () => {
     const problema: ProblemaDetails = {
       type: 'https://smartnet.local/problemas/precondicion-fallida',
