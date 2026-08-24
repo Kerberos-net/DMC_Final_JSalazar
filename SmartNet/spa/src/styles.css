@@ -1,1 +1,394 @@
-/* You can add global styles to this file, and also import other style files */
+/* Global styles -- design.md "Technical Approach": three CSS layers, tokens + base + shared
+ * primitives. Per-component `styleUrl` files own layout/composition only and sit OUTSIDE this
+ * `@layer` stack so they win over these primitives without `!important` (Angular emulated
+ * encapsulation already isolates them). No component redefines a color/typography literal --
+ * spa-design-tokens spec "Shared token budget concentration". */
+
+@layer tokens, base, primitives;
+
+@layer tokens {
+  /* Tema claro (default, no explicit choice needed) -- design.md "Palette and verified contrast".
+   * Every ratio below is the one design.md computed and `contraste.spec.ts` re-verifies. */
+  :root,
+  :root[data-tema='claro'] {
+    color-scheme: light;
+
+    --fondo-app: #f7f8fa;
+    --fondo-superficie: #ffffff;
+    --texto-principal: #16191d;
+    --texto-secundario: #5a6270;
+    --borde-control: #767e8c;
+    --borde-sutil: #d5d9e0;
+
+    --alerta-ink: #b45309;
+    --alerta-texto: #7c3d00;
+    --alerta-fondo: #fdf0e1;
+
+    --conflicto-ink: #6d28d9;
+    --conflicto-fondo: #f1ebfd;
+
+    --error-ink: #b91c1c;
+    --error-fondo: #fdecec;
+
+    --estado-pendiente-texto: #363c46;
+    --estado-pendiente-fondo: #eaecf0;
+    --estado-pendiente-borde: #767e8c;
+
+    --estado-validada-texto: #14532d;
+    --estado-validada-fondo: #dcf3e3;
+    --estado-validada-borde: #1e7a44;
+
+    --estado-descartada-texto: #5a6270;
+    --estado-descartada-fondo: transparent;
+    --estado-descartada-borde: #9aa1ac;
+
+    --accion-fondo: #1f2937;
+    --accion-texto: #ffffff;
+
+    --focus-ring: #1d4ed8;
+
+    --sombra-panel: 0 1px 2px rgb(22 25 29 / 8%), 0 1px 1px rgb(22 25 29 / 6%);
+  }
+
+  /* Tema oscuro -- design.md D1: always explicit via [data-tema], never a bare media-query
+   * override, so the dark block exists exactly once. */
+  :root[data-tema='oscuro'] {
+    color-scheme: dark;
+
+    --fondo-app: #12151a;
+    --fondo-superficie: #1a1f26;
+    --texto-principal: #e8ebf0;
+    --texto-secundario: #a2abba;
+    --borde-control: #6e7787;
+    --borde-sutil: #2a3038;
+
+    --alerta-ink: #e8a33d;
+    --alerta-texto: #e8ebf0;
+    --alerta-fondo: #3a2a14;
+
+    --conflicto-ink: #b79bf5;
+    --conflicto-fondo: #241c3d;
+
+    --error-ink: #f58787;
+    --error-fondo: #3a1e1e;
+
+    --estado-pendiente-texto: #e8ebf0;
+    --estado-pendiente-fondo: #23272e;
+    --estado-pendiente-borde: #8a93a3;
+
+    --estado-validada-texto: #e8ebf0;
+    --estado-validada-fondo: #16301f;
+    --estado-validada-borde: #58c97f;
+
+    --estado-descartada-texto: #a2abba;
+    --estado-descartada-fondo: transparent;
+    --estado-descartada-borde: #4a5160;
+
+    --accion-fondo: #e8ebf0;
+    --accion-texto: #12151a;
+
+    --focus-ring: #7fa9ff;
+
+    /* Shadows do not read on dark; degrade to a border (design.md palette note). */
+    --sombra-panel: 0 0 0 1px var(--borde-sutil);
+  }
+
+  :root {
+    /* Typography -- design.md D5: system stack, no webfont; dense 14px base scale. */
+    --fuente-ui: ui-sans-serif, 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, Arial,
+      sans-serif;
+    --fuente-mono: ui-monospace, 'Cascadia Code', 'Consolas', monospace;
+
+    --fs-12: 0.75rem;
+    --fs-13: 0.8125rem;
+    --fs-14: 0.875rem;
+    --fs-16: 1rem;
+    --fs-20: 1.25rem;
+    --fs-24: 1.5rem;
+
+    --peso-normal: 400;
+    --peso-medio: 500;
+    --peso-semi: 600;
+
+    --lh-densa: 1.35;
+    --lh-normal: 1.5;
+
+    /* Spacing scale, 4px base. */
+    --space-1: 0.25rem;
+    --space-2: 0.5rem;
+    --space-3: 0.75rem;
+    --space-4: 1rem;
+    --space-5: 1.5rem;
+    --space-6: 2rem;
+
+    --radio-control: 6px;
+    --radio-panel: 8px;
+  }
+}
+
+@layer base {
+  *,
+  *::before,
+  *::after {
+    box-sizing: border-box;
+  }
+
+  html {
+    font-family: var(--fuente-ui);
+    font-size: var(--fs-16);
+    line-height: var(--lh-normal);
+    color: var(--texto-principal);
+    background: var(--fondo-app);
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+  }
+
+  h1,
+  h2,
+  h3 {
+    font-weight: var(--peso-semi);
+    line-height: var(--lh-densa);
+    margin: 0 0 var(--space-3);
+  }
+
+  h1 {
+    font-size: var(--fs-24);
+  }
+
+  h2 {
+    font-size: var(--fs-20);
+  }
+
+  p {
+    margin: 0 0 var(--space-2);
+  }
+
+  a {
+    color: var(--focus-ring);
+  }
+
+  label {
+    display: block;
+    font-size: var(--fs-13);
+    color: var(--texto-secundario);
+    margin-bottom: var(--space-3);
+  }
+
+  :focus-visible {
+    outline: 2px solid var(--focus-ring);
+    outline-offset: 2px;
+  }
+
+  /* Native <select>/<input type=date> follow color-scheme (design.md D1). */
+  select,
+  input[type='date'] {
+    color-scheme: inherit;
+  }
+
+  .tabular-nums {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+}
+
+@layer primitives {
+  /* .btn -- spa-design-tokens: components reference tokens, never literals. */
+  .btn {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-2);
+    font: inherit;
+    font-size: var(--fs-14);
+    font-weight: var(--peso-medio);
+    padding: var(--space-2) var(--space-4);
+    border-radius: var(--radio-control);
+    border: 1px solid transparent;
+    background: var(--accion-fondo);
+    color: var(--accion-texto);
+    cursor: pointer;
+  }
+
+  .btn:disabled {
+    opacity: 0.55;
+    cursor: not-allowed;
+  }
+
+  .btn--secundario {
+    background: transparent;
+    color: var(--texto-principal);
+    border-color: var(--borde-control);
+  }
+
+  .btn--peligro {
+    background: var(--error-ink);
+    color: #ffffff;
+  }
+
+  /* .campo -- shared input/label treatment. */
+  .campo input,
+  .campo select,
+  input.campo,
+  select.campo {
+    font: inherit;
+    font-size: var(--fs-14);
+    color: var(--texto-principal);
+    background: var(--fondo-superficie);
+    border: 1px solid var(--borde-control);
+    border-radius: var(--radio-control);
+    padding: var(--space-2) var(--space-3);
+    width: 100%;
+  }
+
+  .campo input:disabled,
+  input.campo:disabled {
+    background: var(--fondo-app);
+    color: var(--texto-secundario);
+  }
+
+  .campo--resaltado input,
+  input.campo--resaltado {
+    border-color: var(--alerta-ink);
+    border-width: 2px;
+  }
+
+  /* .chip -- estado de la factura (D3: un hue = un significado). */
+  .chip {
+    display: inline-flex;
+    align-items: center;
+    gap: var(--space-1);
+    font-size: var(--fs-12);
+    font-weight: var(--peso-semi);
+    line-height: 1;
+    padding: var(--space-1) var(--space-2);
+    border-radius: 999px;
+    border: 1px solid transparent;
+  }
+
+  .chip--pendiente {
+    color: var(--estado-pendiente-texto);
+    background: var(--estado-pendiente-fondo);
+    border-color: var(--estado-pendiente-borde);
+  }
+
+  .chip--validada {
+    color: var(--estado-validada-texto);
+    background: var(--estado-validada-fondo);
+    border-color: var(--estado-validada-borde);
+  }
+
+  .chip--descartada {
+    color: var(--estado-descartada-texto);
+    background: var(--estado-descartada-fondo);
+    border: 1px dashed var(--estado-descartada-borde);
+  }
+
+  /* .tabla -- tabular alignment for amounts/dates (design D5, spec.md tabular-nums requirement). */
+  .tabla {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--fs-14);
+  }
+
+  .tabla th,
+  .tabla td {
+    text-align: left;
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--borde-sutil);
+  }
+
+  .tabla th {
+    font-size: var(--fs-12);
+    font-weight: var(--peso-semi);
+    color: var(--texto-secundario);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  .tabla td.tabular-nums,
+  .tabla th.tabular-nums {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  /* .alerta -- design D2: one ink, two treatments. Bloqueante = fill + 4px rule (the rule, not the
+   * tint, is what actually reaches 4.73:1 -- mandatory, not decorative). Informativa = 1px border
+   * + icon, no fill. Never color alone (WCAG 1.4.1) -- callers pair this with an inline SVG icon
+   * and a text label. */
+  .alerta {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-2);
+    font-size: var(--fs-13);
+    color: var(--alerta-texto);
+    padding: var(--space-2) var(--space-3);
+    border-radius: var(--radio-control);
+  }
+
+  .alerta svg {
+    flex: none;
+    width: 16px;
+    height: 16px;
+    fill: currentColor;
+    margin-top: 2px;
+  }
+
+  .alerta--bloqueante {
+    background: var(--alerta-fondo);
+    border-left: 4px solid var(--alerta-ink);
+  }
+
+  .alerta--informativa {
+    background: transparent;
+    border: 1px solid var(--alerta-ink);
+    color: var(--texto-principal);
+  }
+
+  /* .panel -- generic surface/card, e.g. the historial-correccion <details> panel. */
+  .panel {
+    background: var(--fondo-superficie);
+    border: 1px solid var(--borde-sutil);
+    border-radius: var(--radio-panel);
+    box-shadow: var(--sombra-panel);
+    padding: var(--space-3);
+  }
+
+  .panel--vacio {
+    color: var(--texto-secundario);
+    font-size: var(--fs-13);
+    text-align: center;
+  }
+
+  /* .banner -- 412 conflicto vs 422/negocio error: distinct token, distinct icon shape, always a
+   * text label too (design D3's hardest pair under deuteranopia gets three redundant channels). */
+  .banner {
+    display: flex;
+    align-items: flex-start;
+    gap: var(--space-3);
+    padding: var(--space-3) var(--space-4);
+    border-radius: var(--radio-panel);
+    font-size: var(--fs-14);
+  }
+
+  .banner svg {
+    flex: none;
+    width: 20px;
+    height: 20px;
+    fill: currentColor;
+    margin-top: 2px;
+  }
+
+  .banner--conflicto {
+    background: var(--conflicto-fondo);
+    color: var(--conflicto-ink);
+    border: 1px solid var(--conflicto-ink);
+  }
+
+  .banner--error {
+    background: var(--error-fondo);
+    color: var(--error-ink);
+    border: 1px solid var(--error-ink);
+  }
+}
