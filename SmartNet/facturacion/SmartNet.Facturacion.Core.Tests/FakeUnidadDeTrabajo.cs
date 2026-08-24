@@ -174,6 +174,50 @@ public sealed class FakeUnidadDeTrabajo : IUnidadDeTrabajo
         UltimaFechaConsultadaTipoCambio = fecha;
         return Task.FromResult(TipoCambioVigente);
     }
+
+    // --- PR 3 (Phase 3, BACKLOG #12) additions ---
+
+    public IReadOnlyList<DocumentoFacturaPersistido> DocumentosFacturaACargar { get; set; } = Array.Empty<DocumentoFacturaPersistido>();
+    public IReadOnlyList<AdjuntoManual> AdjuntosDeFacturaACargar { get; set; } = Array.Empty<AdjuntoManual>();
+    public DocumentoFacturaPersistido? DocumentoFacturaPorId { get; set; }
+    public AdjuntoManual? AdjuntoPorId { get; set; }
+
+    public Task<IReadOnlyList<DocumentoFacturaPersistido>> CargarDocumentosFacturaAsync(long facturaId, CancellationToken ct)
+    {
+        Llamadas.Add(nameof(CargarDocumentosFacturaAsync));
+        return Task.FromResult(DocumentosFacturaACargar);
+    }
+
+    public Task<IReadOnlyList<AdjuntoManual>> CargarAdjuntosDeFacturaAsync(long facturaId, CancellationToken ct)
+    {
+        Llamadas.Add(nameof(CargarAdjuntosDeFacturaAsync));
+        return Task.FromResult(AdjuntosDeFacturaACargar);
+    }
+
+    public Task<DocumentoFacturaPersistido?> CargarDocumentoFacturaPorIdAsync(long documentoFacturaId, CancellationToken ct)
+    {
+        Llamadas.Add(nameof(CargarDocumentoFacturaPorIdAsync));
+        return Task.FromResult(DocumentoFacturaPorId);
+    }
+
+    public Task<AdjuntoManual?> CargarAdjuntoPorIdAsync(long adjuntoManualId, CancellationToken ct)
+    {
+        Llamadas.Add(nameof(CargarAdjuntoPorIdAsync));
+        return Task.FromResult(AdjuntoPorId);
+    }
+
+    // --- diseno-visual-spa-item-12 addition ---
+
+    public ResultadoEscritura ResultadoDeConfirmarAfectacion { get; set; } = ResultadoEscritura.Aplicado;
+    public bool? UltimaAfectacionMixtaConfirmada { get; private set; }
+
+    public Task<ResultadoEscritura> ConfirmarAfectacionAsync(
+        long facturaId, byte[] versionEsperada, bool esMixta, CancellationToken ct)
+    {
+        Llamadas.Add(nameof(ConfirmarAfectacionAsync));
+        UltimaAfectacionMixtaConfirmada = esMixta;
+        return Task.FromResult(ResultadoDeConfirmarAfectacion);
+    }
 }
 
 /// <summary>Fábrica que siempre devuelve la misma <see cref="FakeUnidadDeTrabajo"/> — deja a la

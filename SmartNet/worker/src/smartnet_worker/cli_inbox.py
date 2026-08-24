@@ -64,6 +64,10 @@ def _publicar_evento(
         documento_recibido_id=fila.documento_recibido_id,
         tipo_documento=fila.tipo_documento,
         documento_asociado_id=fila.documento_asociado_id,
+        nombre_archivo=fila.nombre_archivo,
+        mime_type=fila.mime_type,
+        ruta_relativa=fila.ruta_relativa,
+        tamano_bytes=fila.tamano_bytes,
         comprobante=_comprobante_desde_fila(fila),
     )
     conexion = conectar(connection_string)

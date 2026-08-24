@@ -28,6 +28,12 @@ public sealed record ComprobanteExtraido(
 /// record already built. <see cref="Comprobante"/> is <c>null</c> when
 /// <see cref="EstadoProcesamiento"/> is <c>ERROR</c> (#6 never writes <c>DatosExtraidos</c> for a
 /// failed document).
+///
+/// BACKLOG #12 (design D1): <see cref="NombreArchivo"/>/<see cref="MimeType"/>/
+/// <see cref="RutaRelativa"/>/<see cref="TamanoBytes"/> travel here because .NET has no SELECT
+/// grant on <c>fact.DocumentoRecibido</c> (ADR 0003 DENY, 008) — this is the only symmetric path
+/// to project the document's metadata into the .NET-owned <c>fact.DocumentoFactura</c> at
+/// promoción (schema 016).
 /// </summary>
 public sealed record EventoInbox(
     int Version,
@@ -35,6 +41,10 @@ public sealed record EventoInbox(
     long DocumentoRecibidoId,
     string TipoDocumento,
     long? DocumentoAsociadoId,
+    string NombreArchivo,
+    string MimeType,
+    string RutaRelativa,
+    long TamanoBytes,
     ComprobanteExtraido? Comprobante,
     IReadOnlyList<EvidenciaCampo> Evidencia,
     bool? AfectacionMixta,

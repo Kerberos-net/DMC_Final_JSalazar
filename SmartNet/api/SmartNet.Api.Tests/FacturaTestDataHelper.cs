@@ -46,6 +46,23 @@ internal static class FacturaTestDataHelper
     public static Task<byte[]> ObtenerVersionFacturaAsync(this TestDatabaseFixture db, long facturaId) =>
         db.ExecuteScalarAsync<byte[]>($"SELECT Version FROM fact.Factura WHERE FacturaId = {facturaId};")!;
 
+    /// <summary>diseno-visual-spa-item-12 (design D9) — fija las 4 columnas indicadoras directamente
+    /// (mismas que <c>SqlBandejaRepository.ListarAsync</c> ya lee), sin pasar por la promoción del
+    /// inbox: <c>null</c> deja la columna sin tocar (para <c>AfectacionMixta</c>, cuyo valor por
+    /// defecto ya es <c>NULL</c>).</summary>
+    public static Task FijarIndicadoresFacturaAsync(
+        this TestDatabaseFixture db, long facturaId, bool esProveedorGenerico = false,
+        bool posibleDuplicado = false, bool tieneCamposNoExtraidos = false, bool? afectacionMixta = null) =>
+        db.ExecuteNonQueryAsync(
+            $"""
+             UPDATE fact.Factura
+             SET EsProveedorGenerico = {(esProveedorGenerico ? 1 : 0)},
+                 PosibleDuplicado = {(posibleDuplicado ? 1 : 0)},
+                 TieneCamposNoExtraidos = {(tieneCamposNoExtraidos ? 1 : 0)},
+                 AfectacionMixta = {(afectacionMixta is null ? "NULL" : afectacionMixta.Value ? "1" : "0")}
+             WHERE FacturaId = {facturaId};
+             """);
+
     /// <summary>Un asiento BORRADOR balanceado (misma forma que <c>AsientoValido()</c> de
     /// <c>ServicioDeFacturasTests</c>, PR 1) que <c>InvariantesDeConfirmacion.Evaluar</c> aprueba
     /// enteramente — necesario para un test de <c>validar</c> feliz-camino de extremo a extremo.</summary>

@@ -553,6 +553,51 @@ public sealed class PermissionMatrixTests
     }
 
     // ---------------------------------------------------------------------------------------
+    // BACKLOG #12, Phase 1 (task 1.1/1.2) — fact.DocumentoFactura (016), the .NET-owned
+    // projection of ingested-document metadata (design.md D1, Blocking Architecture Finding):
+    // fact_api gets SELECT/INSERT (write-once projection, populated at promoción, never
+    // updated), fact_worker is explicitly DENIED — same "Privadas propias de .NET" bucket shape
+    // as the rest of 008, extended by 016.
+    // ---------------------------------------------------------------------------------------
+    [Fact]
+    public async Task UsrApi_CanInsertAndSelect_DocumentoFactura()
+    {
+        await using var db = await MigratedDatabaseWithUsers();
+        var facturaId = await SeedFactura(db);
+
+        await AssertSucceedsWrite(db, UsrApi,
+            $"""
+             INSERT INTO fact.DocumentoFactura
+                 (FacturaId, DocumentoRecibidoId, NombreArchivo, MimeType, RutaRelativa, TamanoBytes)
+             VALUES
+                 ({facturaId}, 1, 'factura.xml', 'application/xml', '2026/08/factura.xml', 2048);
+             """);
+        await AssertSucceedsRead(db, UsrApi, "SELECT COUNT(*) FROM fact.DocumentoFactura;");
+    }
+
+    [Fact]
+    public async Task UsrWorker_IsDenied_DocumentoFactura()
+    {
+        await using var db = await MigratedDatabaseWithUsers();
+
+        await AssertDenied(db, UsrWorker, "SELECT COUNT(*) FROM fact.DocumentoFactura;");
+        await AssertDenied(db, UsrWorker,
+            "INSERT INTO fact.DocumentoFactura " +
+            "(FacturaId, DocumentoRecibidoId, NombreArchivo, MimeType, RutaRelativa, TamanoBytes) " +
+            "VALUES (1, 1, 'factura.xml', 'application/xml', '2026/08/factura.xml', 2048);");
+    }
+
+    // DocumentoRecibido's own DENY (008) is unchanged by 016 — 016 only adds a new table and its
+    // own grants, it does not touch fact.DocumentoRecibido's existing GRANT/DENY statements.
+    [Fact]
+    public async Task UsrApi_IsStillDenied_DocumentoRecibido_AfterSchema016()
+    {
+        await using var db = await MigratedDatabaseWithUsers();
+
+        await AssertDenied(db, UsrApi, "SELECT COUNT(*) FROM fact.DocumentoRecibido;");
+    }
+
+    // ---------------------------------------------------------------------------------------
     // Helpers
     // ---------------------------------------------------------------------------------------
     private static async Task<TestDatabaseFixture> MigratedDatabaseWithUsers()

@@ -71,7 +71,12 @@ public sealed class PromocionBackgroundService : BackgroundService
 
         var indicadores = CalculoDeIndicadores.Calcular(evento, proveedor.Existe, existeIdentidadPrevia);
         var facturaPromovida = ConstruccionDeFactura.Construir(evento, proveedor.Codigo, indicadores);
+        // BACKLOG #12 (design D1): built directly from the already-parsed EventoInbox document
+        // fields -- never a SELECT against fact.DocumentoRecibido (ADR 0003 DENY, task 2.3).
+        var documentoPromovido = new DocumentoPromovido(
+            evento.DocumentoRecibidoId, evento.NombreArchivo, evento.MimeType, evento.RutaRelativa, evento.TamanoBytes);
 
-        await _promocionRepository.PromoverAsync(pendiente.InboxEventId, pendiente.ProcesamientoId, facturaPromovida, ct);
+        await _promocionRepository.PromoverAsync(
+            pendiente.InboxEventId, pendiente.ProcesamientoId, facturaPromovida, documentoPromovido, ct);
     }
 }

@@ -1,4 +1,5 @@
 using System.Globalization;
+using System.Linq;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
@@ -18,6 +19,7 @@ public static class AsientoEndpoints
 {
     public static IEndpointRouteBuilder MapAsientoEndpoints(this IEndpointRouteBuilder app)
     {
+        app.MapGet("/api/asientos/{id:long}", (Delegate)GetAsientoAsync).RequireAuthorization();
         app.MapPatch("/api/asientos/{id:long}", (Delegate)PatchAsientoAsync).RequireAuthorization();
         app.MapPost("/api/asientos/{id:long}/lineas", (Delegate)AgregarLineaAsync).RequireAuthorization();
         app.MapPatch("/api/asientos/{id:long}/lineas/{lineaId:long}", (Delegate)ActualizarLineaAsync).RequireAuthorization();
@@ -26,6 +28,23 @@ public static class AsientoEndpoints
         app.MapPost("/api/asientos/{id:long}/anular", (Delegate)AnularAsync).RequireAuthorization();
 
         return app;
+    }
+
+    /// <summary>tasks.md 3.8/3.9, spec.md asiento-lectura-api — lectura pura, sin comando: mismo
+    /// patrón de <c>FacturaEndpoints.GetFacturaAsync</c> (ETag en el encabezado, nunca en el
+    /// cuerpo).</summary>
+    private static async Task<IResult> GetAsientoAsync(long id, HttpContext http, IFacturacionStore store, CancellationToken ct)
+    {
+        await using var uow = await store.AbrirAsync(ct);
+        var asiento = await uow.CargarAsientoAsync(id, ct);
+        if (asiento is null)
+        {
+            return Results.NotFound();
+        }
+
+        var lineas = await uow.CargarLineasPersistidasAsync(id, ct);
+        http.Response.Headers.ETag = TokenDeConcurrencia.Codificar(asiento.Version);
+        return Results.Ok(AsientoRespuesta.De(asiento, lineas));
     }
 
     private static async Task<IResult> PatchAsientoAsync(
@@ -144,7 +163,12 @@ public static class AsientoEndpoints
 
     /// <summary>design D2 -- tras un comando exitoso, recarga el asiento y devuelve su ETag nuevo
     /// (mismo patrón que <c>FacturaEndpoints.PatchFacturaAsync</c>): el cliente necesita el rowversion
-    /// fresco para la siguiente escritura CAS sobre el mismo recurso.</summary>
+    /// fresco para la siguiente escritura CAS sobre el mismo recurso.
+    ///
+    /// PR5 gap closure (BACKLOG #12, Phase 5) -- también recarga las líneas por
+    /// <see cref="IUnidadDeTrabajo.CargarLineasPersistidasAsync"/> y las expone en la misma respuesta:
+    /// la pantalla de detalle necesita el <c>LineaId</c> estable de cada línea recién escrita para su
+    /// próxima edición (spec.md api-asientos: "never position").</summary>
     private static async Task<IResult> ResponderConAsientoActualizadoAsync(
         long id, ResultadoComando resultado, HttpContext http, CancellationToken ct)
     {
@@ -161,8 +185,10 @@ public static class AsientoEndpoints
             return Results.NotFound();
         }
 
+        var lineas = await uow.CargarLineasPersistidasAsync(id, ct);
+
         http.Response.Headers.ETag = TokenDeConcurrencia.Codificar(asiento.Version);
-        return Results.Ok(AsientoRespuesta.De(asiento));
+        return Results.Ok(AsientoRespuesta.De(asiento, lineas));
     }
 
     private static long ResolverUsuarioId(HttpContext http)
@@ -192,13 +218,43 @@ internal sealed record LineaCreadaRespuesta(long LineaId);
 
 internal sealed record ReabrirAnularRequest(string? Motivo);
 
-/// <summary>Forma de respuesta de <c>PATCH /api/asientos/{id}</c> y de los comandos de línea/
-/// reabrir/anular (todos devuelven el asiento actualizado, igual que <c>FacturaRespuesta</c>).</summary>
+/// <summary>Forma de respuesta de <c>GET</c>/<c>PATCH /api/asientos/{id}</c> y de los comandos de
+/// línea/reabrir/anular (todos devuelven el asiento actualizado, igual que <c>FacturaRespuesta</c>).
+///
+/// <see cref="TipoCambioVenta"/> — tasks.md 3.10/3.11, design D4 (BACKLOG #12): la tasa de venta
+/// congelada al generar/confirmar el asiento (<c>fact.AsientoContable.TipoCambioVenta</c>, ADR 0018
+/// pt.1 — nunca "compra"), ya persistida desde #11 (<c>SqlUnidadDeTrabajo.cs</c>) y ya cargada en
+/// <see cref="AsientoContable.TipoCambioVenta"/> -- este campo solo la expone, sin tocar el store.
+/// <c>null</c> para una factura en PEN, nunca un valor fabricado.
+///
+/// DEVIACIÓN DOCUMENTADA de la spec delta `factura-respuesta-asiento-respuesta.md` (que pide el
+/// campo en AMBAS `FacturaRespuesta` y `AsientoRespuesta`): design.md D4 corrige explícitamente la
+/// propuesta -- `FacturaPersistida` no tiene esa columna, y exponer una tasa DISTINTA junto a la
+/// congelada dejaría dos tasas divergiendo en pantalla. Se sigue design.md (la corrección
+/// documentada), no la spec delta sin corregir; ver apply-progress para el detalle.</summary>
 internal sealed record AsientoRespuesta(
     long AsientoContableId, string Estado, string? NumeroAsiento, string ProveedorCodigo, DateOnly FechaContable,
-    string? MotivoDescripcion)
+    string? MotivoDescripcion, decimal? TipoCambioVenta, IReadOnlyList<LineaRespuesta> Lineas)
 {
-    public static AsientoRespuesta De(AsientoPersistido asiento) => new(
+    public static AsientoRespuesta De(AsientoPersistido asiento, IReadOnlyList<LineaPersistida> lineas) => new(
         asiento.AsientoContableId, asiento.Estado, asiento.NumeroAsiento, asiento.Asiento.ProveedorCodigo,
-        asiento.Asiento.FechaContable, asiento.Asiento.MotivoDescripcion);
+        asiento.Asiento.FechaContable, asiento.Asiento.MotivoDescripcion, asiento.Asiento.TipoCambioVenta,
+        lineas.Select(LineaRespuesta.De).ToArray());
+}
+
+/// <summary>Forma HTTP de una <see cref="LineaPersistida"/> -- espejo de <see cref="LineaAsientoRequest"/>
+/// más su <see cref="LineaId"/> estable (spec.md api-asientos: "never position"). PR5 gap closure
+/// (BACKLOG #12, Phase 5): Phase 3 nunca serializó las líneas en ninguna respuesta de
+/// <c>AsientoEndpoints</c>, aunque <c>IUnidadDeTrabajo.CargarLineasPersistidasAsync</c> ya existía.</summary>
+internal sealed record LineaRespuesta(
+    long LineaId, short Orden, string Bloque, string Tipo, decimal Debe, decimal Haber, string? CuentaCodigo,
+    string? CuentaDescripcion, string? CtaReflejaCodigo, string? CtaPuenteCodigo)
+{
+    public static LineaRespuesta De(LineaPersistida persistida) => new(
+        persistida.LineaId,
+        persistida.Linea.Orden,
+        persistida.Linea.Bloque == global::SmartNet.Contable.Core.Bloque.Principal ? "PRINCIPAL" : "DESTINO",
+        persistida.Linea.Tipo == TipoLinea.D ? "D" : "H",
+        persistida.Linea.Debe, persistida.Linea.Haber, persistida.Linea.CuentaCodigo,
+        persistida.Linea.CuentaDescripcion, persistida.Linea.CtaReflejaCodigo, persistida.Linea.CtaPuenteCodigo);
 }

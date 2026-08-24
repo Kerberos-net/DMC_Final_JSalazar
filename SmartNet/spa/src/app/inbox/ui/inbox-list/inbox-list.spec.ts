@@ -1,4 +1,5 @@
 import { TestBed } from '@angular/core/testing';
+import { provideRouter } from '@angular/router';
 import { InboxList } from './inbox-list';
 import { BandejaItem } from '../../models/bandeja-item.model';
 
@@ -46,6 +47,7 @@ describe('InboxList', () => {
   beforeEach(async () => {
     await TestBed.configureTestingModule({
       imports: [InboxList],
+      providers: [provideRouter([])],
     }).compileComponents();
   });
 
@@ -59,6 +61,14 @@ describe('InboxList', () => {
       row.querySelectorAll('[data-testid="indicador-chip"]')
     ) as HTMLElement[];
     expect(chips.length).toBe(2);
+  });
+
+  it('links a promoted item to its detail screen (BACKLOG #12 Phase 5)', () => {
+    const fixture = createComponent([promovido]);
+    const enlace: HTMLAnchorElement = fixture.nativeElement.querySelector(
+      '[data-testid="ir-a-detalle"]'
+    );
+    expect(enlace.getAttribute('href')).toBe('/detalle/42');
   });
 
   it('shows the discard reason for a discarded item', () => {

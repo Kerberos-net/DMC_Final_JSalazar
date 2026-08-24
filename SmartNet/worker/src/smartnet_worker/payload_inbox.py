@@ -54,12 +54,21 @@ def construir_payload(
     documento_recibido_id: int,
     tipo_documento: str,
     documento_asociado_id: int | None,
+    nombre_archivo: str,
+    mime_type: str,
+    ruta_relativa: str,
+    tamano_bytes: int,
     comprobante: ComprobanteParaEvento | None,
 ) -> str:
     """Devuelve el JSON serializado (`fact.InboxEvent.Payload`, `NVARCHAR(MAX)`) — la forma de
     design.md's Interfaces/Contracts, `version=1`. `comprobante=None` es el caso `Estado='ERROR'`:
     #6 nunca escribe `fact.DatosExtraidos` para un documento fallido (spec.md 'Failed processing
-    still emits an event'), asi que no hay comprobante que reportar."""
+    still emits an event'), asi que no hay comprobante que reportar.
+
+    BACKLOG #12 (design D1): `nombre_archivo`/`mime_type`/`ruta_relativa`/`tamano_bytes` viajan en
+    `documento` porque .NET no puede leer `fact.DocumentoRecibido` (ADR 0003 DENY, 008) para
+    proyectarlos por su cuenta -- el payload es el UNICO camino simetrico con el que Drive ya usa
+    para el sentido contrario (Python no lee `AdjuntoManual`)."""
     cuerpo = {
         "version": _VERSION,
         "estadoProcesamiento": estado_procesamiento,
@@ -67,6 +76,10 @@ def construir_payload(
             "documentoRecibidoId": documento_recibido_id,
             "tipoDocumento": tipo_documento,
             "documentoAsociadoId": documento_asociado_id,
+            "nombreArchivo": nombre_archivo,
+            "mimeType": mime_type,
+            "rutaRelativa": ruta_relativa,
+            "tamanoBytes": tamano_bytes,
         },
         "comprobante": _comprobante_dict(comprobante),
         "evidencia": _evidencia(comprobante, tipo_documento),

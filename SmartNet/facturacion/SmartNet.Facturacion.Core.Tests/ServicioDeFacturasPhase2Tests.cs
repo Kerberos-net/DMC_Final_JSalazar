@@ -303,6 +303,65 @@ public class ServicioDeFacturasPhase2Tests
         Assert.DoesNotContain(nameof(IUnidadDeTrabajo.GuardarFacturaAsync), store.UnidadDeTrabajo.Llamadas);
     }
 
+    // --- diseno-visual-spa-item-12 (design D10): ConfirmarAfectacionAsync — gate stays dormant,
+    // this only writes the column + the existing CONFIRMACION_AFECTACION audit action. ---
+
+    [Fact]
+    public async Task ConfirmarAfectacionAsync_WhenFacturaDoesNotExist_ReturnsNoEncontrado()
+    {
+        var store = new FakeFacturacionStore();
+        store.UnidadDeTrabajo.FacturaACargar = null;
+        var sut = new ServicioDeFacturas(store);
+
+        var resultado = await sut.ConfirmarAfectacionAsync(999, VersionInicial, esMixta: false, usuarioId: 1, Ahora, CancellationToken.None);
+
+        Assert.IsType<ResultadoComando.NoEncontrado>(resultado);
+        Assert.Empty(store.UnidadDeTrabajo.AuditoriasRegistradas);
+    }
+
+    [Fact]
+    public async Task ConfirmarAfectacionAsync_WhenVersionIsStale_ReturnsVersionEnConflicto_AndWritesNoAudit()
+    {
+        var store = new FakeFacturacionStore();
+        store.UnidadDeTrabajo.FacturaACargar = FacturaPendiente();
+        store.UnidadDeTrabajo.ResultadoDeConfirmarAfectacion = ResultadoEscritura.VersionEnConflicto;
+        var sut = new ServicioDeFacturas(store);
+
+        var resultado = await sut.ConfirmarAfectacionAsync(100, VersionInicial, esMixta: false, usuarioId: 1, Ahora, CancellationToken.None);
+
+        Assert.IsType<ResultadoComando.VersionEnConflicto>(resultado);
+        Assert.Empty(store.UnidadDeTrabajo.AuditoriasRegistradas);
+        Assert.False(store.UnidadDeTrabajo.Committed);
+    }
+
+    [Fact]
+    public async Task ConfirmarAfectacionAsync_WhenApplied_WritesConfirmacionAfectacionAudit_AndCommits()
+    {
+        var store = new FakeFacturacionStore();
+        store.UnidadDeTrabajo.FacturaACargar = FacturaPendiente();
+        var sut = new ServicioDeFacturas(store);
+
+        var resultado = await sut.ConfirmarAfectacionAsync(100, VersionInicial, esMixta: true, usuarioId: 7, Ahora, CancellationToken.None);
+
+        Assert.IsType<ResultadoComando.Aplicado>(resultado);
+        var entrada = Assert.Single(store.UnidadDeTrabajo.AuditoriasRegistradas);
+        Assert.Equal(EntradaAuditoria.Acciones.ConfirmacionAfectacion, entrada.Accion);
+        Assert.Equal(EntradaAuditoria.EntidadTipos.Factura, entrada.EntidadTipo);
+        Assert.Equal(100, entrada.EntidadId);
+        Assert.Equal("True", entrada.ValorNuevo);
+        Assert.Equal(7, entrada.UsuarioId);
+        Assert.True(store.UnidadDeTrabajo.Committed);
+        Assert.Equal(
+            new[]
+            {
+                nameof(IUnidadDeTrabajo.CargarFacturaAsync),
+                "ConfirmarAfectacionAsync",
+                nameof(IUnidadDeTrabajo.RegistrarAuditoriaAsync),
+                nameof(IUnidadDeTrabajo.CommitAsync),
+            },
+            store.UnidadDeTrabajo.Llamadas);
+    }
+
     // --- Adjuntos ---
 
     [Fact]

@@ -20,3 +20,18 @@ public sealed record FacturaPromovida(
     IndicadoresFactura Indicadores,
     IReadOnlyList<FacturaExtraccionPromovida> Extracciones,
     string Estado);
+
+/// <summary>
+/// BACKLOG #12 (design D1): the <c>fact.DocumentoFactura</c> row <c>SqlPromocionRepository</c>
+/// INSERTs in the SAME transaction as <see cref="FacturaPromovida"/> (schema 016). Built directly
+/// from <see cref="EventoInbox"/>'s document fields -- never from a SELECT against
+/// <c>fact.DocumentoRecibido</c> (ADR 0003 DENY, 008; unchanged, task 2.3). <see cref="DocumentoRecibidoId"/>
+/// is the idempotency key (<c>UQ_DocumentoFactura_DocumentoRecibidoId</c>): a re-processed
+/// <c>InboxEvent</c> for the same ingested document projects at most one row.
+/// </summary>
+public sealed record DocumentoPromovido(
+    long DocumentoRecibidoId,
+    string NombreArchivo,
+    string MimeType,
+    string RutaRelativa,
+    long TamanoBytes);

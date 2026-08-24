@@ -1,0 +1,110 @@
+<table class="tabla asiento-lineas">
+  <thead>
+    <tr>
+      <th>Bloque</th>
+      <th>Tipo</th>
+      <th>Cuenta</th>
+      <th class="tabular-nums">Debe</th>
+      <th class="tabular-nums">Haber</th>
+      @if (editable()) {
+        <th>Acciones</th>
+      }
+    </tr>
+  </thead>
+  <tbody>
+    @for (linea of lineas(); track linea.lineaId) {
+      @if (editandoId() === linea.lineaId) {
+        <tr [attr.data-testid]="'linea-' + linea.lineaId">
+          <td>{{ linea.bloque }}</td>
+          <td>{{ linea.tipo }}</td>
+          <td>{{ linea.cuentaCodigo }}</td>
+          <td>
+            <input
+              [attr.data-testid]="'editar-debe-' + linea.lineaId"
+              type="number"
+              class="tabular-nums"
+              [value]="borradorEdicion().debe"
+              (input)="onCampoEdicion('debe', $any($event.target).value)"
+            />
+          </td>
+          <td>
+            <input
+              [attr.data-testid]="'editar-haber-' + linea.lineaId"
+              type="number"
+              class="tabular-nums"
+              [value]="borradorEdicion().haber"
+              (input)="onCampoEdicion('haber', $any($event.target).value)"
+            />
+          </td>
+          <td>
+            <button class="btn" [attr.data-testid]="'confirmar-edicion-' + linea.lineaId" type="button" (click)="confirmarEdicion(linea)">
+              Confirmar
+            </button>
+            <button class="btn btn--secundario" type="button" (click)="cancelarEdicion()">Cancelar</button>
+          </td>
+        </tr>
+      } @else {
+        <tr [attr.data-testid]="'linea-' + linea.lineaId">
+          <td>{{ linea.bloque }}</td>
+          <td>{{ linea.tipo }}</td>
+          <td>{{ linea.cuentaCodigo }}</td>
+          <td class="tabular-nums">{{ linea.debe }}</td>
+          <td class="tabular-nums">{{ linea.haber }}</td>
+          @if (editable()) {
+            <td>
+              @if (pendienteEliminarId() === linea.lineaId) {
+                <span role="alert">¿Confirmar eliminación?</span>
+                <button [attr.data-testid]="'confirmar-eliminar-' + linea.lineaId" type="button" (click)="confirmarEliminar(linea.lineaId)">
+                  Sí
+                </button>
+                <button [attr.data-testid]="'cancelar-eliminar-' + linea.lineaId" type="button" (click)="cancelarEliminar()">
+                  No
+                </button>
+              } @else {
+                <button [attr.data-testid]="'editar-' + linea.lineaId" type="button" (click)="iniciarEdicion(linea)">
+                  Editar
+                </button>
+                <button [attr.data-testid]="'eliminar-' + linea.lineaId" type="button" (click)="pedirEliminar(linea.lineaId)">
+                  Eliminar
+                </button>
+              }
+            </td>
+          }
+        </tr>
+      }
+    }
+  </tbody>
+</table>
+
+@if (editable()) {
+  @if (agregandoNueva()) {
+    <div class="nueva-linea">
+      <input
+        data-testid="nueva-cuentaCodigo"
+        placeholder="Cuenta"
+        [value]="borradorNueva().cuentaCodigo"
+        (input)="onCampoNueva('cuentaCodigo', $any($event.target).value)"
+      />
+      <input
+        data-testid="nueva-debe"
+        type="number"
+        class="tabular-nums"
+        [value]="borradorNueva().debe"
+        (input)="onCampoNueva('debe', $any($event.target).value)"
+      />
+      <input
+        data-testid="nueva-haber"
+        type="number"
+        class="tabular-nums"
+        [value]="borradorNueva().haber"
+        (input)="onCampoNueva('haber', $any($event.target).value)"
+      />
+      <button class="btn" data-testid="confirmar-nueva" type="button" (click)="confirmarAgregar()">Agregar</button>
+      <button class="btn btn--secundario" type="button" (click)="cancelarAgregar()">Cancelar</button>
+    </div>
+  } @else {
+    <button class="btn btn--secundario" data-testid="agregar-linea" type="button" (click)="iniciarAgregar()">Agregar línea</button>
+  }
+}
+
+<app-historial-correccion [historial]="historial()" />

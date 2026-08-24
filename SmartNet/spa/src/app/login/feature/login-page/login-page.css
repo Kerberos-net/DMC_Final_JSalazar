@@ -1,0 +1,28 @@
+/* tasks.md 4.1 (spa-visual-login) -- centered card, layout only; every color/typography value
+ * comes from the global tokens/primitives in `styles.css` (no literal here). */
+.login-page {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: calc(100vh - 57px);
+  padding: var(--space-5);
+}
+
+.login-page__tarjeta {
+  width: 100%;
+  max-width: 360px;
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.login-page__campo {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.login-page__acciones {
+  display: flex;
+  justify-content: flex-end;
+}

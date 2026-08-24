@@ -1,0 +1,41 @@
+/* tasks.md 4.13 -- "documento + formulario" side-by-side layout (DESIGN_BRIEF.md), 2-col grid,
+ * sticky visor, collapses to a single column under 1100px. Layout/composition only. */
+.detalle-page {
+  padding: var(--space-4) var(--space-5);
+}
+
+.detalle-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr);
+  gap: var(--space-5);
+  align-items: start;
+}
+
+.detalle-layout__visor {
+  position: sticky;
+  top: var(--space-4);
+  height: calc(100vh - 57px - var(--space-6));
+}
+
+.detalle-formulario {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.detalle-formulario__acciones {
+  display: flex;
+  align-items: flex-end;
+  gap: var(--space-3);
+}
+
+@media (max-width: 1100px) {
+  .detalle-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+
+  .detalle-layout__visor {
+    position: static;
+    height: 60vh;
+  }
+}

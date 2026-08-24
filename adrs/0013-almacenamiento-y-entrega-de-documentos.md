@@ -2,7 +2,12 @@
 
 ## Estado
 
-Aceptado. Revisión 2. Los adjuntos siguen abiertos después de validar y su cambio emite
+Aceptado. Revisión 3. Corrige la "vista unificada de documentos" de la revisión 2: **no** es una
+lectura cruzada de `fact.DocumentoRecibido` desde .NET. Es una **proyección propiedad de .NET**,
+`fact.DocumentoFactura` (esquema 016), poblada de forma asíncrona desde el *payload* del
+`InboxEvent` al promover (BACKLOG #12, hallazgo de bloqueo de `design.md`).
+
+Revisión 2. Los adjuntos siguen abiertos después de validar y su cambio emite
 `DOCUMENTACION_ACTUALIZADA`, para que el medio probatorio que llega tarde llegue a Drive (revisión
 adversarial v2, A5).
 
@@ -48,6 +53,50 @@ La partición de ADR 0003 queda **impecable por tabla**: ningún componente escr
 corresponde, y el refuerzo con permisos por usuario de base de datos sigue siendo aplicable.
 
 .NET expone una **vista unificada de documentos de la factura**. Angular nunca combina fuentes.
+
+### Revisión 3 · La vista unificada es una proyección .NET, no una lectura cruzada
+
+La revisión 2 daba por hecho que ".NET lee ese volumen y sirve los bytes" bastaba para justificar
+que la vista unificada leyera `DocumentoRecibido` directamente para el origen ingesta. Es una
+lectura de intención — dice qué runtime sirve los bytes del archivo, no de qué tabla lee los
+metadatos del documento — y en BACKLOG #12 (`design.md`, hallazgo de bloqueo) resultó ser **una
+violación estructural**, no solo un vacío de redacción.
+
+**El motivo — DENY explícito, simétrico con ADR 0003.** `008_usuarios_y_permisos.sql` ejecuta
+`DENY SELECT ... ON fact.DocumentoRecibido TO fact_api`. ADR 0003 §Privadas clasifica
+`DocumentoRecibido` entre las tablas **privadas de Python** ("un solo componente escribe **y**
+lee") y su invariante 3 lo dice sin ambigüedad: *"Ningún componente sondea la tabla privada del
+otro"*, con la consecuencia ya escrita en ese mismo ADR — *"`usr_api` no puede leer
+`fact.Procesamiento`. Aunque alguien escriba ese `SELECT`, falla."* — aplicada aquí, por simetría,
+a `DocumentoRecibido`. La propuesta original de BACKLOG #12 y las dos specs derivadas
+(`documentos-lista-unificada-api`, `documento-contenido-api`) asumían un `SELECT` de solo lectura
+sobre `DocumentoRecibido` desde .NET. Eso es estructuralmente imposible — el motor lo rechaza — y
+normativamente prohibido por ADR 0003, no una omisión de permisos que baste con corregir con un
+`GRANT`.
+
+**Qué cambia.** La resolución replica el mecanismo que este mismo ADR ya eligió para la dirección
+opuesta (Python no puede leer `AdjuntoManual`, así que las rutas viajan en el *payload* del
+evento): los metadatos del documento (`nombreArchivo`, `mimeType`, `rutaRelativa`, `tamanoBytes`)
+viajan en el *payload* del `InboxEvent` y se persisten del lado de .NET **al promover**, en una
+tabla nueva y propia de .NET, `fact.DocumentoFactura` (esquema 016, `GRANT` para `fact_api`, `DENY`
+para `fact_worker` — mismo patrón de refuerzo que el resto de tablas privadas de .NET). La vista
+unificada de documentos de la factura combina `fact.DocumentoFactura` (proyección, origen ingesta)
+con `AdjuntoManual` (origen manual) — **ambas tablas propiedad de .NET** — y nunca lee
+`DocumentoRecibido`, ni para listar ni para servir bytes (`GET /api/documentos/{id}/contenido`
+resuelve `RutaRelativa` desde `fact.DocumentoFactura`).
+
+Alternativas descartadas en el momento de decidir esto (`design.md` Decisión D1): `GRANT SELECT`
+sobre `DocumentoRecibido` para `fact_api` — desmontaría la garantía más fuerte de ADR 0003; una
+vista SQL con *ownership chaining* — evade el `DENY` de forma encubierta, peor que el `GRANT`
+directo; servir la pantalla solo con `AdjuntoManual` — la pantalla pierde su razón de ser (el caso
+más común es el documento **ingerido**, no el subido a mano).
+
+**Costo nuevo, ya asumido en el esquema de rollout de BACKLOG #12.** La proyección es asíncrona:
+un documento recién ingerido puede estar temporalmente ausente de la vista unificada hasta que su
+promoción termine — no es un error, es consistencia eventual esperada. Los documentos ingeridos
+**antes** del esquema 016 no tienen fila de proyección y no pueden reconstruirse retroactivamente
+(reconstruirlos exigiría leer `DocumentoRecibido`, la misma lectura prohibida); la vista se degrada
+a solo `AdjuntoManual` para esas facturas, sin tratarse como error.
 
 ### Entrega y renderizado
 
@@ -126,6 +175,20 @@ vigente de los adjuntos en el momento de emitir cada evento. Es el cambio concep
 - La pantalla central del producto puede cumplir su función.
 - El caso borde del PRD tiene una respuesta dentro del sistema.
 - La base de datos se mantiene pequeña.
+- **(Revisión 3) La vista unificada gana una tercera tabla propia de .NET**, `fact.DocumentoFactura`
+  (esquema 016), además de `AdjuntoManual`. El costo de "dos tablas con formas distintas" ya listado
+  más abajo pasa a ser, en la práctica, dos tablas .NET-owned con la misma forma (`DocumentoFactura`
+  espeja las columnas de `AdjuntoManual`) más un tercer nombre (`DocumentoRecibido`) que nunca se lee
+  desde .NET.
+- **(Revisión 3) La proyección es asíncrona y puede quedar temporalmente desactualizada** respecto a
+  lo que Python ya ingirió: un documento recién llegado puede tardar hasta que su `InboxEvent` se
+  promueva en aparecer en la vista unificada. No es un error — es la misma consistencia eventual que
+  ya rige `OutboxEvent`/`InboxEvent` (ADR 0003, ADR 0004) — pero es un costo nuevo que la revisión 2
+  no declaraba porque asumía una lectura en vivo.
+- **(Revisión 3) Los documentos ingeridos antes del esquema 016 no tienen proyección** y no pueden
+  reconstruirse retroactivamente (reconstruirlos exigiría la misma lectura de `DocumentoRecibido`
+  que esta revisión prohíbe). Para esas facturas la vista unificada se degrada a solo
+  `AdjuntoManual`; se acepta porque la ingesta en producción no había empezado.
 - **Costo:** el volumen compartido es obligatorio y restringe la topología (ADR 0012).
 - **Costo:** **dos respaldos que coordinar**, base y volumen, en el orden que fija ADR 0014. Si se
   desincronizan, hay asientos cuyo documento ya no existe.

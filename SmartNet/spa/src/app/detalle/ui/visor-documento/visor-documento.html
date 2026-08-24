@@ -1,0 +1,18 @@
+@if (documentos().length > 1) {
+  <select
+    class="campo"
+    data-testid="selector-documento"
+    [value]="seleccionado()?.id"
+    (change)="onSeleccionar($any($event.target).value)"
+  >
+    @for (documento of documentos(); track documento.id) {
+      <option [value]="documento.id">{{ documento.nombreArchivo }}</option>
+    }
+  </select>
+}
+
+@if (urlSegura(); as url) {
+  <iframe [src]="url" title="Documento de la factura" class="visor-documento"></iframe>
+} @else {
+  <p class="panel panel--vacio" data-testid="sin-documentos">Esta factura no tiene documentos asociados.</p>
+}

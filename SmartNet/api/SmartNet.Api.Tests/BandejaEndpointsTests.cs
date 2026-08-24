@@ -90,7 +90,7 @@ public sealed class BandejaEndpointsTests : SesionEndpointsTestBase
         var inboxEventIdPromovido = await Db.InsertarInboxEventAsync(procesamientoIdPromovido, "{}");
         var promocionRepository = new SqlPromocionRepository(Db.ConnectionString);
         await promocionRepository.PromoverAsync(
-            inboxEventIdPromovido, procesamientoIdPromovido, MuestraFacturaPromovida(), CancellationToken.None);
+            inboxEventIdPromovido, procesamientoIdPromovido, MuestraFacturaPromovida(), MuestraDocumentoPromovido(), CancellationToken.None);
 
         var procesamientoIdDescartado = await Db.InsertarProcesamientoAsync(gmailMessageId: "msg-bandeja-descartado");
         var inboxEventIdDescartado = await Db.InsertarInboxEventAsync(procesamientoIdDescartado, "{}");
@@ -143,6 +143,9 @@ public sealed class BandejaEndpointsTests : SesionEndpointsTestBase
         Assert.All(items!, i => Assert.Equal("DESCARTADO", i.EstadoConsumo));
         Assert.Contains(items!, i => i.InboxEventId == inboxEventId);
     }
+
+    private static DocumentoPromovido MuestraDocumentoPromovido() =>
+        new(DocumentoRecibidoId: 1, NombreArchivo: "f.pdf", MimeType: "application/pdf", RutaRelativa: "/f.pdf", TamanoBytes: 10);
 
     private static FacturaPromovida MuestraFacturaPromovida() =>
         new(

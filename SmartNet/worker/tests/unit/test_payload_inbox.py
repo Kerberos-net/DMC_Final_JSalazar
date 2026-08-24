@@ -13,6 +13,17 @@ from decimal import Decimal
 from smartnet_worker.payload_inbox import ComprobanteParaEvento, construir_payload
 
 
+def _metadata_documento(**overrides) -> dict:
+    base = dict(
+        nombre_archivo="factura.xml",
+        mime_type="application/xml",
+        ruta_relativa="2026/08/factura.xml",
+        tamano_bytes=2048,
+    )
+    base.update(overrides)
+    return base
+
+
 def _comprobante(**overrides) -> ComprobanteParaEvento:
     base = dict(
         tipo_comprobante="01",
@@ -36,6 +47,7 @@ def test_documento_completado_produce_la_forma_completa_de_design_md():
             documento_recibido_id=8,
             tipo_documento="XML",
             documento_asociado_id=9,
+            **_metadata_documento(),
             comprobante=_comprobante(),
         )
     )
@@ -46,6 +58,10 @@ def test_documento_completado_produce_la_forma_completa_de_design_md():
         "documentoRecibidoId": 8,
         "tipoDocumento": "XML",
         "documentoAsociadoId": 9,
+        "nombreArchivo": "factura.xml",
+        "mimeType": "application/xml",
+        "rutaRelativa": "2026/08/factura.xml",
+        "tamanoBytes": 2048,
     }
     assert payload["comprobante"] == {
         "tipoComprobante": "01",
@@ -68,6 +84,7 @@ def test_evidencia_solo_lleva_campo_valor_fuente_nunca_confianza():
             documento_recibido_id=1,
             tipo_documento="PDF",
             documento_asociado_id=None,
+            **_metadata_documento(),
             comprobante=_comprobante(),
         )
     )
@@ -87,6 +104,7 @@ def test_evidencia_omite_campos_ausentes_del_comprobante():
             documento_recibido_id=1,
             tipo_documento="XML",
             documento_asociado_id=None,
+            **_metadata_documento(),
             comprobante=_comprobante(numero=None, fecha_emision=None),
         )
     )
@@ -104,6 +122,7 @@ def test_documento_sin_pareja_agrega_advertencia_sin_pareja():
             documento_recibido_id=1,
             tipo_documento="XML",
             documento_asociado_id=None,
+            **_metadata_documento(),
             comprobante=_comprobante(),
         )
     )
@@ -118,6 +137,7 @@ def test_campos_no_extraidos_se_parte_por_coma():
             documento_recibido_id=1,
             tipo_documento="XML",
             documento_asociado_id=1,
+            **_metadata_documento(),
             comprobante=_comprobante(campos_no_extraidos="igv,fechaEmision"),
         )
     )
@@ -132,6 +152,8 @@ def test_documento_fallido_sin_comprobante_produce_comprobante_null():
             documento_recibido_id=2,
             tipo_documento="PDF",
             documento_asociado_id=None,
+            **_metadata_documento(nombre_archivo="factura.pdf", mime_type="application/pdf",
+                                   ruta_relativa="2026/08/factura.pdf", tamano_bytes=4096),
             comprobante=None,
         )
     )
@@ -140,3 +162,7 @@ def test_documento_fallido_sin_comprobante_produce_comprobante_null():
     assert payload["evidencia"] == []
     assert payload["afectacionMixta"] is None
     assert payload["camposNoExtraidos"] == []
+    assert payload["documento"]["nombreArchivo"] == "factura.pdf"
+    assert payload["documento"]["mimeType"] == "application/pdf"
+    assert payload["documento"]["rutaRelativa"] == "2026/08/factura.pdf"
+    assert payload["documento"]["tamanoBytes"] == 4096

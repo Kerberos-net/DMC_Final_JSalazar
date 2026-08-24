@@ -47,7 +47,9 @@ public sealed class SqlBandejaRepositoryTests : IAsyncLifetime
             TotalOrig: 100m, Moneda: "PEN", FechaEmision: new DateOnly(2026, 8, 9),
             Indicadores: new Core.IndicadoresFactura(true, false, false, false, false),
             Extracciones: Array.Empty<Core.FacturaExtraccionPromovida>(), Estado: "PENDIENTE_VALIDACION");
-        await promocionRepo.PromoverAsync(inboxEventId, procesamientoId, factura, CancellationToken.None);
+        var documento = new Core.DocumentoPromovido(
+            DocumentoRecibidoId: 1, NombreArchivo: "f.pdf", MimeType: "application/pdf", RutaRelativa: "/f.pdf", TamanoBytes: 10);
+        await promocionRepo.PromoverAsync(inboxEventId, procesamientoId, factura, documento, CancellationToken.None);
 
         var sut = new SqlBandejaRepository(_db.ConnectionString);
         var resultado = await sut.ListarAsync("PROMOVIDO", "asc", CancellationToken.None);

@@ -1,0 +1,44 @@
+@if (problema(); as p) {
+  <!-- spa-visual-detalle-validacion "412 vs. 422 visually distinct": dedicated token + distinct
+       inline SVG shape (never color alone, WCAG 1.4.1) -- design D3's hardest hue pair. -->
+  <div
+    class="banner"
+    [class.banner--conflicto]="esConflictoDeConcurrencia"
+    [class.banner--error]="!esConflictoDeConcurrencia"
+    role="alert"
+    [attr.data-testid]="'problema-' + p.status"
+  >
+    @if (esConflictoDeConcurrencia) {
+      <svg viewBox="0 0 20 20" aria-hidden="true" data-icono="conflicto">
+        <path
+          d="M10 2a8 8 0 1 0 0 16 8 8 0 0 0 0-16Zm3.54 5.29-3.83 3.83a.75.75 0 0 1-1.06 0L6.46 9.94a.75.75 0 1 1 1.06-1.06l1.68 1.68 3.29-3.3a.75.75 0 0 1 1.06 1.06Z"
+        />
+      </svg>
+    } @else {
+      <svg viewBox="0 0 20 20" aria-hidden="true" data-icono="error">
+        <path
+          d="M10 1.5 1 18.5h18L10 1.5Zm0 5.5a1.15 1.15 0 0 1 1.15 1.15v4.5a1.15 1.15 0 1 1-2.3 0v-4.5A1.15 1.15 0 0 1 10 7Zm0 8.6a1.2 1.2 0 1 1 0 2.4 1.2 1.2 0 0 1 0-2.4Z"
+        />
+      </svg>
+    }
+
+    <div>
+      <p>{{ p.title }}</p>
+      <p>{{ p.detail }}</p>
+
+      @if (p.errors; as errores) {
+        <ul>
+          @for (grupo of errores | keyvalue; track grupo.key) {
+            <li>{{ grupo.key }}: {{ grupo.value.join(', ') }}</li>
+          }
+        </ul>
+      }
+
+      @if (esConflictoDeConcurrencia) {
+        <button class="btn btn--secundario" type="button" data-testid="recargar" (click)="recargar.emit()">
+          Recargar
+        </button>
+      }
+    </div>
+  </div>
+}

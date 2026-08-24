@@ -34,14 +34,31 @@ public sealed class SqlPromocionRepositoryTests : IAsyncLifetime
             Extracciones: new[] { new FacturaExtraccionPromovida("total", "1180.00", "XML") },
             Estado: estado);
 
+    /// <summary>BACKLOG #12 task 2.1 -- built purely from in-memory values (never a SELECT against
+    /// <c>fact.DocumentoRecibido</c>, design D1/task 2.3); <paramref name="documentoRecibidoId"/>
+    /// only needs to match the FK chain <see cref="InboxTestDatabaseFixtureHelper.InsertarProcesamientoAsync"/>
+    /// already inserted so a real ingested document's provenance is exercised.</summary>
+    private static DocumentoPromovido MuestraDocumento(long documentoRecibidoId) =>
+        new(
+            DocumentoRecibidoId: documentoRecibidoId,
+            NombreArchivo: "f.pdf",
+            MimeType: "application/pdf",
+            RutaRelativa: "/f.pdf",
+            TamanoBytes: 10);
+
+    private Task<long> DocumentoRecibidoIdDeAsync(long procesamientoId) =>
+        _db.ExecuteScalarAsync<long>($"SELECT DocumentoRecibidoId FROM fact.Procesamiento WHERE ProcesamientoId = {procesamientoId};")!;
+
     [Fact]
     public async Task PromoverAsync_InsertsFacturaAndFacturaExtraccion_AndMarksInboxEventPromovido()
     {
         var procesamientoId = await _db.InsertarProcesamientoAsync();
         var inboxEventId = await _db.InsertarInboxEventAsync(procesamientoId, "{}");
+        var documentoRecibidoId = await DocumentoRecibidoIdDeAsync(procesamientoId);
         var sut = new SqlPromocionRepository(_db.ConnectionString);
 
-        var resultado = await sut.PromoverAsync(inboxEventId, procesamientoId, MuestraFactura(), CancellationToken.None);
+        var resultado = await sut.PromoverAsync(
+            inboxEventId, procesamientoId, MuestraFactura(), MuestraDocumento(documentoRecibidoId), CancellationToken.None);
 
         Assert.False(resultado.YaExistia);
         var estadoFactura = await _db.ExecuteScalarAsync<string>(
@@ -60,16 +77,74 @@ public sealed class SqlPromocionRepositoryTests : IAsyncLifetime
         Assert.Equal(resultado.FacturaId, facturaIdEnEvento);
     }
 
+    /// <summary>BACKLOG #12 task 2.1 -- proves the projection row lands with the metadata mapped
+    /// verbatim from the payload-derived <see cref="DocumentoPromovido"/>, in the same transaction
+    /// as the <c>Factura</c> row it references.</summary>
+    [Fact]
+    public async Task PromoverAsync_InsertsDocumentoFactura_WithMappedMetadata()
+    {
+        var procesamientoId = await _db.InsertarProcesamientoAsync();
+        var inboxEventId = await _db.InsertarInboxEventAsync(procesamientoId, "{}");
+        var documentoRecibidoId = await DocumentoRecibidoIdDeAsync(procesamientoId);
+        var sut = new SqlPromocionRepository(_db.ConnectionString);
+
+        var resultado = await sut.PromoverAsync(
+            inboxEventId, procesamientoId, MuestraFactura(), MuestraDocumento(documentoRecibidoId), CancellationToken.None);
+
+        var facturaIdProyectada = await _db.ExecuteScalarAsync<long>(
+            $"SELECT FacturaId FROM fact.DocumentoFactura WHERE DocumentoRecibidoId = {documentoRecibidoId};");
+        Assert.Equal(resultado.FacturaId, facturaIdProyectada);
+
+        var nombreArchivo = await _db.ExecuteScalarAsync<string>(
+            $"SELECT NombreArchivo FROM fact.DocumentoFactura WHERE DocumentoRecibidoId = {documentoRecibidoId};");
+        Assert.Equal("f.pdf", nombreArchivo!.TrimEnd());
+        var mimeType = await _db.ExecuteScalarAsync<string>(
+            $"SELECT MimeType FROM fact.DocumentoFactura WHERE DocumentoRecibidoId = {documentoRecibidoId};");
+        Assert.Equal("application/pdf", mimeType!.TrimEnd());
+        var rutaRelativa = await _db.ExecuteScalarAsync<string>(
+            $"SELECT RutaRelativa FROM fact.DocumentoFactura WHERE DocumentoRecibidoId = {documentoRecibidoId};");
+        Assert.Equal("/f.pdf", rutaRelativa!.TrimEnd());
+        var tamanoBytes = await _db.ExecuteScalarAsync<long>(
+            $"SELECT TamanoBytes FROM fact.DocumentoFactura WHERE DocumentoRecibidoId = {documentoRecibidoId};");
+        Assert.Equal(10, tamanoBytes);
+    }
+
+    /// <summary>BACKLOG #12 task 2.1 -- a re-processed <c>InboxEvent</c> for the same
+    /// <c>DocumentoRecibidoId</c> (e.g. a duplicate promoción attempt) projects at most one
+    /// <c>fact.DocumentoFactura</c> row, same anti-duplicate discipline as <c>fact.Factura</c>.
+    /// </summary>
+    [Fact]
+    public async Task PromoverAsync_DoesNotDuplicateDocumentoFactura_WhenDocumentoRecibidoIdRepeats()
+    {
+        var procesamientoId = await _db.InsertarProcesamientoAsync();
+        var documentoRecibidoId = await DocumentoRecibidoIdDeAsync(procesamientoId);
+        var primerEventoId = await _db.InsertarInboxEventAsync(procesamientoId, "{}");
+        var sut = new SqlPromocionRepository(_db.ConnectionString);
+        await sut.PromoverAsync(
+            primerEventoId, procesamientoId, MuestraFactura(), MuestraDocumento(documentoRecibidoId), CancellationToken.None);
+
+        var segundoEventoId = await _db.InsertarInboxEventAsync(procesamientoId, "{}");
+        await sut.PromoverAsync(
+            segundoEventoId, procesamientoId, MuestraFactura(), MuestraDocumento(documentoRecibidoId), CancellationToken.None);
+
+        var totalProyectado = await _db.ExecuteScalarAsync<int>(
+            $"SELECT COUNT(*) FROM fact.DocumentoFactura WHERE DocumentoRecibidoId = {documentoRecibidoId};");
+        Assert.Equal(1, totalProyectado);
+    }
+
     [Fact]
     public async Task PromoverAsync_ReusesExistingFactura_WhenProcesamientoIdAlreadyHasOne()
     {
         var procesamientoId = await _db.InsertarProcesamientoAsync();
+        var documentoRecibidoId = await DocumentoRecibidoIdDeAsync(procesamientoId);
         var primerEventoId = await _db.InsertarInboxEventAsync(procesamientoId, "{}");
         var sut = new SqlPromocionRepository(_db.ConnectionString);
-        var primero = await sut.PromoverAsync(primerEventoId, procesamientoId, MuestraFactura(), CancellationToken.None);
+        var primero = await sut.PromoverAsync(
+            primerEventoId, procesamientoId, MuestraFactura(), MuestraDocumento(documentoRecibidoId), CancellationToken.None);
 
         var segundoEventoId = await _db.InsertarInboxEventAsync(procesamientoId, "{}");
-        var segundo = await sut.PromoverAsync(segundoEventoId, procesamientoId, MuestraFactura(), CancellationToken.None);
+        var segundo = await sut.PromoverAsync(
+            segundoEventoId, procesamientoId, MuestraFactura(), MuestraDocumento(documentoRecibidoId), CancellationToken.None);
 
         Assert.True(segundo.YaExistia);
         Assert.Equal(primero.FacturaId, segundo.FacturaId);
@@ -130,8 +205,10 @@ public sealed class SqlPromocionRepositoryTests : IAsyncLifetime
     {
         var procesamientoId = await _db.InsertarProcesamientoAsync();
         var inboxEventId = await _db.InsertarInboxEventAsync(procesamientoId, "{}");
+        var documentoRecibidoId = await DocumentoRecibidoIdDeAsync(procesamientoId);
         var sut = new SqlPromocionRepository(_db.ConnectionString);
-        await sut.PromoverAsync(inboxEventId, procesamientoId, MuestraFactura(), CancellationToken.None);
+        await sut.PromoverAsync(
+            inboxEventId, procesamientoId, MuestraFactura(), MuestraDocumento(documentoRecibidoId), CancellationToken.None);
 
         var existe = await sut.ExisteIdentidadPreviaAsync("20100000001", "01", "F001-123", CancellationToken.None);
 

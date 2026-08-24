@@ -1,5 +1,6 @@
 import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { BandejaItem, IndicadoresFactura } from '../../models/bandeja-item.model';
 
 interface IndicadorChip {
@@ -43,7 +44,7 @@ interface FilaInbox {
 @Component({
   selector: 'app-inbox-list',
   standalone: true,
-  imports: [DatePipe],
+  imports: [DatePipe, RouterLink],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './inbox-list.html',
 })

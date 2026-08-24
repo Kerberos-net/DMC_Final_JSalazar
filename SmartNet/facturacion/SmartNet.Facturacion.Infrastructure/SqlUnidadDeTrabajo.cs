@@ -275,7 +275,8 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
         await using var command = CrearComando(
             """
             SELECT FacturaId, Estado, ProveedorCodigo, RucProveedor, TipoComprobante, Numero, TotalOrig,
-                   Moneda, FechaEmision, Motivo, Afectacion, Version
+                   Moneda, FechaEmision, Motivo, Afectacion, Version,
+                   EsProveedorGenerico, PosibleDuplicado, TieneCamposNoExtraidos, AfectacionMixta
             FROM fact.Factura
             WHERE FacturaId = @facturaId;
             """);
@@ -299,7 +300,11 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
             FechaEmision: DateOnly.FromDateTime(reader.GetDateTime(8)),
             Motivo: reader.IsDBNull(9) ? null : reader.GetInt32(9),
             Afectacion: reader.IsDBNull(10) ? null : reader.GetString(10).TrimEnd(),
-            Version: (byte[])reader[11]);
+            Version: (byte[])reader[11],
+            EsProveedorGenerico: reader.GetBoolean(12),
+            PosibleDuplicado: reader.GetBoolean(13),
+            TieneCamposNoExtraidos: reader.GetBoolean(14),
+            AfectacionMixta: reader.IsDBNull(15) ? null : reader.GetBoolean(15));
     }
 
     public async Task<ResultadoEscritura> GuardarFacturaAsync(
@@ -332,6 +337,35 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
 
         await using var verificacion = CrearComando("SELECT COUNT(*) FROM fact.Factura WHERE FacturaId = @id;");
         verificacion.Parameters.AddWithValue("@id", id);
+        var existe = (int)(await verificacion.ExecuteScalarAsync(ct))! > 0;
+
+        return existe ? ResultadoEscritura.VersionEnConflicto : ResultadoEscritura.NoEncontrado;
+    }
+
+    // --- diseno-visual-spa-item-12 (design D10) addition: escritura CAS dedicada de
+    // AfectacionMixta -- GuardarFacturaAsync's UPDATE de arriba deliberadamente no la toca. ---
+
+    public async Task<ResultadoEscritura> ConfirmarAfectacionAsync(
+        long facturaId, byte[] versionEsperada, bool esMixta, CancellationToken ct)
+    {
+        await using var command = CrearComando(
+            """
+            UPDATE fact.Factura
+            SET AfectacionMixta = @afectacionMixta
+            WHERE FacturaId = @id AND Version = @versionEsperada;
+            """);
+        command.Parameters.AddWithValue("@afectacionMixta", esMixta);
+        command.Parameters.AddWithValue("@id", facturaId);
+        command.Parameters.AddWithValue("@versionEsperada", versionEsperada);
+
+        var filasAfectadas = await command.ExecuteNonQueryAsync(ct);
+        if (filasAfectadas > 0)
+        {
+            return ResultadoEscritura.Aplicado;
+        }
+
+        await using var verificacion = CrearComando("SELECT COUNT(*) FROM fact.Factura WHERE FacturaId = @id;");
+        verificacion.Parameters.AddWithValue("@id", facturaId);
         var existe = (int)(await verificacion.ExecuteScalarAsync(ct))! > 0;
 
         return existe ? ResultadoEscritura.VersionEnConflicto : ResultadoEscritura.NoEncontrado;
@@ -411,6 +445,101 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
         var filasAfectadas = await command.ExecuteNonQueryAsync(ct);
         return filasAfectadas > 0 ? ResultadoEscritura.Aplicado : ResultadoEscritura.NoEncontrado;
     }
+
+    // --- PR 3 (Phase 3, BACKLOG #12) additions: lectura read-only para lista unificada / visor
+    // (IUnidadDeTrabajo.cs). Ningún SELECT contra fact.DocumentoRecibido en este archivo. ---
+
+    public async Task<IReadOnlyList<DocumentoFacturaPersistido>> CargarDocumentosFacturaAsync(long facturaId, CancellationToken ct)
+    {
+        await using var command = CrearComando(
+            """
+            SELECT DocumentoFacturaId, FacturaId, NombreArchivo, MimeType, RutaRelativa, TamanoBytes, CreadoEn
+            FROM fact.DocumentoFactura
+            WHERE FacturaId = @facturaId
+            ORDER BY DocumentoFacturaId;
+            """);
+        command.Parameters.AddWithValue("@facturaId", facturaId);
+
+        var documentos = new List<DocumentoFacturaPersistido>();
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            documentos.Add(MapearDocumentoFactura(reader));
+        }
+
+        return documentos;
+    }
+
+    public async Task<IReadOnlyList<AdjuntoManual>> CargarAdjuntosDeFacturaAsync(long facturaId, CancellationToken ct)
+    {
+        await using var command = CrearComando(
+            """
+            SELECT AdjuntoManualId, FacturaId, NombreArchivo, RutaRelativa, MimeType, TamanoBytes,
+                   SubidoPorUsuarioId, SubidoEn, EliminadoEn
+            FROM fact.AdjuntoManual
+            WHERE FacturaId = @facturaId AND EliminadoEn IS NULL
+            ORDER BY AdjuntoManualId;
+            """);
+        command.Parameters.AddWithValue("@facturaId", facturaId);
+
+        var adjuntos = new List<AdjuntoManual>();
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            adjuntos.Add(MapearAdjunto(reader));
+        }
+
+        return adjuntos;
+    }
+
+    public async Task<DocumentoFacturaPersistido?> CargarDocumentoFacturaPorIdAsync(long documentoFacturaId, CancellationToken ct)
+    {
+        await using var command = CrearComando(
+            """
+            SELECT DocumentoFacturaId, FacturaId, NombreArchivo, MimeType, RutaRelativa, TamanoBytes, CreadoEn
+            FROM fact.DocumentoFactura
+            WHERE DocumentoFacturaId = @id;
+            """);
+        command.Parameters.AddWithValue("@id", documentoFacturaId);
+
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        return await reader.ReadAsync(ct) ? MapearDocumentoFactura(reader) : null;
+    }
+
+    public async Task<AdjuntoManual?> CargarAdjuntoPorIdAsync(long adjuntoManualId, CancellationToken ct)
+    {
+        await using var command = CrearComando(
+            """
+            SELECT AdjuntoManualId, FacturaId, NombreArchivo, RutaRelativa, MimeType, TamanoBytes,
+                   SubidoPorUsuarioId, SubidoEn, EliminadoEn
+            FROM fact.AdjuntoManual
+            WHERE AdjuntoManualId = @id AND EliminadoEn IS NULL;
+            """);
+        command.Parameters.AddWithValue("@id", adjuntoManualId);
+
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        return await reader.ReadAsync(ct) ? MapearAdjunto(reader) : null;
+    }
+
+    private static DocumentoFacturaPersistido MapearDocumentoFactura(SqlDataReader reader) => new(
+        DocumentoFacturaId: reader.GetInt64(0),
+        FacturaId: reader.GetInt64(1),
+        NombreArchivo: reader.GetString(2).TrimEnd(),
+        MimeType: reader.GetString(3).TrimEnd(),
+        RutaRelativa: reader.GetString(4).TrimEnd(),
+        TamanoBytes: reader.GetInt64(5),
+        CreadoEn: new DateTimeOffset(DateTime.SpecifyKind(reader.GetDateTime(6), DateTimeKind.Utc)));
+
+    private static AdjuntoManual MapearAdjunto(SqlDataReader reader) => new(
+        AdjuntoManualId: reader.GetInt64(0),
+        FacturaId: reader.GetInt64(1),
+        NombreArchivo: reader.GetString(2).TrimEnd(),
+        RutaRelativa: reader.GetString(3).TrimEnd(),
+        MimeType: reader.GetString(4).TrimEnd(),
+        TamanoBytes: reader.GetInt64(5),
+        SubidoPorUsuarioId: reader.GetInt64(6),
+        SubidoEn: new DateTimeOffset(DateTime.SpecifyKind(reader.GetDateTime(7), DateTimeKind.Utc)),
+        EliminadoEn: reader.IsDBNull(8) ? null : new DateTimeOffset(DateTime.SpecifyKind(reader.GetDateTime(8), DateTimeKind.Utc)));
 
     // --- PR 3 (Phase 3) additions: líneas por LineaId (IUnidadDeTrabajo.cs) ---
 

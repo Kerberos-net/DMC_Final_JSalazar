@@ -22,6 +22,10 @@ public sealed class PayloadInboxContractTests
         Assert.Equal(8, evento.DocumentoRecibidoId);
         Assert.Equal("XML", evento.TipoDocumento);
         Assert.Equal(9, evento.DocumentoAsociadoId);
+        Assert.Equal("factura.xml", evento.NombreArchivo);
+        Assert.Equal("application/xml", evento.MimeType);
+        Assert.Equal("2026/08/factura.xml", evento.RutaRelativa);
+        Assert.Equal(2048, evento.TamanoBytes);
 
         Assert.NotNull(evento.Comprobante);
         Assert.Equal("01", evento.Comprobante!.TipoComprobante);
