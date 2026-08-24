@@ -11,7 +11,7 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | **11 de 17 cerrados** (+ sub-cambio visual SPA del ítem #12 cerrado 2026-08-24; ítem #18 "Ajuste visual" split off) |
+| Ítems del backlog | **11 de 18 cerrados** (BACKLOG.md ahora tiene 18 ítems: el #18 "Ajuste visual del diseño SPA" nació al cerrar el sub-cambio visual del #12, 2026-08-24) |
 | Ciclo SDD activo | Ninguno — último cerrado: ítem #12 + sub-cambio visual SPA |
 | Última fase cerrada | Ítem #12 (Detalle y validación), 7 fases, 46/46 tareas cerradas, verify PASS sin CRITICAL (689 .NET + 72 SPA + 190 Python en verde, tras aislar y reconfirmar los fallos transitorios de contención de bases de prueba en paralelo), smoke E2E manual (bandeja → guardar avance → validar → conflicto 412) verificado por el usuario — ítem #12 cerrado 2026-08-23; sub-cambio visual SPA (diseño tokens, tema, visuales, lectura auditoría) cerrado 2026-08-24 |
 
@@ -1228,7 +1228,7 @@ Engram desactualizado, no el estado real del archivo.
 
 ---
 
-## ⬜ Ítems 10, 13 a 17 — sin ciclo SDD abierto
+## ⬜ Ítems 10, 13 a 18 — sin ciclo SDD abierto
 
 Las fases de cada ítem **se definen cuando arranca su ciclo SDD**, no antes. Ponerlas aquí ahora
 sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ítem, y ninguno existe.
@@ -1241,6 +1241,11 @@ sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ít
 | 15 | Publicación a Drive | #14 | — | ⬜ |
 | 16 | Publicación a Sheets | #14 | — | ⬜ |
 | 17 | Errores, notificaciones y operación | #14 | — | ⬜ |
+| 18 | Ajuste visual del diseño SPA | #12 | ⚠ *Handoff* de diseño | ⬜ |
+
+Ítem #18 nace del cierre del sub-cambio visual del #12 (2026-08-24): el tema aplica y las pantallas
+funcionan, pero el resultado no conforma del todo al *handoff* de diseño. Se separó a propósito en
+vez de reabrir ese cambio, para no bloquear con retrabajo visual el avance de lógica de negocio.
 
 ---
 
