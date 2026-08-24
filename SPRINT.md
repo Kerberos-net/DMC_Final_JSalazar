@@ -11,9 +11,9 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | **11 de 17 cerrados** |
-| Ciclo SDD activo | Ninguno — último cerrado: ítem #12 |
-| Última fase cerrada | Ítem #12 (Detalle y validación), 7 fases, 46/46 tareas cerradas, verify PASS sin CRITICAL (689 .NET + 72 SPA + 190 Python en verde, tras aislar y reconfirmar los fallos transitorios de contención de bases de prueba en paralelo), smoke E2E manual (bandeja → guardar avance → validar → conflicto 412) verificado por el usuario — ítem #12 cerrado 2026-08-23 |
+| Ítems del backlog | **11 de 17 cerrados** (+ sub-cambio visual SPA del ítem #12 cerrado 2026-08-24; ítem #18 "Ajuste visual" split off) |
+| Ciclo SDD activo | Ninguno — último cerrado: ítem #12 + sub-cambio visual SPA |
+| Última fase cerrada | Ítem #12 (Detalle y validación), 7 fases, 46/46 tareas cerradas, verify PASS sin CRITICAL (689 .NET + 72 SPA + 190 Python en verde, tras aislar y reconfirmar los fallos transitorios de contención de bases de prueba en paralelo), smoke E2E manual (bandeja → guardar avance → validar → conflicto 412) verificado por el usuario — ítem #12 cerrado 2026-08-23; sub-cambio visual SPA (diseño tokens, tema, visuales, lectura auditoría) cerrado 2026-08-24 |
 
 ---
 
@@ -1196,6 +1196,35 @@ insertó solo al correr `ng test`/`ng serve`); revertido antes de archivar para 
 Una desviación no bloqueante documentada por `sdd-verify`: `problema-ux.ts` simplifica el
 discriminador D6 del *design* (distinguir por `type` URI) a un *switch* por *status code* — cubre
 los mismos tres escenarios del spec, queda anotado para quien lea `design.md` después.
+
+### Sub-cambio: Diseño visual SPA + lectura de auditoría (diseno-visual-spa-item-12)
+
+**Ciclo SDD:** `openspec/changes/archive/2026-08-24-diseno-visual-spa-item-12/` · **43 de 43 tareas cerradas** — ✅ **CERRADO 2026-08-24**
+
+Construido sobre el ítem #12 para agregar estilo visual (tokens CSS, tema claro/oscuro),
+indicadores de UI (alertas bloqueantes vs. informativas, distinción de conflicto 412 vs. 422) y una
+API de solo lectura para el historial de correcciones.
+
+| Fase | Unidad | Alcance | Tareas | Estado |
+|---|---|---|---|---|
+| 1 | 1 | Backend — *slice* de lectura de auditoría (índice SQL 017, `IAuditoriaRepository`, `GET /historial`, DI) | 8/8 | ✅ |
+| 2 | 2 | Backend — proyección de indicadores + confirmación de afectación (`FacturaRespuesta` +4 campos, `POST /confirmar-afectacion`) | 8/8 | ✅ |
+| 3 | 3 | SPA — tokens y tema (`TemaService`, `contraste.spec`, `styles.css` con `@layer`, *shell* de la app) | 9/9 | ✅ |
+| 4 | 4 | SPA — componentes visuales y *wiring* de datos (login, historial, `factura-form`, `asiento-lineas`, visor, *banner*) | 14/14 | ✅ |
+| 5 | 5 | Verificación cruzada (`dotnet test`, `ng test`, smoke E2E manual, `PermissionMatrixTests`/`SchemaShapeTests`) | 4/4 | ✅ |
+
+**Pruebas**: 140/140 SPA (Vitest); backend .NET sin regresiones (dos fallos transitorios de
+contención SQL bajo ejecución en paralelo, reconfirmados en verde de forma aislada) + 57/57 en
+`SmartNet.Db.Runner.Tests` (permisos/esquema); smoke E2E manual verificado por el usuario
+(login → detalle, cambio de tema, indicadores, confirmar-afectación).
+
+**Hallazgos**: el tema visual quedó aplicado y funcional. Decisión del usuario: diferir la
+conformidad plena con el *handoff* de diseño al **ítem #18 del backlog** ("Ajuste visual del diseño
+SPA"), para no bloquear el avance de lógica de negocio con retrabajo visual. Se confirmó por
+inspección directa del archivo en disco que el orden documentado en `spec.md`
+(`auditoria-correccion-lectura-api`) ya es "más reciente primero", coincidente con diseño (D7),
+implementación y pruebas — el CRITICAL que reportó `sdd-verify` referenciaba un *snapshot* de
+Engram desactualizado, no el estado real del archivo.
 
 ---
 

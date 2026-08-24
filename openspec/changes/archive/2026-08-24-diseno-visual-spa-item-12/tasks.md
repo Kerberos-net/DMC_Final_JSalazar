@@ -78,7 +78,7 @@ Chain strategy: pending
 
 ## Phase 5: Cross-cutting verification
 
-- [ ] 5.1 Run `dotnet test` full suite (Core + Infrastructure + Api) — confirm no regression in existing `FacturaEndpointsTests`/`SqlUnidadDeTrabajoTests`
+- [x] 5.1 Run `dotnet test` full suite (Core + Infrastructure + Api) — confirm no regression in existing `FacturaEndpointsTests`/`SqlUnidadDeTrabajoTests` (2 parallel-run flakes from SQL Server test-DB teardown contention; both pass in isolation — not a code regression)
 - [x] 5.2 Run `ng test` full suite — confirm no regression in existing detalle/login specs (140/140 pass)
-- [ ] 5.3 Manual E2E smoke: login → detalle with real audit history + indicators, light/dark toggle, 412 vs 422 distinction, confirmar-afectación round-trip
-- [ ] 5.4 Confirm `PermissionMatrixTests` and `SchemaShapeTests` pass unmodified (no privilege/schema drift)
+- [x] 5.3 Manual E2E smoke: login → detalle with real audit history + indicators, light/dark toggle, 412 vs 422 distinction, confirmar-afectación round-trip — verified by user; theme applies and the flows work, but the visual result does not fully conform to the design handoff. Follow-up split out as BACKLOG #18 rather than reopening this change, to keep business-logic work unblocked.
+- [x] 5.4 Confirm `PermissionMatrixTests` and `SchemaShapeTests` pass unmodified (no privilege/schema drift) — 57/57 pass in `SmartNet.Db.Runner.Tests`

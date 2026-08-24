@@ -29,6 +29,7 @@ cinco premisas externas verificadas y ningún ADR queda condicionado.
 | 15 | **Publicación a Drive** | Empaquetado desde el *payload*, `appProperties` como clave, adjuntos manuales y `DOCUMENTACION_ACTUALIZADA` | #14 | — |
 | 16 | **Publicación a Sheets** | *Upsert* por `FacturaId`, columna de secuencia, corrección y anulación reflejadas | #14 | — |
 | 17 | **Errores, notificaciones y operación** | Tres clases de error, notificación por clase, Telegram con respaldo por correo, `EstadoIntegracion`, latido, pantalla de configuración | #14 | — |
+| 18 | **Ajuste visual del diseño SPA** | Correcciones sobre la capa visual (tokens/tema, `login-page`, `detalle-page` y sus componentes) para conformar el resultado al *handoff* de diseño; separado del #12 para no bloquear la lógica de negocio con retrabajo visual | #12 | ⚠ *Handoff* de diseño |
 
 ## Cómo usar este backlog
 
