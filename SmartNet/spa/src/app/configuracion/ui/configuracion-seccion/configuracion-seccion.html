@@ -1,0 +1,11 @@
+<section class="configuracion-seccion" [attr.data-testid]="'seccion-' + seccion()">
+  <h2>{{ seccion() }}</h2>
+  @for (entrada of entradas(); track entrada.clave) {
+    <app-campo-configuracion
+      [entrada]="entrada"
+      [error]="errorPara(entrada.clave)"
+      [guardando]="guardandoClave() === entrada.clave"
+      (guardar)="onGuardar($event)"
+    />
+  }
+</section>

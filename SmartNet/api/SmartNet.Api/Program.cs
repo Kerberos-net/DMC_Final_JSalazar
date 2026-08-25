@@ -83,6 +83,13 @@ builder.Services.AddScoped<ServicioDeIntegraciones>();
 builder.Services.AddSingleton<IAuditoriaRepository>(sp =>
     new SqlAuditoriaRepository(ApiConnectionOptions.Resolve(sp.GetRequiredService<IConfiguration>())));
 
+// BACKLOG #17 Phase 5 composition root: configuracion-api-spa (design D6) -- same lazy-resolution
+// pattern as every repo above. IConfiguracionRepository holds no per-request state (plain
+// GET/PUT over fact.Configuracion), so it is a Singleton like the read-only/read-write repos
+// above, not Scoped like the *Servicio* facades.
+builder.Services.AddSingleton<IConfiguracionRepository>(sp =>
+    new SqlConfiguracionRepository(ApiConnectionOptions.Resolve(sp.GetRequiredService<IConfiguration>())));
+
 // design D7: PeriodicTimer(1 min) with the DI-registered TimeProvider.System above -- so a test
 // that substitutes a FakeTimeProvider via SmartNetApiFactory could drive it deterministically the
 // same way SmartNet.Inbox.Infrastructure.Tests.PromocionBackgroundServiceTests already does for
@@ -156,6 +163,7 @@ app.MapTipoCambioEndpoints();
 app.MapIntegracionEndpoints();
 app.MapDocumentoEndpoints();
 app.MapAuditoriaEndpoints();
+app.MapConfiguracionEndpoints();
 
 app.Run();
 

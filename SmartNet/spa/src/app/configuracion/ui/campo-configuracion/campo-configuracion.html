@@ -1,0 +1,19 @@
+<div class="campo-configuracion" [attr.data-testid]="'campo-' + entrada().seccion + '-' + entrada().clave">
+  <label>
+    <span class="campo-configuracion__clave">{{ entrada().clave }}</span>
+    <input
+      type="text"
+      data-testid="campo-valor"
+      [value]="borrador() ?? entrada().valor ?? ''"
+      [placeholder]="entrada().valorPorDefecto ?? ''"
+      (input)="onValorInput($any($event.target).value)"
+    />
+  </label>
+  <p class="campo-configuracion__descripcion">{{ entrada().descripcion }}</p>
+  <button type="button" data-testid="campo-guardar" [disabled]="guardando()" (click)="onGuardar()">
+    Guardar
+  </button>
+  @if (error()) {
+    <p data-testid="campo-error" class="campo-configuracion__error">{{ error() }}</p>
+  }
+</div>

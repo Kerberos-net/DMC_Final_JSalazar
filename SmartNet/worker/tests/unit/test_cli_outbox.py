@@ -93,7 +93,7 @@ def test_sin_destinos_registrados_no_reclama_nada(monkeypatch):
 def test_ciclo_usa_una_transaccion_para_reclamar_y_una_por_evento(monkeypatch):
     _preparar_entorno(monkeypatch)
     eventos: list[str] = []
-    filas_reclamar = [(1, "DRIVE", 100, "FACTURA_VALIDADA", '{"version":1}', 6)]
+    filas_reclamar = [(1, "DRIVE", 100, "FACTURA_VALIDADA", '{"version":1}', 6, 0)]
     cursor = _FakeCursor(eventos=eventos, filas_reclamar=filas_reclamar, filas_progreso=(None,))
 
     import smartnet_worker.despacho_outbox as despacho_outbox
@@ -117,7 +117,7 @@ def test_ciclo_usa_una_transaccion_para_reclamar_y_una_por_evento(monkeypatch):
 def test_evento_obsoleto_marca_obsoleto_sin_tocar_intentos_ni_ultimoerror(monkeypatch):
     _preparar_entorno(monkeypatch)
     eventos: list[str] = []
-    filas_reclamar = [(1, "DRIVE", 100, "FACTURA_VALIDADA", '{"version":1}', 5)]
+    filas_reclamar = [(1, "DRIVE", 100, "FACTURA_VALIDADA", '{"version":1}', 5, 0)]
     cursor = _FakeCursor(eventos=eventos, filas_reclamar=filas_reclamar, filas_progreso=(5,))
 
     import smartnet_worker.despacho_outbox as despacho_outbox
@@ -136,8 +136,8 @@ def test_fallo_en_un_evento_no_aborta_el_resto_del_lote(monkeypatch):
     _preparar_entorno(monkeypatch)
     eventos: list[str] = []
     filas_reclamar = [
-        (1, "DRIVE", 100, "FACTURA_VALIDADA", '{"version":1}', 6),
-        (2, "DRIVE", 101, "FACTURA_VALIDADA", '{"version":1}', 6),
+        (1, "DRIVE", 100, "FACTURA_VALIDADA", '{"version":1}', 6, 0),
+        (2, "DRIVE", 101, "FACTURA_VALIDADA", '{"version":1}', 6, 0),
     ]
 
     class _CursorConFalloEnPrimerProgreso(_FakeCursor):

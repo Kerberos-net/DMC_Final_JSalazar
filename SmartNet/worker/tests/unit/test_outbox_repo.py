@@ -7,7 +7,7 @@ nunca `Intentos`/`UltimoError` — tarea 4.6)."""
 
 from __future__ import annotations
 
-from datetime import UTC, datetime
+from datetime import UTC, datetime, timedelta
 
 from smartnet_worker.outbox_repo import OutboxRepo
 from smartnet_worker.reclamo import ARRENDAMIENTO
@@ -106,7 +106,7 @@ def test_reclamar_con_destinos_vacios_no_ejecuta_sql():
 
 
 def test_reclamar_mapea_las_filas_a_eventoreclamado():
-    filas = [(1, "DRIVE", 100, "FACTURA_VALIDADA", '{"version":1}', 7)]
+    filas = [(1, "DRIVE", 100, "FACTURA_VALIDADA", '{"version":1}', 7, 0)]
     cursor = _FakeCursor(filas=filas)
     repo = OutboxRepo(cursor)
 
@@ -120,6 +120,7 @@ def test_reclamar_mapea_las_filas_a_eventoreclamado():
     assert evento.tipo == "FACTURA_VALIDADA"
     assert evento.payload == '{"version":1}'
     assert evento.secuencia == 7
+    assert evento.intentos == 0
 
 
 # --- progreso ------------------------------------------------------------------------------------
@@ -176,3 +177,85 @@ def test_marcar_completado_tampoco_toca_intentos_ni_ultimoerror():
     sql = sentencia.lower()
     assert "intentos" not in sql
     assert "ultimoerror" not in sql
+
+
+def test_reclamar_selecciona_intentos_y_los_mapea():
+    filas = [(1, "DRIVE", 100, "FACTURA_VALIDADA", '{"version":1}', 7, 2)]
+    cursor = _FakeCursor(filas=filas)
+    repo = OutboxRepo(cursor)
+
+    resultado = repo.reclamar(("DRIVE",), 50, _AHORA)
+
+    sentencia, _ = cursor.llamadas[0]
+    assert "oei.intentos" in sentencia.lower()
+    assert resultado[0].intentos == 2
+
+
+# --- marcar_fallo (BACKLOG #17, Fase 2, tasks.md 2.5) --------------------------------------------
+
+
+def test_marcar_fallo_escribe_estado_intentos_ultimoerror_clasificacion_proximointentoen():
+    cursor = _FakeCursor()
+    repo = OutboxRepo(cursor)
+    proximo = _AHORA + timedelta(seconds=2)
+
+    repo.marcar_fallo(
+        evento_id=1,
+        destino="DRIVE",
+        clasificacion="TRANSITORIO",
+        mensaje="boom",
+        proximo_intento_en=proximo,
+        ahora=_AHORA,
+    )
+
+    sentencia, parametros = cursor.llamadas[0]
+    sql = sentencia.lower()
+    assert "update fact.outboxeventintegracion" in sql
+    assert "estado = ?" in sql
+    assert "intentos = intentos + 1" in sql
+    assert "ultimoerror = ?" in sql
+    assert "clasificacion = ?" in sql
+    assert "proximointentoen = ?" in sql
+    assert "ERROR" in parametros
+    assert "boom" in parametros
+    assert "TRANSITORIO" in parametros
+    assert proximo in parametros
+    assert 1 in parametros
+    assert "DRIVE" in parametros
+
+
+def test_leer_clasificacion_devuelve_el_valor_de_la_fila():
+    cursor = _FakeCursor(filas=[("DIFERIBLE",)])
+    repo = OutboxRepo(cursor)
+
+    resultado = repo.leer_clasificacion(1, "DRIVE")
+
+    assert resultado == "DIFERIBLE"
+    sentencia, parametros = cursor.llamadas[0]
+    assert "select clasificacion" in sentencia.lower()
+    assert parametros == (1, "DRIVE")
+
+
+def test_leer_clasificacion_sin_fila_devuelve_none():
+    cursor = _FakeCursor(filas=[])
+    repo = OutboxRepo(cursor)
+
+    assert repo.leer_clasificacion(1, "DRIVE") is None
+
+
+def test_marcar_fallo_trunca_mensaje_a_2000_caracteres():
+    cursor = _FakeCursor()
+    repo = OutboxRepo(cursor)
+
+    repo.marcar_fallo(
+        evento_id=1,
+        destino="DRIVE",
+        clasificacion="PERMANENTE",
+        mensaje="x" * 3000,
+        proximo_intento_en=None,
+        ahora=_AHORA,
+    )
+
+    _, parametros = cursor.llamadas[0]
+    mensajes = [p for p in parametros if isinstance(p, str) and p.startswith("x")]
+    assert len(mensajes[0]) == 2000

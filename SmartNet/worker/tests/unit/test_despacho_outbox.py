@@ -9,6 +9,7 @@ from datetime import UTC, datetime
 
 from smartnet_worker.despacho_outbox import (
     ESTADO_COMPLETADO,
+    ESTADO_ERROR,
     ESTADO_OBSOLETO,
     REGISTRO_HANDLERS,
     despachar_evento,
@@ -105,3 +106,76 @@ def test_guarda_corre_antes_que_el_handler():
     )
 
     assert orden == ["progreso", "handler"]
+
+
+# --- clasificacion del handler (BACKLOG #17, Fase 2, tasks.md 2.4) -------------------------------
+
+
+class _FakeRegistroDeFallo:
+    def __init__(self):
+        self.llamadas: list[tuple] = []
+
+    def registrar(self, evento_id, integracion, resultado, mensaje, instante):
+        self.llamadas.append((evento_id, integracion, resultado, mensaje, instante))
+
+
+def test_handler_que_lanza_sin_registro_de_fallo_propaga_la_excepcion():
+    # default None -> comportamiento de #14 preservado byte-por-byte: sin `registro_fallo`, la
+    # excepcion del handler se propaga (cli_outbox._procesar_evento la captura y hace rollback).
+    reclamo = _FakeReclamo(progreso=None)
+
+    def _handler(evento):
+        raise ValueError("boom")
+
+    try:
+        despachar_evento(reclamo, _evento(), ahora=_AHORA, registro={"DRIVE": _handler})
+        raise AssertionError("se esperaba que la excepcion se propagara")
+    except ValueError as error:
+        assert str(error) == "boom"
+
+    assert not any(llamada[0] == "marcar" for llamada in reclamo.llamadas)
+
+
+def test_handler_que_lanza_con_registro_de_fallo_clasifica_y_no_propaga():
+    reclamo = _FakeReclamo(progreso=None)
+    registro_fallo = _FakeRegistroDeFallo()
+
+    def _handler(evento):
+        raise ValueError("boom")
+
+    resultado = despachar_evento(
+        reclamo,
+        _evento(),
+        ahora=_AHORA,
+        registro={"DRIVE": _handler},
+        registro_fallo=registro_fallo,
+    )
+
+    assert resultado == ESTADO_ERROR
+    assert len(registro_fallo.llamadas) == 1
+    evento_id, integracion, resultado_despacho, mensaje, instante = registro_fallo.llamadas[0]
+    assert evento_id == 1
+    assert integracion == "DRIVE"
+    assert resultado_despacho.estado == "ERROR"
+    assert mensaje == "boom"
+    assert instante == _AHORA
+    # sin registro_fallo.registrar el estado terminal no pasa por `reclamo.marcar` -- ese estado
+    # ('ERROR' con Clasificacion/ProximoIntentoEn) lo escribe `outbox_repo.marcar_fallo`, no
+    # `reclamo.marcar` (que solo conoce Estado/ActualizadoEn, tarea 4.6 de #14).
+    assert not any(llamada[0] == "marcar" for llamada in reclamo.llamadas)
+
+
+def test_handler_exitoso_no_invoca_registro_de_fallo():
+    reclamo = _FakeReclamo(progreso=None)
+    registro_fallo = _FakeRegistroDeFallo()
+
+    resultado = despachar_evento(
+        reclamo,
+        _evento(),
+        ahora=_AHORA,
+        registro={"DRIVE": lambda evento: None},
+        registro_fallo=registro_fallo,
+    )
+
+    assert resultado == ESTADO_COMPLETADO
+    assert registro_fallo.llamadas == []

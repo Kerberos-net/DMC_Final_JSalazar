@@ -18,5 +18,13 @@ export const routes: Routes = [
     loadComponent: () =>
       import('./detalle/feature/detalle-page/detalle-page').then((m) => m.DetallePage),
   },
+  {
+    path: 'configuracion',
+    canActivate: [authGuard],
+    loadComponent: () =>
+      import('./configuracion/feature/configuracion-page/configuracion-page').then(
+        (m) => m.ConfiguracionPage
+      ),
+  },
   { path: '', pathMatch: 'full', redirectTo: 'bandeja' },
 ];

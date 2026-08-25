@@ -45,6 +45,17 @@ _TIPOS_PERMANENTES: tuple[type[BaseException], ...] = (
 )
 
 
+class CuotaExcedidaError(Exception):
+    """Productor de `DIFERIBLE` (BACKLOG #17, design.md D1/D3): un HTTP 429/`Retry-After` en el
+    camino del outbox. Carga `retry_after` opcional -- `clasificacion_despacho.decidir` lo honra
+    verbatim cuando esta presente, y cae a `proximo_reintento` cuando no (la integracion no mando
+    la cabecera, o esta no se pudo parsear)."""
+
+    def __init__(self, retry_after: timedelta | None = None):
+        super().__init__("cuota excedida")
+        self.retry_after = retry_after
+
+
 def clasificar(error: BaseException) -> Clasificacion:
     """Lookup puro: un tipo de `_TIPOS_PERMANENTES` -> `PERMANENTE`; cualquier otra cosa,
     reconocida o no, -> `TRANSITORIO` (ADR 0010's regla de "errar hacia transitorio ante la

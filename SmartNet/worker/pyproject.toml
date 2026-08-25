@@ -35,6 +35,7 @@ smartnet-gmail = "smartnet_worker.cli_gmail:main"
 smartnet-procesamiento = "smartnet_worker.cli_procesamiento:main"
 smartnet-inbox = "smartnet_worker.cli_inbox:main"
 smartnet-outbox = "smartnet_worker.cli_outbox:main"
+smartnet-command-queue = "smartnet_worker.cli_command_queue:main"
 
 [build-system]
 requires = ["setuptools>=68"]

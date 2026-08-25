@@ -37,6 +37,10 @@ class EventoReclamado:
     tipo: str
     payload: str
     secuencia: int
+    # BACKLOG #17 (design.md D2/D3): cuenta de intentos fallidos previos, necesaria para que
+    # `clasificacion_despacho.decidir` calcule backoff/agotamiento. Default 0 preserva la
+    # construccion posicional/keyword de las pruebas de #14 que no la pasan.
+    intentos: int = 0
 
 
 @runtime_checkable

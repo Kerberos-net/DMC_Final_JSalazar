@@ -46,9 +46,12 @@ FROM fact.OutboxEventIntegracion AS oei WITH (READPAST, UPDLOCK, ROWLOCK)
 WHERE oei.Estado = 'PENDIENTE' AND oei.Integracion IN ({marcadores})
   AND (oei.ProximoIntentoEn IS NULL OR oei.ProximoIntentoEn <= ?);
 
-SELECT r.OutboxEventId, r.Integracion, oe.FacturaId, oe.Tipo, oe.Payload, oe.Secuencia
+SELECT r.OutboxEventId, r.Integracion, oe.FacturaId, oe.Tipo, oe.Payload, oe.Secuencia,
+       oei.Intentos
 FROM @reclamadas r
-JOIN fact.OutboxEvent oe ON oe.OutboxEventId = r.OutboxEventId;
+JOIN fact.OutboxEvent oe ON oe.OutboxEventId = r.OutboxEventId
+JOIN fact.OutboxEventIntegracion oei
+    ON oei.OutboxEventId = r.OutboxEventId AND oei.Integracion = r.Integracion;
 """
 
 _PROGRESO = """
@@ -63,6 +66,25 @@ UPDATE fact.OutboxEventIntegracion
 SET Estado = ?, ActualizadoEn = ?
 WHERE OutboxEventId = ? AND Integracion = ?
 """
+
+# BACKLOG #17 (design.md D1/D1b): unico UPDATE que toca `Clasificacion` -- distinto de `_MARCAR`,
+# que solo escribe Estado/ActualizadoEn para los estados terminales sin error (COMPLETADO/OBSOLETO,
+# tarea 4.6 de #14). `Intentos = Intentos + 1` incrementa server-side; el conteo que
+# `clasificacion_despacho.decidir` necesita para el backoff viene de la lectura previa
+# (`EventoReclamado.intentos`, `reclamar`), nunca de releer esta fila.
+_LEER_CLASIFICACION = """
+SELECT Clasificacion FROM fact.OutboxEventIntegracion
+WHERE OutboxEventId = ? AND Integracion = ?
+"""
+
+_MARCAR_FALLO = """
+UPDATE fact.OutboxEventIntegracion
+SET Estado = ?, Intentos = Intentos + 1, UltimoError = ?, Clasificacion = ?,
+    ProximoIntentoEn = ?, ActualizadoEn = ?
+WHERE OutboxEventId = ? AND Integracion = ?
+"""
+
+_MAX_MENSAJE_LEN = 2000
 
 
 class OutboxRepo:
@@ -96,6 +118,7 @@ class OutboxRepo:
                 tipo=fila[3],
                 payload=fila[4],
                 secuencia=fila[5],
+                intentos=fila[6],
             )
             for fila in self._cursor.fetchall()
         )
@@ -107,3 +130,36 @@ class OutboxRepo:
 
     def marcar(self, evento_id: int, destino: str, estado: str, ahora: datetime) -> None:
         self._cursor.execute(_MARCAR, estado, ahora, evento_id, destino)
+
+    def leer_clasificacion(self, evento_id: int, destino: str) -> str | None:
+        """Lee la `Clasificacion` YA escrita en la fila, antes de sobreescribirla -- el mecanismo
+        de dedupe de DIFERIBLE de `politica_notificacion.debe_notificar` (design.md D4)."""
+        self._cursor.execute(_LEER_CLASIFICACION, evento_id, destino)
+        fila = self._cursor.fetchone()
+        return fila[0] if fila is not None else None
+
+    def marcar_fallo(
+        self,
+        *,
+        evento_id: int,
+        destino: str,
+        clasificacion: str,
+        mensaje: str,
+        proximo_intento_en: datetime | None,
+        ahora: datetime,
+    ) -> None:
+        """Unico punto de escritura de `Clasificacion` (BACKLOG #17, design.md D1). `mensaje` se
+        trunca a `_MAX_MENSAJE_LEN` antes de tocar `UltimoError` -- mismo limite y mismo motivo que
+        `estado_integracion.registrar_fallo` (no filtrar payload crudo en la base, design.md Threat
+        Matrix)."""
+        mensaje_truncado = str(mensaje)[:_MAX_MENSAJE_LEN]
+        self._cursor.execute(
+            _MARCAR_FALLO,
+            "ERROR",
+            mensaje_truncado,
+            clasificacion,
+            proximo_intento_en,
+            ahora,
+            evento_id,
+            destino,
+        )

@@ -55,6 +55,14 @@ OCR_IDIOMA = "spa"
 # para un documento SUNAT tipico; escala = OCR_DPI / 72 (72 DPI es la unidad nativa de PDF).
 OCR_DPI = 300
 
+# BACKLOG #17 (design.md D4): mismo patron que GMAIL_CREDENTIALS_ENV_VAR -- un secreto atomico por
+# integracion, sin default en codigo. El JSON de Telegram carga {"bot_token": "..."}; el de SMTP
+# carga {"host": "...", "port": ..., "usuario": "...", "password": "...", "remitente": "..."}. Las
+# NO-secretas (chat id, destinatarios de correo) vienen de fact.Configuracion via
+# configuracion_repo.py, nunca de aqui (008:131 le da SELECT a fact_worker sobre esa tabla).
+TELEGRAM_CREDENTIALS_ENV_VAR = "SMARTNET_WORKER_TELEGRAM_CREDENTIALS"
+SMTP_CREDENTIALS_ENV_VAR = "SMARTNET_WORKER_SMTP_CREDENTIALS"
+
 
 class ConfiguracionError(Exception):
     """La configuracion requerida del worker (variables de entorno) no esta presente."""
@@ -98,6 +106,40 @@ def obtener_raiz_almacenamiento() -> str:
             f"La variable de entorno {STORAGE_ROOT_ENV_VAR} no esta definida."
         )
     return valor
+
+
+def obtener_credenciales_telegram_json() -> dict:
+    """Lee y parsea el JSON `{"bot_token": "..."}` desde `SMARTNET_WORKER_TELEGRAM_CREDENTIALS`.
+    Lanza `ConfiguracionError` si la variable no esta definida o su contenido no es JSON valido --
+    mismo contrato que `obtener_credenciales_gmail_json`."""
+    valor = os.environ.get(TELEGRAM_CREDENTIALS_ENV_VAR)
+    if not valor:
+        raise ConfiguracionError(
+            f"La variable de entorno {TELEGRAM_CREDENTIALS_ENV_VAR} no esta definida."
+        )
+    try:
+        return json.loads(valor)
+    except json.JSONDecodeError as error:
+        raise ConfiguracionError(
+            f"La variable de entorno {TELEGRAM_CREDENTIALS_ENV_VAR} no contiene JSON valido."
+        ) from error
+
+
+def obtener_credenciales_smtp_json() -> dict:
+    """Lee y parsea el JSON `{"host", "port", "usuario", "password", "remitente"}` desde
+    `SMARTNET_WORKER_SMTP_CREDENTIALS`. Lanza `ConfiguracionError` si la variable no esta definida
+    o su contenido no es JSON valido -- mismo contrato que `obtener_credenciales_gmail_json`."""
+    valor = os.environ.get(SMTP_CREDENTIALS_ENV_VAR)
+    if not valor:
+        raise ConfiguracionError(
+            f"La variable de entorno {SMTP_CREDENTIALS_ENV_VAR} no esta definida."
+        )
+    try:
+        return json.loads(valor)
+    except json.JSONDecodeError as error:
+        raise ConfiguracionError(
+            f"La variable de entorno {SMTP_CREDENTIALS_ENV_VAR} no contiene JSON valido."
+        ) from error
 
 
 def obtener_tesseract_cmd() -> str | None:

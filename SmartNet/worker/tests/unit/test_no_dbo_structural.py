@@ -139,3 +139,30 @@ def test_dispatcher_destination_agnostic_nunca_importa_outbox_repo_ni_readpast()
                 "Decision D6; spec.md 'Dispatcher depends only on the interface')."
             )
             assert termino not in contenido, mensaje
+
+
+# BACKLOG #17, Fase 4 (tasks.md 4.5): el consumidor de CommandQueue solo puede tocar sus tres
+# tablas propias -- CommandQueue (contrato), Procesamiento (privada de Python) y EstadoIntegracion
+# (compartida). `_TERMINOS_READPAST_PROHIBIDOS` (arriba) ya prueba, para el escaneo generico de
+# `dbo.`/tablas .NET, que ningun modulo del worker (incluido este) menciona `fact.Factura`.
+_TABLAS_PERMITIDAS_COMMAND_QUEUE = (
+    "fact.commandqueue",
+    "fact.procesamiento",
+    "fact.estadointegracion",
+)
+
+
+def test_consumidor_command_queue_solo_toca_sus_tres_tablas():
+    archivo = _SRC / "cli_command_queue.py"
+    assert archivo.exists(), "cli_command_queue.py no existe -- el escaneo no probaria nada."
+    contenido = _sin_comentarios(archivo.read_text(encoding="utf-8")).lower()
+
+    import re as _re
+
+    referencias = set(_re.findall(r"fact\.[a-z]+", contenido))
+    permitidas = set(_TABLAS_PERMITIDAS_COMMAND_QUEUE)
+    inesperadas = referencias - permitidas
+    assert not inesperadas, (
+        f"cli_command_queue.py referencia tablas fuera de las tres permitidas: {inesperadas} "
+        "(ADR 0003 -- CommandQueue/Procesamiento/EstadoIntegracion, nunca fact.Factura ni otra)."
+    )

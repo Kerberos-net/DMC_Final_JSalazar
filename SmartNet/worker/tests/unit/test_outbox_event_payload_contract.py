@@ -27,7 +27,7 @@ class _CursorFalsoConUnaFilaReclamada:
     round trip."""
 
     def __init__(self, payload_texto: str) -> None:
-        self._fila = (1, "DRIVE", 100, "FACTURA_VALIDADA", payload_texto, 1)
+        self._fila = (1, "DRIVE", 100, "FACTURA_VALIDADA", payload_texto, 1, 0)
 
     def execute(self, sql, *parametros):
         return self

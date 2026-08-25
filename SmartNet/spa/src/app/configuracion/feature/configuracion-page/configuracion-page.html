@@ -1,0 +1,15 @@
+<h1>Configuración</h1>
+
+@if (loading()) {
+  <p data-testid="configuracion-cargando">Cargando…</p>
+}
+
+@for (grupo of secciones(); track grupo.seccion) {
+  <app-configuracion-seccion
+    [seccion]="grupo.seccion"
+    [entradas]="grupo.entradas"
+    [errores]="erroresPorClave()"
+    [guardandoClave]="guardandoClave()"
+    (guardar)="onGuardar($event)"
+  />
+}

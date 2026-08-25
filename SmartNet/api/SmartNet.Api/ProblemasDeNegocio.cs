@@ -52,6 +52,20 @@ internal static class ProblemasDeNegocio
             statusCode: StatusCodes.Status409Conflict,
             contentType: "application/problem+json");
 
+    /// <summary>spec.md configuracion-api-spa — "Invalid value rejected... the previously stored
+    /// value remains unchanged": traduce <see cref="ResultadoActualizacionConfiguracion.ValorInvalido"/>
+    /// (design D6, <see cref="ValorDeConfiguracion.Validar"/>) a 422 -- nunca 400: el valor tiene la
+    /// forma correcta de un PUT, pero incumple la regla declarada por el <c>Tipo</c> de la clave,
+    /// igual que las <see cref="InvarianteContable"/> de abajo.</summary>
+    public static IResult ValorDeConfiguracionInvalido() =>
+        TypedResults.Json(
+            new ProblemaGenerico(
+                Base + "configuracion-valor-invalido", "El valor no cumple el tipo declarado de la clave",
+                StatusCodes.Status422UnprocessableEntity,
+                "El valor enviado no pasó la validación de su Tipo (TEXTO/ENTERO/DECIMAL/BOOLEANO/FECHA/LISTA); el valor previo se conserva."),
+            statusCode: StatusCodes.Status422UnprocessableEntity,
+            contentType: "application/problem+json");
+
     private static IResult VersionEnConflicto() =>
         TypedResults.Json(
             new ProblemaGenerico(

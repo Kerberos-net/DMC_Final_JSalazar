@@ -22,14 +22,17 @@ from datetime import UTC, datetime
 
 import pyodbc
 
-from smartnet_worker import config
+from smartnet_worker import config, configuracion_repo
 from smartnet_worker.despacho_outbox import (
     REGISTRO_HANDLERS,
     despachar_evento,
     destinos_registrados,
 )
+from smartnet_worker.notificaciones import CorreoCanal, TelegramCanal
+from smartnet_worker.notificaciones import notificar as _notificar_canales
 from smartnet_worker.outbox_repo import OutboxRepo
 from smartnet_worker.reclamo import EventoReclamado
+from smartnet_worker.registro_fallo import RegistroDeFalloConNotificacion
 
 _LIMITE_LOTE = 50
 
@@ -83,13 +86,43 @@ def _procesar_evento(
     try:
         cursor = conexion.cursor()
         repo = OutboxRepo(cursor)
-        despachar_evento(repo, evento, ahora=ahora, registro=REGISTRO_HANDLERS)
+        registro_fallo = RegistroDeFalloConNotificacion(
+            repo,
+            cursor=cursor,
+            fabrica_canales=lambda: _construir_canales(cursor),
+            notificar=_notificar_canales,
+        )
+        despachar_evento(
+            repo, evento, ahora=ahora, registro=REGISTRO_HANDLERS, registro_fallo=registro_fallo
+        )
         conexion.commit()
     except Exception:
         conexion.rollback()
         raise
     finally:
         conexion.close()
+
+
+def _construir_canales(cursor) -> tuple:
+    """Fabrica de canales reales (BACKLOG #17, design.md D4) -- solo se invoca cuando
+    `politica_notificacion.debe_notificar` ya decidio que hay que notificar (`registro_fallo.py`).
+    Telegram primero, correo de respaldo despues; el orden es el que `notificaciones.notificar`
+    respeta."""
+    credenciales_telegram = config.obtener_credenciales_telegram_json()
+    chat_id = configuracion_repo.obtener(cursor, "TELEGRAM", "DESTINO_CHAT_ID")
+    credenciales_smtp = config.obtener_credenciales_smtp_json()
+    destinatarios = configuracion_repo.obtener_destinatarios_correo(cursor)
+    return (
+        TelegramCanal(credenciales_telegram["bot_token"], chat_id),
+        CorreoCanal(
+            credenciales_smtp["host"],
+            credenciales_smtp["port"],
+            credenciales_smtp["usuario"],
+            credenciales_smtp["password"],
+            credenciales_smtp["remitente"],
+            destinatarios,
+        ),
+    )
 
 
 def main() -> None:
