@@ -138,4 +138,26 @@ public interface IUnidadDeTrabajo : IAsyncDisposable
     /// <see cref="ResultadoEscritura"/> que <see cref="GuardarFacturaAsync"/>.</summary>
     Task<ResultadoEscritura> ConfirmarAfectacionAsync(
         long facturaId, byte[] versionEsperada, bool esMixta, CancellationToken ct);
+
+    // --- outbox-mensajeria (BACKLOG #14, design D10 / ADR 0020 decisión 5) addition ---
+
+    /// <summary>Único miembro nuevo de #14: transición <c>state-CAS</c> (no version-CAS, ver ADR 0020
+    /// decisión 5) <c>PENDIENTE_VALIDACION -&gt; VALIDADA</c> de <c>fact.Factura.Estado</c>. Nunca
+    /// recibe versión ni estado destino -- una columna, un valor literal, un único estado de origen
+    /// legal (design D10).</summary>
+    Task<TransicionEstadoFactura> MarcarFacturaValidadaAsync(long facturaId, CancellationToken ct);
+}
+
+/// <summary>design D10 — resultado de <see cref="IUnidadDeTrabajo.MarcarFacturaValidadaAsync"/>.</summary>
+public enum TransicionEstadoFactura
+{
+    /// <summary><c>@@ROWCOUNT &gt; 0</c> -- la factura estaba PENDIENTE_VALIDACION y ahora es VALIDADA.</summary>
+    Aplicada,
+
+    /// <summary>La factura ya estaba VALIDADA -- reconfirmación tras reabrir (D1); no es un error, no
+    /// hace rollback.</summary>
+    YaValidada,
+
+    /// <summary>Cualquier otro estado (hoy: DESCARTADA) -- terminal, 409 (OQ5, ADR 0020 decisión 5).</summary>
+    NoTransicionable,
 }

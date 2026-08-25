@@ -13,11 +13,16 @@ namespace SmartNet.Facturacion.Core.Tests;
 public class ResultadoComandoCasoConflictoShapeTests
 {
     [Fact]
-    public void CasoConflicto_HasExactlyTheNineAdr0008Rows()
+    public void CasoConflicto_HasExactlyTheNineAdr0008RowsPlusFacturaDescartada()
     {
+        // outbox-mensajeria (BACKLOG #14, OQ5/ADR 0020 decisión 5) adds a TENTH case:
+        // FacturaDescartada -- "validar" on a DESCARTADA factura (ValidarInternoAsync's
+        // NoTransicionable branch). Not a reuse of AsientoYaConfirmado: its detail text is the
+        // MIRROR rule ("la factura ya fue validada"), not this one, and ADR 0008's 409 table is one
+        // row per case (design.md File Changes, CasoConflicto.cs entry).
         var valores = Enum.GetNames<CasoConflicto>();
 
-        Assert.Equal(9, valores.Length);
+        Assert.Equal(10, valores.Length);
         Assert.Contains(nameof(CasoConflicto.DuplicadoNoResuelto), valores);
         Assert.Contains(nameof(CasoConflicto.ComprobanteEmitidoDomingo), valores);
         Assert.Contains(nameof(CasoConflicto.SinTipoCambio), valores);
@@ -27,6 +32,7 @@ public class ResultadoComandoCasoConflictoShapeTests
         Assert.Contains(nameof(CasoConflicto.AsientoYaConfirmado), valores);
         Assert.Contains(nameof(CasoConflicto.AfectacionMixta), valores);
         Assert.Contains(nameof(CasoConflicto.AfectacionNoVerificada), valores);
+        Assert.Contains(nameof(CasoConflicto.FacturaDescartada), valores);
     }
 
     [Fact]

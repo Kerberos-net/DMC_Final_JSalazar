@@ -26,7 +26,10 @@ public sealed class FakeUnidadDeTrabajo : IUnidadDeTrabajo
     public Task<AsientoPersistido?> CargarAsientoAsync(long asientoId, CancellationToken ct)
     {
         Llamadas.Add(nameof(CargarAsientoAsync));
-        return Task.FromResult(AsientoACargar);
+        // design D9 fidelity fix: "la transacción ve sus propias escrituras" -- una vez que
+        // GuardarAsientoAsync corrió en esta misma unidad de trabajo, la siguiente lectura debe
+        // reflejar lo escrito (p.ej. el PayloadOutbox re-read de D2), no el estado pre-escritura.
+        return Task.FromResult(UltimoAsientoGuardado ?? AsientoACargar);
     }
 
     public Task<ResultadoEscritura> GuardarAsientoAsync(
@@ -50,9 +53,21 @@ public sealed class FakeUnidadDeTrabajo : IUnidadDeTrabajo
         return Task.CompletedTask;
     }
 
+    private readonly HashSet<(string Tipo, long FacturaId)> _emitidosEnEstaTx = new();
+
     public Task EmitirOutboxAsync(string tipo, long facturaId, string payload, CancellationToken ct)
     {
         Llamadas.Add(nameof(EmitirOutboxAsync));
+
+        // design D8 -- a lo sumo un evento por (Tipo, FacturaId) por transacción; fail-loud en vez
+        // de un dedupe silencioso que escondería el error de diseño (mismo mirror que
+        // SqlUnidadDeTrabajo.EmitirOutboxAsync, tasks.md 2.8).
+        if (!_emitidosEnEstaTx.Add((tipo, facturaId)))
+        {
+            throw new InvalidOperationException(
+                $"Ya se emitió un evento '{tipo}' para la factura {facturaId} en esta transacción.");
+        }
+
         EventosOutbox.Add((tipo, facturaId, payload));
         return Task.CompletedTask;
     }
@@ -72,7 +87,24 @@ public sealed class FakeUnidadDeTrabajo : IUnidadDeTrabajo
 
     // --- PR 2 additions ---
 
-    public FacturaPersistida? FacturaACargar { get; set; }
+    // design D9 fidelity fix -- default no-nulo: los tests de ValidarAsync/ValidarPorFacturaAsync
+    // (ServicioDeFacturasTests/ServicioDeFacturasPhase2Tests) solo fijan AsientoACargar, nunca
+    // FacturaACargar, y ahora PayloadOutbox.ConstruirAsync SIEMPRE re-lee la factura (D2). FacturaId
+    // 100 coincide con AsientoPersistidoBorrador().FacturaId de ambos archivos de test. Los tests
+    // que necesitan "factura ausente" ya fijan FacturaACargar = null explícitamente.
+    public FacturaPersistida? FacturaACargar { get; set; } = new FacturaPersistida(
+        FacturaId: 100,
+        Estado: FacturaPersistida.PendienteValidacion,
+        ProveedorCodigo: "P00123",
+        RucProveedor: "20100000001",
+        TipoComprobante: "01",
+        Numero: "F001-1",
+        TotalOrig: 118.00m,
+        Moneda: "PEN",
+        FechaEmision: new DateOnly(2026, 8, 10),
+        Motivo: null,
+        Afectacion: "GRAVADA",
+        Version: new byte[] { 0, 0, 0, 0, 0, 0, 0, 1 });
     public ResultadoEscritura ResultadoDeGuardarFactura { get; set; } = ResultadoEscritura.Aplicado;
     public long? AsientoVigenteId { get; set; }
     public long AsientoBorradorCreadoId { get; set; } = 900;
@@ -84,7 +116,10 @@ public sealed class FakeUnidadDeTrabajo : IUnidadDeTrabajo
     public Task<FacturaPersistida?> CargarFacturaAsync(long facturaId, CancellationToken ct)
     {
         Llamadas.Add(nameof(CargarFacturaAsync));
-        return Task.FromResult(FacturaACargar);
+        // design D9 fidelity fix -- misma razón que CargarAsientoAsync: la transacción ve sus
+        // propias escrituras (GuardarFacturaAsync o MarcarFacturaValidadaAsync, que muta
+        // FacturaACargar directamente porque no pasa por GuardarFacturaAsync -- ver más abajo).
+        return Task.FromResult(UltimaFacturaGuardada ?? FacturaACargar);
     }
 
     public Task<ResultadoEscritura> GuardarFacturaAsync(
@@ -217,6 +252,35 @@ public sealed class FakeUnidadDeTrabajo : IUnidadDeTrabajo
         Llamadas.Add(nameof(ConfirmarAfectacionAsync));
         UltimaAfectacionMixtaConfirmada = esMixta;
         return Task.FromResult(ResultadoDeConfirmarAfectacion);
+    }
+
+    // --- outbox-mensajeria (BACKLOG #14, design D10) addition ---
+
+    public Task<TransicionEstadoFactura> MarcarFacturaValidadaAsync(long facturaId, CancellationToken ct)
+    {
+        Llamadas.Add(nameof(MarcarFacturaValidadaAsync));
+
+        var actual = FacturaACargar;
+        if (actual is null)
+        {
+            return Task.FromResult(TransicionEstadoFactura.NoTransicionable);
+        }
+
+        return actual.Estado switch
+        {
+            FacturaPersistida.PendienteValidacion => Aplicar(actual),
+            FacturaPersistida.Validada => Task.FromResult(TransicionEstadoFactura.YaValidada),
+            _ => Task.FromResult(TransicionEstadoFactura.NoTransicionable),
+        };
+
+        Task<TransicionEstadoFactura> Aplicar(FacturaPersistida original)
+        {
+            // "La transacción ve sus propias escrituras" (design D2/D9) -- el próximo
+            // CargarFacturaAsync debe ver Estado = VALIDADA, igual que UltimaFacturaGuardada ??
+            // FacturaACargar en GuardarFacturaAsync ya modela para el resto de escrituras.
+            FacturaACargar = original with { Estado = FacturaPersistida.Validada };
+            return Task.FromResult(TransicionEstadoFactura.Aplicada);
+        }
     }
 }
 

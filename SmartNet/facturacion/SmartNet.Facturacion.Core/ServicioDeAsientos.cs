@@ -129,9 +129,17 @@ public sealed class ServicioDeAsientos
                 motivo, usuarioId, ahora),
             ct);
 
+        // outbox-mensajeria (BACKLOG #14, design D1/D2) -- asientoContableId pasado EXPLÍCITO: tras
+        // anular, ObtenerAsientoVigenteIdAsync ya no lo encontraría ("vigente" excluye ANULADO).
+        var payload = await PayloadOutbox.ConstruirAsync(
+            uow, TipoEventoAsientoAnulado, persistido.FacturaId, asientoId, ct);
+        await uow.EmitirOutboxAsync(TipoEventoAsientoAnulado, persistido.FacturaId, payload, ct);
+
         await uow.CommitAsync(ct);
         return new ResultadoComando.Aplicado();
     }
+
+    private const string TipoEventoAsientoAnulado = "ASIENTO_ANULADO";
 
     // -----------------------------------------------------------------------------------------
     // PR 3 (Phase 3) — líneas por LineaId (spec.md api-asientos: "never position"). Los tres

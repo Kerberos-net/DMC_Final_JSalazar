@@ -19,6 +19,12 @@ documentos nunca salen de la organizacion" (design.md, Decision 1). `cli_gmail.p
 quedan fuera de este escaneo especifico porque SI hablan con la API de Gmail por diseno (ADR 0017);
 la regla aplica a los modulos que deciden y persisten sobre el contenido de un documento ya
 descargado, nunca a la ingesta.
+
+BACKLOG #14 (Fase 4, design.md Decision D6) amplia el escaneo con una cuarta regla, el
+"import-graph test" de la tarea 4.3: el dispatcher destination-agnostic del consumidor
+(`despacho_outbox.py`, y su Protocol `reclamo.py`) NUNCA debe mencionar `READPAST` ni importar
+`outbox_repo`/`pyodbc` — la unica frontera SQL-Server-especifica del consumidor vive en
+`outbox_repo.py` (spec.md, "Dispatcher depends only on the interface").
 """
 
 import re
@@ -49,9 +55,25 @@ _MODULOS_CAMINO_EXTRACCION = (
 )
 _IMPORTS_DE_RED_PROHIBIDOS = ("import requests", "import urllib", "import http", "import socket")
 
+# BACKLOG #14, tarea 4.3: el dispatcher destination-agnostic (design.md Decision D6) nunca debe
+# depender de la frontera SQL-Server-especifica del consumidor.
+_MODULOS_DESTINATION_AGNOSTIC = ("reclamo.py", "despacho_outbox.py")
+_TERMINOS_READPAST_PROHIBIDOS = ("readpast", "import pyodbc", "outbox_repo")
+
+
+_DOCSTRING_RE = re.compile(r'""".*?"""|\'\'\'.*?\'\'\'', re.DOTALL)
+
 
 def _sin_comentarios(texto: str) -> str:
     return _COMENTARIO_LINEA_RE.sub("", texto)
+
+
+def _sin_docstrings_ni_comentarios(texto: str) -> str:
+    """Igual que `_sin_comentarios`, mas elimina todo docstring (modulo/clase/funcion). BACKLOG
+    #14, tarea 4.3: `reclamo.py`/`despacho_outbox.py` documentan en prosa su relacion con la
+    frontera SQL-Server-especifica del consumidor (por que NO la implementan) — esa prosa
+    legitimamente menciona los mismos terminos que esta prueba prohibe en CODIGO real."""
+    return _DOCSTRING_RE.sub("", _sin_comentarios(texto))
 
 
 def _archivos_fuente() -> list[Path]:
@@ -102,3 +124,18 @@ def test_ningun_modulo_del_camino_de_extraccion_importa_bibliotecas_de_red():
                 "\"documentos nunca salen de la organizacion\")."
             )
             assert importacion not in contenido, mensaje
+
+
+def test_dispatcher_destination_agnostic_nunca_importa_outbox_repo_ni_readpast():
+    for nombre in _MODULOS_DESTINATION_AGNOSTIC:
+        archivo = _SRC / nombre
+        assert archivo.exists(), f"{nombre} no existe en {_SRC} — el escaneo no probaria nada."
+        contenido = _sin_docstrings_ni_comentarios(archivo.read_text(encoding="utf-8")).lower()
+        for termino in _TERMINOS_READPAST_PROHIBIDOS:
+            mensaje = (
+                f"{nombre} menciona '{termino}' fuera de un comentario — la unica frontera "
+                "SQL-Server-especifica del consumidor (READPAST, ADR 0002) vive en "
+                "outbox_repo.py, nunca en el dispatcher destination-agnostic (design.md "
+                "Decision D6; spec.md 'Dispatcher depends only on the interface')."
+            )
+            assert termino not in contenido, mensaje

@@ -40,4 +40,10 @@ public enum CasoConflicto
 
     /// <summary>Comprobante solo-PDF cuya afectación aún no fue confirmada por el usuario.</summary>
     AfectacionNoVerificada,
+
+    /// <summary>outbox-mensajeria (BACKLOG #14, OQ5/ADR 0020 decisión 5) — <c>validar</c> sobre una
+    /// factura <c>DESCARTADA</c> (<see cref="TransicionEstadoFactura.NoTransicionable"/>): terminal,
+    /// 409, revierte la confirmación del asiento. No reutiliza <see cref="AsientoYaConfirmado"/>: ese
+    /// caso es la regla ESPEJO ("la factura ya fue validada"), no esta.</summary>
+    FacturaDescartada,
 }

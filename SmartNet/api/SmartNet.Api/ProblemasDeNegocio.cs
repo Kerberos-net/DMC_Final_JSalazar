@@ -128,6 +128,8 @@ internal static class ProblemasDeNegocio
         CasoConflicto.AsientoYaConfirmado => (Base + "asiento-ya-confirmado", "El asiento ya fue confirmado o anulado"),
         CasoConflicto.AfectacionMixta => (Base + "afectacion-mixta", "El comprobante declara más de un código de afectación"),
         CasoConflicto.AfectacionNoVerificada => (Base + "afectacion-no-verificada", "Afectación tributaria no verificada"),
+        // outbox-mensajeria (BACKLOG #14, OQ5/ADR 0020 decisión 5)
+        CasoConflicto.FacturaDescartada => (Base + "factura-descartada", "Factura descartada"),
         _ => throw new ArgumentOutOfRangeException(nameof(caso)),
     };
 }

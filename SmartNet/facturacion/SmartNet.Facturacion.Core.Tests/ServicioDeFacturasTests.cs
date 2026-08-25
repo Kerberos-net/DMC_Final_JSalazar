@@ -144,16 +144,27 @@ public class ServicioDeFacturasTests
         var resultado = await sut.ValidarAsync(501, FechaCorte, Ahora, usuarioId: 1, CancellationToken.None);
 
         Assert.IsType<ResultadoComando.Aplicado>(resultado);
+        // outbox-mensajeria (BACKLOG #14, design D9/D10) -- extendido: MarcarFacturaValidadaAsync
+        // (D10, state-CAS) + el re-read de PayloadOutbox.ConstruirAsync (D2: CargarFacturaAsync,
+        // CargarAsientoAsync, CargarLineasPersistidasAsync, CargarDocumentosFacturaAsync,
+        // CargarAdjuntosDeFacturaAsync) se insertan entre GuardarAsientoAsync y EmitirOutboxAsync.
         Assert.Equal(
             new[]
             {
                 nameof(IUnidadDeTrabajo.CargarAsientoAsync),
                 nameof(IUnidadDeTrabajo.AsignarCorrelativoAsync),
                 nameof(IUnidadDeTrabajo.GuardarAsientoAsync),
+                nameof(IUnidadDeTrabajo.MarcarFacturaValidadaAsync),
+                nameof(IUnidadDeTrabajo.CargarFacturaAsync),
+                nameof(IUnidadDeTrabajo.CargarAsientoAsync),
+                nameof(IUnidadDeTrabajo.CargarLineasPersistidasAsync),
+                nameof(IUnidadDeTrabajo.CargarDocumentosFacturaAsync),
+                nameof(IUnidadDeTrabajo.CargarAdjuntosDeFacturaAsync),
                 nameof(IUnidadDeTrabajo.EmitirOutboxAsync),
                 nameof(IUnidadDeTrabajo.CommitAsync),
             },
             store.UnidadDeTrabajo.Llamadas);
+        Assert.Equal("FACTURA_VALIDADA", store.UnidadDeTrabajo.EventosOutbox[0].Tipo);
         Assert.Equal("02-2026-08-000007", store.UnidadDeTrabajo.UltimoAsientoGuardado!.NumeroAsiento);
         Assert.Equal(AsientoPersistido.Confirmado, store.UnidadDeTrabajo.UltimoAsientoGuardado!.Estado);
         Assert.True(store.UnidadDeTrabajo.Committed);
@@ -172,5 +183,46 @@ public class ServicioDeFacturasTests
 
         Assert.IsType<ResultadoComando.VersionEnConflicto>(resultado);
         Assert.False(store.UnidadDeTrabajo.Committed);
+    }
+
+    // outbox-mensajeria (BACKLOG #14, tasks.md 2.2/2.3, design D10/OQ5/D1) ---------------------
+
+    [Fact]
+    public async Task ValidarAsync_WhenFacturaIsDescartada_ReturnsConflicto409_RollsBack_NoOutboxEmitted()
+    {
+        var store = new FakeFacturacionStore();
+        store.UnidadDeTrabajo.AsientoACargar = AsientoPersistidoBorrador();
+        store.UnidadDeTrabajo.FacturaACargar = store.UnidadDeTrabajo.FacturaACargar! with { Estado = FacturaPersistida.Descartada };
+        var sut = new ServicioDeFacturas(store);
+
+        var resultado = await sut.ValidarAsync(501, FechaCorte, Ahora, usuarioId: 1, CancellationToken.None);
+
+        var conflicto = Assert.IsType<ResultadoComando.Conflicto>(resultado);
+        Assert.Equal(CasoConflicto.FacturaDescartada, conflicto.Caso);
+        Assert.False(store.UnidadDeTrabajo.Committed);
+        Assert.Empty(store.UnidadDeTrabajo.EventosOutbox);
+        Assert.DoesNotContain(nameof(IUnidadDeTrabajo.EmitirOutboxAsync), store.UnidadDeTrabajo.Llamadas);
+        // el asiento CONFIRMADO nunca se persiste como resultado final -- await using uow rueda
+        // atrás porque CommitAsync nunca se llamó.
+        Assert.Contains(nameof(IUnidadDeTrabajo.MarcarFacturaValidadaAsync), store.UnidadDeTrabajo.Llamadas);
+    }
+
+    [Fact]
+    public async Task ValidarAsync_ReconfirmingAfterReopen_EmitsAsientoCorregido_NotFacturaValidada_NoRollback()
+    {
+        var store = new FakeFacturacionStore();
+        // D1: NumeroAsiento ya presente antes de la escritura de validar -- "reconfirmación tras
+        // reapertura" (ReabrirAsync no lo limpia). D10: la factura ya quedó VALIDADA por la
+        // primera validación -- MarcarFacturaValidadaAsync debe devolver YaValidada, no error.
+        store.UnidadDeTrabajo.AsientoACargar = AsientoPersistidoBorrador() with { NumeroAsiento = "02-2026-08-000001" };
+        store.UnidadDeTrabajo.FacturaACargar = store.UnidadDeTrabajo.FacturaACargar! with { Estado = FacturaPersistida.Validada };
+        var sut = new ServicioDeFacturas(store);
+
+        var resultado = await sut.ValidarAsync(501, FechaCorte, Ahora, usuarioId: 1, CancellationToken.None);
+
+        Assert.IsType<ResultadoComando.Aplicado>(resultado);
+        Assert.True(store.UnidadDeTrabajo.Committed);
+        var evento = Assert.Single(store.UnidadDeTrabajo.EventosOutbox);
+        Assert.Equal("ASIENTO_CORREGIDO", evento.Tipo);
     }
 }

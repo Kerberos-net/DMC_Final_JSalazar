@@ -11,9 +11,9 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | **12 de 18 cerrados** (BACKLOG.md tiene 18 ítems: el #18 "Ajuste visual del diseño SPA" nació al cerrar el sub-cambio visual del #12, 2026-08-24) |
-| Ciclo SDD activo | Ninguno — último cerrado: ítem #13 (Bandeja e incidencias) |
-| Última fase cerrada | Ítem #13 (Bandeja e incidencias), 6 fases, 51/51 tareas cerradas, verify PASS sin CRITICAL/WARNING (2 SUGGESTIONS no bloqueantes), suite completa en verde tras aislar y reconfirmar un fallo transitorio de contención de bases de prueba en `SmartNet.Db.Runner.Tests` — ítem #13 cerrado 2026-08-24 |
+| Ítems del backlog | **13 de 18 cerrados** (BACKLOG.md tiene 18 ítems: el #18 "Ajuste visual del diseño SPA" nació al cerrar el sub-cambio visual del #12, 2026-08-24) |
+| Ciclo SDD activo | Ninguno — último cerrado: ítem #14 (Outbox y mensajería) |
+| Última fase cerrada | Ítem #14 (Outbox y mensajería), 6 fases, 51/51 tareas cerradas, verify PASS sin CRITICAL/WARNING (2 SUGGESTIONS no bloqueantes), 2 bugs de producción reales encontrados y corregidos (permiso `SEQUENCE` en `fact.SeqOutbox`, `SET NOCOUNT ON`) — ítem #14 cerrado 2026-08-25 |
 
 ---
 
@@ -1312,7 +1312,80 @@ un *timer* de reloj — *tradeoff* interina ya aceptada, a reemplazar cuando exi
 
 ---
 
-## ⬜ Ítems 10, 14 a 18 — sin ciclo SDD abierto
+## ✅ 14. Outbox y mensajería
+
+`OutboxEvent`/`OutboxEventIntegracion`/`CommandQueue`/`InboxEvent` ya existían desde el ítem #1
+(ADR 0004), pero solo 2 de los 5 eventos del catálogo se emitían y ningún consumidor leía la cola.
+El diseño amplió el alcance dos veces sobre la propuesta inicial, con decisión explícita del dueño
+del proyecto en cada punto: (1) corregir el payload de los 2 eventos ya emitidos para que sean
+snapshots autosuficientes como los 3 nuevos, en vez de dejarlo como deuda; (2) cerrar el gap del
+ítem #11 donde nada ponía `fact.Factura.Estado = 'VALIDADA'` en producción, dejando 3 guardas
+dormidas (`DOCUMENTACION_ACTUALIZADA`, `FACTURA_CORREGIDA`, `DescartarAsync`) que nunca se activaban.
+Depende del ítem #11 (completo). #15 (Drive) y #16 (Sheets) quedan explícitamente fuera de alcance —
+es infraestructura sin efecto visible por sí sola.
+
+**Entrega:** un solo PR (`size:exception`), aceptado explícitamente por el dueño del proyecto en 3
+rondas distintas conforme el alcance real creció muy por encima del pronóstico inicial de
+`sdd-tasks` (750-950 líneas estimadas → ~1.700+ líneas reales).
+
+**Ciclo SDD:** `openspec/changes/archive/2026-08-25-outbox-mensajeria/` · **51 de 51 tareas cerradas** — ✅ **CERRADO 2026-08-25**
+
+| Fase | Alcance | Tareas | Estado |
+|---|---|---|---|
+| 1 | Core Foundation — `PayloadOutbox`, `IUnidadDeTrabajo.MarcarFacturaValidadaAsync`, `CasoConflicto.FacturaDescartada` | 6/6 | ✅ |
+| 2 | Productor .NET — 4 puntos de emisión (`ASIENTO_CORREGIDO`, `ASIENTO_ANULADO`, `FACTURA_CORREGIDA` ×2), retrofit de los 2 eventos existentes, guarda por-transacción contra doble emisión | 8/8 | ✅ |
+| 3 | Infraestructura — fan-out a `OutboxEventIntegracion` (mapa DRIVE/SHEETS), test de estado-CAS real, aserción 412 por ETag obsoleto | 3/3 | ✅ |
+| 4 | Consumidor Python — reclamo de lote `READPAST` tras interfaz, guarda de obsolescencia, lease 5min, cadencia 1min | 6/6 | ✅ |
+| 5 | Tests de contrato bidireccional (ADR 0019 N2) — matriz de permisos `usr_api`/`usr_worker` contra esquema real | 6/6 | ✅ |
+| 6 | Regresión (#7/#11 sin cambios) + nota de release | 3/3 | ✅ |
+
+Pronóstico de revisión: alto riesgo de presupuesto de 800 líneas (750-950 estimadas por `sdd-tasks`);
+el dueño del proyecto eligió explícitamente **un solo PR** con `size:exception`. El acumulado real
+terminó duplicando la estimación (~1.700+ líneas) al cerrar el gap del ítem #11 dentro del propio
+#14; reafirmado por el dueño del proyecto al superarse la estimación original. Detalle completo en
+`tasks.md`.
+
+### Pruebas
+
+Verificación independiente de `sdd-verify`, corriendo cada suite por separado contra SQL Server real:
+
+| Suite | Resultado | Nota |
+|---|---|---|
+| `SmartNet.Facturacion.Core.Tests` | 88/88 | Incluye `PayloadOutboxTests`, casos `NoTransicionable`/`YaValidada` |
+| `SmartNet.Facturacion.Infrastructure.Tests` | 46/46 | Fan-out a `OutboxEventIntegracion`, guarda por-transacción, contra esquema real |
+| `SmartNet.Inbox.Core.Tests` / `SmartNet.Inbox.Infrastructure.Tests` | 49/49 / 41/41 | Sin regresión del ítem #7 |
+| `SmartNet.Api.Tests` | 143/143 | Incluye los 2 cambios de comportamiento visibles |
+| `SmartNet.Db.Runner.Tests` (`PermissionMatrixTests`) | 27/27 | Confirmado sin tocar por #14 |
+| Worker `pytest tests/unit` | 210/210 | Consumidor Python |
+| Worker `pytest tests/integration -m integracion` | 19/19 (1 no aplicable) | `READPAST` concurrente, lease, ronda bidireccional contra SQL Server real |
+
+### Lo verificado al cerrar
+
+**Dos bugs de producción reales encontrados por los tests de contrato bidireccional (ADR 0019 N2),
+no supuestos.** (1) SQL Server exige permiso `UPDATE` sobre el objeto `SEQUENCE` (no la tabla) para
+`NEXT VALUE FOR`; `008_usuarios_y_permisos.sql` nunca se lo otorgó a `fact_api`, así que el INSERT
+real de `SqlUnidadDeTrabajo.EmitirOutboxAsync` habría fallado (error 229) en producción bajo el login
+`usr_api` real — corregido con la migración nueva `019_permiso_secuencia_seqoutbox.sql` (nunca se
+edita `008` en sitio, ADR 0016) + su rollback. (2) Faltaba `SET NOCOUNT ON` en el *batch* de 3
+sentencias de `outbox_repo.reclamar`, que `pyodbc` real interpretaba como "No results." — los tests
+unitarios con cursor falso nunca lo habrían reproducido. Ambos bugs solo se hicieron visibles porque
+la Fase 5 fue la primera vez que el ítem #14 conectó como el login `usr_api` real en vez de una
+conexión de confianza/sysadmin.
+
+**Dos cambios de comportamiento visibles en endpoints existentes**, documentados en
+`RELEASE-NOTES.md`: `POST /descartar` sobre una factura `VALIDADA` ahora devuelve 409 (guarda
+dormida de ADR 0008 que despierta al cerrarse el gap del ítem #11); `POST /validar` sobre una
+factura `DESCARTADA` ahora devuelve 409 y revierte (`NoTransicionable`, decisión explícita del dueño
+del proyecto).
+
+`sdd-verify`: 0 CRITICAL, 0 WARNING, 2 SUGGESTIONS no bloqueantes (interacción con
+`gentle-ai sdd-attempt` omitida — RDD desactivado a nivel de repo; Open Questions 6/7 del diseño
+quedan deliberadamente diferidas fuera de alcance del #14 — reversión de `Estado` en
+`ReabrirAsync`/`AnularAsync` y *backfill* histórico, ninguna bloqueante).
+
+---
+
+## ⬜ Ítems 10, 15 a 18 — sin ciclo SDD abierto
 
 Las fases de cada ítem **se definen cuando arranca su ciclo SDD**, no antes. Ponerlas aquí ahora
 sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ítem, y ninguno existe.
@@ -1320,7 +1393,6 @@ sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ít
 | # | Ítem | Depende de | Contexto obligatorio | Estado |
 |---|---|---|---|---|
 | 10 | Notas de crédito | #8 | ⚠ `REGLAS.md` §5, §7 | ⬜ |
-| 14 | Outbox y mensajería | #11 | — | ⬜ |
 | 15 | Publicación a Drive | #14 | — | ⬜ |
 | 16 | Publicación a Sheets | #14 | — | ⬜ |
 | 17 | Errores, notificaciones y operación | #14 | — | ⬜ |

@@ -260,6 +260,8 @@ public class ServicioDeFacturasPhase2Tests
             100, new DateOnly(2026, 8, 1), Ahora, usuarioId: 1, CancellationToken.None);
 
         Assert.IsType<ResultadoComando.Aplicado>(resultado);
+        // outbox-mensajeria (BACKLOG #14, design D9/D10) -- misma extensión de ValidarInternoAsync
+        // que ValidarAsync_..._CommitsInOrder (ServicioDeFacturasTests.cs).
         Assert.Equal(
             new[]
             {
@@ -267,6 +269,12 @@ public class ServicioDeFacturasPhase2Tests
                 nameof(IUnidadDeTrabajo.CargarAsientoAsync),
                 nameof(IUnidadDeTrabajo.AsignarCorrelativoAsync),
                 nameof(IUnidadDeTrabajo.GuardarAsientoAsync),
+                nameof(IUnidadDeTrabajo.MarcarFacturaValidadaAsync),
+                nameof(IUnidadDeTrabajo.CargarFacturaAsync),
+                nameof(IUnidadDeTrabajo.CargarAsientoAsync),
+                nameof(IUnidadDeTrabajo.CargarLineasPersistidasAsync),
+                nameof(IUnidadDeTrabajo.CargarDocumentosFacturaAsync),
+                nameof(IUnidadDeTrabajo.CargarAdjuntosDeFacturaAsync),
                 nameof(IUnidadDeTrabajo.EmitirOutboxAsync),
                 nameof(IUnidadDeTrabajo.CommitAsync),
             },
@@ -338,7 +346,10 @@ public class ServicioDeFacturasPhase2Tests
     public async Task ConfirmarAfectacionAsync_WhenApplied_WritesConfirmacionAfectacionAudit_AndCommits()
     {
         var store = new FakeFacturacionStore();
-        store.UnidadDeTrabajo.FacturaACargar = FacturaPendiente();
+        // outbox-mensajeria (BACKLOG #14, design D8): FACTURA_CORREGIDA requiere factura VALIDADA
+        // (spec.md "on any accepted update to a validated invoice") -- extendido desde
+        // FacturaPendiente() para ejercer el emission gate junto con el cambio de AfectacionMixta.
+        store.UnidadDeTrabajo.FacturaACargar = FacturaPendiente() with { Estado = FacturaPersistida.Validada };
         var sut = new ServicioDeFacturas(store);
 
         var resultado = await sut.ConfirmarAfectacionAsync(100, VersionInicial, esMixta: true, usuarioId: 7, Ahora, CancellationToken.None);
@@ -351,12 +362,24 @@ public class ServicioDeFacturasPhase2Tests
         Assert.Equal("True", entrada.ValorNuevo);
         Assert.Equal(7, entrada.UsuarioId);
         Assert.True(store.UnidadDeTrabajo.Committed);
+        var evento = Assert.Single(store.UnidadDeTrabajo.EventosOutbox);
+        Assert.Equal("FACTURA_CORREGIDA", evento.Tipo);
+        Assert.Equal(100, evento.FacturaId);
+        // outbox-mensajeria (BACKLOG #14, design D9) -- +4 reads del re-read de PayloadOutbox
+        // (D2: CargarFacturaAsync, ObtenerAsientoVigenteIdAsync, CargarDocumentosFacturaAsync,
+        // CargarAdjuntosDeFacturaAsync -- AsientoVigenteId es null por defecto, así que
+        // CargarAsientoAsync/CargarLineasPersistidasAsync no corren) + EmitirOutboxAsync.
         Assert.Equal(
             new[]
             {
                 nameof(IUnidadDeTrabajo.CargarFacturaAsync),
                 "ConfirmarAfectacionAsync",
                 nameof(IUnidadDeTrabajo.RegistrarAuditoriaAsync),
+                nameof(IUnidadDeTrabajo.CargarFacturaAsync),
+                nameof(IUnidadDeTrabajo.ObtenerAsientoVigenteIdAsync),
+                nameof(IUnidadDeTrabajo.CargarDocumentosFacturaAsync),
+                nameof(IUnidadDeTrabajo.CargarAdjuntosDeFacturaAsync),
+                nameof(IUnidadDeTrabajo.EmitirOutboxAsync),
                 nameof(IUnidadDeTrabajo.CommitAsync),
             },
             store.UnidadDeTrabajo.Llamadas);
@@ -392,6 +415,77 @@ public class ServicioDeFacturasPhase2Tests
         Assert.IsType<ResultadoComando.Aplicado>(resultado);
         var evento = Assert.Single(store.UnidadDeTrabajo.EventosOutbox);
         Assert.Equal("DOCUMENTACION_ACTUALIZADA", evento.Tipo);
+    }
+
+    // outbox-mensajeria (BACKLOG #14, tasks.md 2.7) -- "production-shaped guard test": Estado
+    // nunca se fija a mano, se produce por una validación real (ValidarAsync -> D10
+    // MarcarFacturaValidadaAsync) sobre el MISMO fake store (FakeFacturacionStore.AbrirAsync
+    // siempre devuelve la misma FakeUnidadDeTrabajo), tal como en producción una factura ya
+    // VALIDADA persiste su Estado entre transacciones.
+    [Fact]
+    public async Task RegistrarAdjuntoAsync_AfterARealValidarAsync_EmitsDocumentacionActualizada_NoHandSetEstado()
+    {
+        var store = new FakeFacturacionStore();
+        store.UnidadDeTrabajo.AsientoACargar = new AsientoPersistido(
+            AsientoContableId: 501,
+            FacturaId: 100,
+            Estado: AsientoPersistido.Borrador,
+            NumeroAsiento: null,
+            Version: VersionInicial,
+            Asiento: new AsientoContable(
+                ProveedorCodigo: "P00123", FechaContable: new DateOnly(2026, 8, 10),
+                MotivoDescripcion: "Compra", TipoCambioVenta: null, BasePEN: 100m, IgvPEN: 18m,
+                NetoPEN: 118m, AfectacionCongelada: Afectacion.Gravada, Comprobante: TipoComprobante.Factura,
+                Lineas: new[]
+                {
+                    new LineaAsiento(1, Bloque.Principal, TipoLinea.D, 100m, 0m, "639915", null, null, null),
+                    new LineaAsiento(2, Bloque.Principal, TipoLinea.D, 18m, 0m, "401111", null, null, null),
+                    new LineaAsiento(3, Bloque.Principal, TipoLinea.H, 0m, 118m, "421001", null, null, null),
+                }),
+            Hechos: HechosDeConflicto.Ninguno);
+        var sut = new ServicioDeFacturas(store);
+
+        var resultadoValidar = await sut.ValidarAsync(501, new DateOnly(2026, 8, 1), Ahora, usuarioId: 1, CancellationToken.None);
+        Assert.IsType<ResultadoComando.Aplicado>(resultadoValidar);
+
+        var adjunto = new AdjuntoManual(0, 100, "f.pdf", "/f.pdf", "application/pdf", 10, 1, Ahora, null);
+        var resultadoAdjunto = await sut.RegistrarAdjuntoAsync(100, adjunto, CancellationToken.None);
+
+        Assert.IsType<ResultadoComando.Aplicado>(resultadoAdjunto);
+        Assert.Contains(store.UnidadDeTrabajo.EventosOutbox, e => e.Tipo == "DOCUMENTACION_ACTUALIZADA");
+    }
+
+    [Fact]
+    public async Task PatchAsync_AfterARealValidarAsync_EmitsFacturaCorregida_NoHandSetEstado()
+    {
+        var store = new FakeFacturacionStore();
+        store.UnidadDeTrabajo.AsientoACargar = new AsientoPersistido(
+            AsientoContableId: 501,
+            FacturaId: 100,
+            Estado: AsientoPersistido.Borrador,
+            NumeroAsiento: null,
+            Version: VersionInicial,
+            Asiento: new AsientoContable(
+                ProveedorCodigo: "P00123", FechaContable: new DateOnly(2026, 8, 10),
+                MotivoDescripcion: "Compra", TipoCambioVenta: null, BasePEN: 100m, IgvPEN: 18m,
+                NetoPEN: 118m, AfectacionCongelada: Afectacion.Gravada, Comprobante: TipoComprobante.Factura,
+                Lineas: new[]
+                {
+                    new LineaAsiento(1, Bloque.Principal, TipoLinea.D, 100m, 0m, "639915", null, null, null),
+                    new LineaAsiento(2, Bloque.Principal, TipoLinea.D, 18m, 0m, "401111", null, null, null),
+                    new LineaAsiento(3, Bloque.Principal, TipoLinea.H, 0m, 118m, "421001", null, null, null),
+                }),
+            Hechos: HechosDeConflicto.Ninguno);
+        var sut = new ServicioDeFacturas(store);
+
+        var resultadoValidar = await sut.ValidarAsync(501, new DateOnly(2026, 8, 1), Ahora, usuarioId: 1, CancellationToken.None);
+        Assert.IsType<ResultadoComando.Aplicado>(resultadoValidar);
+
+        var resultadoPatch = await sut.PatchAsync(
+            100, VersionInicial, new CorreccionFactura(RucProveedor: "20999999999"), usuarioId: 1, Ahora, CancellationToken.None);
+
+        Assert.IsType<ResultadoComando.Aplicado>(resultadoPatch);
+        Assert.Contains(store.UnidadDeTrabajo.EventosOutbox, e => e.Tipo == "FACTURA_CORREGIDA");
     }
 
     [Fact]

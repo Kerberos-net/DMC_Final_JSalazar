@@ -146,6 +146,14 @@ public class ServicioDeAsientosTests
         var auditoria = Assert.Single(store.UnidadDeTrabajo.AuditoriasRegistradas);
         Assert.Equal(EntradaAuditoria.Acciones.Anulacion, auditoria.Accion);
         Assert.True(store.UnidadDeTrabajo.Committed);
+
+        // outbox-mensajeria (BACKLOG #14, design D1/D2) -- ASIENTO_ANULADO, asientoId explícito
+        // (ObtenerAsientoVigenteIdAsync excluye ANULADO -- resolver "vigente" tras anular no lo
+        // encontraría).
+        var evento = Assert.Single(store.UnidadDeTrabajo.EventosOutbox);
+        Assert.Equal("ASIENTO_ANULADO", evento.Tipo);
+        Assert.Equal(100, evento.FacturaId);
+        Assert.DoesNotContain(nameof(IUnidadDeTrabajo.ObtenerAsientoVigenteIdAsync), store.UnidadDeTrabajo.Llamadas);
     }
 
     [Fact]
@@ -160,6 +168,7 @@ public class ServicioDeAsientosTests
         var conflicto = Assert.IsType<ResultadoComando.Conflicto>(resultado);
         Assert.Equal(CasoConflicto.AsientoYaConfirmado, conflicto.Caso);
         Assert.False(store.UnidadDeTrabajo.Committed);
+        Assert.Empty(store.UnidadDeTrabajo.EventosOutbox);
     }
 
     // -----------------------------------------------------------------------------------------

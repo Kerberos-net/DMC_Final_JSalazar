@@ -31,6 +31,11 @@ Variables de entorno:
                                             autenticacion integrada de Windows en ambos dialectos)
   SMARTNET_WORKER_TEST_LOGIN_PASSWORD   -- password del LOGIN efimero `usr_worker` (por defecto,
                                             una constante de prueba — nunca usar en un entorno real)
+  SMARTNET_API_TEST_LOGIN_PASSWORD      -- password del LOGIN efimero `usr_api` (BACKLOG #14,
+                                            Fase 5, tasks.md 5.2 — ADR 0019 nivel 2 bidireccional:
+                                            los tests de contrato de outbox necesitan insertar como
+                                            `usr_api` real, no solo leer como `usr_worker`; por
+                                            defecto, la misma constante de prueba que `usr_worker`)
 
 Si SQL Server o `dotnet` no estan disponibles, el fixture hace `pytest.skip(...)` con un mensaje
 explicito. Nunca se marca una prueba como pasada sin haber corrido contra una base real.
@@ -52,6 +57,14 @@ _RUNNER_PROJECT = _REPO_ROOT / "SmartNet" / "db" / "runner" / "SmartNet.Db.Runne
 _SQL_HOST = os.environ.get("SMARTNET_TEST_SQL_HOST", "localhost")
 _LOGIN_NAME = "usr_worker"
 _LOGIN_PASSWORD = os.environ.get("SMARTNET_WORKER_TEST_LOGIN_PASSWORD", "SoloParaPruebas_2026!")
+
+# BACKLOG #14, Fase 5 (tasks.md 5.2): LOGIN real, mismo mecanismo que _LOGIN_NAME/_LOGIN_PASSWORD
+# de arriba -- ya NO se crea como `WITHOUT LOGIN` (ver worker_db abajo), porque los tests de
+# contrato bidireccional (5.3-5.6) necesitan insertar fact.OutboxEvent/OutboxEventIntegracion como
+# usr_api real, ejerciendo el GRANT/DENY real de 008_usuarios_y_permisos.sql, no solo simular el
+# principal para satisfacer la guarda del script.
+_API_LOGIN_NAME = "usr_api"
+_API_LOGIN_PASSWORD = os.environ.get("SMARTNET_API_TEST_LOGIN_PASSWORD", "SoloParaPruebas_2026!")
 
 # Los cuatro catalogos externos dbo.* que 008_usuarios_y_permisos.sql (GRANT SELECT) y
 # 010_motivo_atributo_demo.sql (INSERT ... SELECT ... FROM dbo.Motivo) necesitan que existan como
@@ -137,6 +150,15 @@ def _odbc_worker_connection_string(db_name: str) -> str:
     )
 
 
+def _odbc_api_connection_string(db_name: str) -> str:
+    # BACKLOG #14, Fase 5 (tasks.md 5.2) -- mismo dialecto que _odbc_worker_connection_string,
+    # distinto UID/PWD: usr_api es ahora un LOGIN de instancia real, no un usuario WITHOUT LOGIN.
+    return (
+        f"DRIVER={{ODBC Driver 18 for SQL Server}};SERVER={_SQL_HOST};DATABASE={db_name};"
+        f"UID={_API_LOGIN_NAME};PWD={_API_LOGIN_PASSWORD};TrustServerCertificate=yes;Encrypt=no;"
+    )
+
+
 def _odbc_admin_connection_string(db_name: str) -> str:
     return (
         f"DRIVER={{ODBC Driver 18 for SQL Server}};SERVER={_SQL_HOST};DATABASE={db_name};"
@@ -171,13 +193,17 @@ def worker_db():
             f"CREATE LOGIN [{_LOGIN_NAME}] WITH PASSWORD = '{_LOGIN_PASSWORD}';"
         )
 
-        # usr_api no se usa desde estas pruebas, pero 008 exige que exista algun principal (login
-        # o usuario WITHOUT LOGIN) antes de migrar — mismo patron que
-        # TestDatabaseFixture.CreateWithoutLoginUserAsync() del lado .NET, sin login de instancia.
+        # BACKLOG #14, Fase 5 (tasks.md 5.2): usr_api es ahora un LOGIN de instancia real, mismo
+        # mecanismo que usr_worker arriba -- ya NO `CREATE USER ... WITHOUT LOGIN`. 008's propia
+        # guarda (`DATABASE_PRINCIPAL_ID('usr_api') IS NULL AND SUSER_ID('usr_api') IS NULL ->
+        # THROW`) pasa porque SUSER_ID ya no es NULL, y 008 crea el USER FOR LOGIN por su cuenta
+        # (create-if-absent, el mismo camino que usa un despliegue real).
+        master_conn.execute(
+            f"IF SUSER_ID('{_API_LOGIN_NAME}') IS NULL "
+            f"CREATE LOGIN [{_API_LOGIN_NAME}] WITH PASSWORD = '{_API_LOGIN_PASSWORD}';"
+        )
+
         with pyodbc.connect(_odbc_admin_connection_string(db_name), autocommit=True) as db_conn:
-            db_conn.execute(
-                "IF DATABASE_PRINCIPAL_ID('usr_api') IS NULL CREATE USER [usr_api] WITHOUT LOGIN;"
-            )
             db_conn.execute(_CREATE_EXTERNAL_DBO_CATALOGS_SQL)
             db_conn.execute(_SEED_DBO_MOTIVO_FIXTURE_SQL)
 
@@ -215,6 +241,7 @@ def worker_db():
             "master_connection": master_conn,
             "db_name": db_name,
             "worker_connection_string": _odbc_worker_connection_string(db_name),
+            "api_connection_string": _odbc_api_connection_string(db_name),
         }
     finally:
         try:
@@ -228,6 +255,12 @@ def worker_db():
         try:
             master_conn.execute(
                 f"IF SUSER_ID('{_LOGIN_NAME}') IS NOT NULL DROP LOGIN [{_LOGIN_NAME}];"
+            )
+        except pyodbc.Error:
+            pass
+        try:
+            master_conn.execute(
+                f"IF SUSER_ID('{_API_LOGIN_NAME}') IS NOT NULL DROP LOGIN [{_API_LOGIN_NAME}];"
             )
         except pyodbc.Error:
             pass

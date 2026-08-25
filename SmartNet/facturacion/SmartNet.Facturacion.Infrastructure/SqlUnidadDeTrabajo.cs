@@ -38,6 +38,12 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
     private bool _committed;
     private bool _disposed;
 
+    // outbox-mensajeria (BACKLOG #14, design D8) -- a lo sumo un evento por (Tipo, FacturaId) por
+    // transacción; mirror de FakeUnidadDeTrabajo.EmitirOutboxAsync (Core.Tests). Fail-loud dentro
+    // de la transacción en curso -- el "await using" del caller ya deshace todo, así que este throw
+    // nunca deja una fila a medio escribir.
+    private readonly HashSet<(string Tipo, long FacturaId)> _emitidosEnEstaTx = new();
+
     internal SqlUnidadDeTrabajo(SqlConnection connection, SqlTransaction transaction, ITipoCambioRepository tipoCambioRepository)
     {
         _connection = connection;
@@ -218,17 +224,64 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
         await command.ExecuteNonQueryAsync(ct);
     }
 
+    // outbox-mensajeria (BACKLOG #14, design D3) -- mapa de aplicabilidad Tipo -> destinos,
+    // fuente ADR 0004: "Solo sincroniza Drive: los adjuntos no son un dato del dashboard" (:59-60)
+    // y "un evento que no aplica a un destino -DOCUMENTACION_ACTUALIZADA no toca Sheets- se marca
+    // aplicado sin avanzar la secuencia de ese destino" (:177-178). TELEGRAM/CORREO (CK_...Integracion)
+    // son canales de notificación de errores (#17, BACKLOG), no destinos sincronizados por FacturaId
+    // (ADR 0004 "Clave de sincronización con los destinos externos" solo lista Sheets y Drive) -- este
+    // fan-out no escribe filas para ellos; #17 tiene su propio punto de emisión, fuera de #14.
+    // Vive en Infrastructure, no en Core: D3 rechaza explícitamente un mapa en Core porque
+    // "fact_worker" no tiene INSERT en esta tabla y el mapa filtraría conocimiento de destinos hacia
+    // el núcleo contable.
+    private static readonly IReadOnlyDictionary<string, IReadOnlyList<string>> DestinosAplicables =
+        new Dictionary<string, IReadOnlyList<string>>
+        {
+            ["FACTURA_VALIDADA"] = new[] { "DRIVE", "SHEETS" },
+            ["FACTURA_CORREGIDA"] = new[] { "DRIVE", "SHEETS" },
+            ["ASIENTO_CORREGIDO"] = new[] { "DRIVE", "SHEETS" },
+            ["ASIENTO_ANULADO"] = new[] { "DRIVE", "SHEETS" },
+            ["DOCUMENTACION_ACTUALIZADA"] = new[] { "DRIVE" },
+        };
+
     public async Task EmitirOutboxAsync(string tipo, long facturaId, string payload, CancellationToken ct)
     {
+        if (!_emitidosEnEstaTx.Add((tipo, facturaId)))
+        {
+            throw new InvalidOperationException(
+                $"Ya se emitió un evento '{tipo}' para la factura {facturaId} en esta transacción.");
+        }
+
+        if (!DestinosAplicables.TryGetValue(tipo, out var destinos))
+        {
+            // Fail-loud: un Tipo sin entrada en el mapa es un evento nuevo que design D3 no
+            // clasificó todavía -- mejor romper la transacción (rollback) que emitirlo sin fan-out.
+            throw new InvalidOperationException(
+                $"Tipo de evento '{tipo}' no tiene destinos aplicables definidos en el mapa D3.");
+        }
+
         await using var command = CrearComando(
             """
             INSERT INTO fact.OutboxEvent (Tipo, FacturaId, Payload, Secuencia)
+            OUTPUT inserted.OutboxEventId
             VALUES (@tipo, @facturaId, @payload, NEXT VALUE FOR fact.SeqOutbox);
             """);
         command.Parameters.AddWithValue("@tipo", tipo);
         command.Parameters.AddWithValue("@facturaId", facturaId);
         command.Parameters.AddWithValue("@payload", payload);
-        await command.ExecuteNonQueryAsync(ct);
+        var outboxEventId = (long)(await command.ExecuteScalarAsync(ct))!;
+
+        foreach (var destino in destinos)
+        {
+            await using var fanOut = CrearComando(
+                """
+                INSERT INTO fact.OutboxEventIntegracion (OutboxEventId, Integracion)
+                VALUES (@outboxEventId, @integracion);
+                """);
+            fanOut.Parameters.AddWithValue("@outboxEventId", outboxEventId);
+            fanOut.Parameters.AddWithValue("@integracion", destino);
+            await fanOut.ExecuteNonQueryAsync(ct);
+        }
     }
 
     /// <summary>PR 5 -- delega en el <see cref="ITipoCambioRepository"/> ya existente (item #3/#11);
@@ -369,6 +422,43 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
         var existe = (int)(await verificacion.ExecuteScalarAsync(ct))! > 0;
 
         return existe ? ResultadoEscritura.VersionEnConflicto : ResultadoEscritura.NoEncontrado;
+    }
+
+    // --- outbox-mensajeria (BACKLOG #14, design D10 / ADR 0020 decisión 5) addition ---
+    //
+    // DEVIACIÓN DOCUMENTADA (apply batch 1 / Phase 1): esta implementación se adelanta desde
+    // tasks.md 3.1 -- SIN su prueba de integración de esquema real dedicada todavía (esa prueba
+    // exige SQL Server real y vive en Phase 3 de este mismo cambio). Se implementa aquí, ahora,
+    // porque extender IUnidadDeTrabajo (task 1.4) es un cambio de interfaz que rompe la compilación
+    // de SqlUnidadDeTrabajo en TODO el resto de la solución -- dejarlo sin cuerpo bloquearía cada
+    // prueba de cada otro ítem, no solo las de #14. El SQL es literal, verbatim de design D10; la
+    // prueba de integración de Phase 3 (SqlUnidadDeTrabajoFacturaTests.cs) la ejercita contra
+    // esquema real cuando ese lote corra.
+
+    public async Task<TransicionEstadoFactura> MarcarFacturaValidadaAsync(long facturaId, CancellationToken ct)
+    {
+        await using var command = CrearComando(
+            """
+            UPDATE fact.Factura SET Estado = 'VALIDADA'
+            WHERE FacturaId = @id AND Estado = 'PENDIENTE_VALIDACION';
+            """);
+        command.Parameters.AddWithValue("@id", facturaId);
+
+        var filasAfectadas = await command.ExecuteNonQueryAsync(ct);
+        if (filasAfectadas > 0)
+        {
+            return TransicionEstadoFactura.Aplicada;
+        }
+
+        // @@ROWCOUNT = 0 -- design D10: re-SELECT para distinguir "ya VALIDADA" (reconfirmación
+        // tras reabrir, D1) de cualquier otro estado (hoy: DESCARTADA), que es terminal (OQ5).
+        await using var verificacion = CrearComando("SELECT Estado FROM fact.Factura WHERE FacturaId = @id;");
+        verificacion.Parameters.AddWithValue("@id", facturaId);
+        var estadoActual = (string?)await verificacion.ExecuteScalarAsync(ct);
+
+        return estadoActual?.TrimEnd() == FacturaPersistida.Validada
+            ? TransicionEstadoFactura.YaValidada
+            : TransicionEstadoFactura.NoTransicionable;
     }
 
     public async Task<long?> ObtenerAsientoVigenteIdAsync(long facturaId, CancellationToken ct)

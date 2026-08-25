@@ -25,6 +25,14 @@ public sealed class ServicioDeFacturas
     // DOCUMENTACION_ACTUALIZADA. "validar" es, desde la tabla de contrato, un FACTURA_VALIDADA.
     private const string TipoEventoFacturaValidada = "FACTURA_VALIDADA";
 
+    // outbox-mensajeria (BACKLOG #14, design D1) -- reconfirmación de un asiento reabierto (D1:
+    // persistido.NumeroAsiento ya existe antes de la escritura de validar).
+    private const string TipoEventoAsientoCorregido = "ASIENTO_CORREGIDO";
+
+    // outbox-mensajeria (BACKLOG #14, design D8) -- PatchAsync y ConfirmarAfectacionAsync, a lo
+    // sumo un evento por transacción cada uno (nunca ambos a la vez -- dos rutas, dos transacciones).
+    private const string TipoEventoFacturaCorregida = "FACTURA_CORREGIDA";
+
     private readonly IFacturacionStore _store;
 
     public ServicioDeFacturas(IFacturacionStore store) => _store = store;
@@ -93,6 +101,11 @@ public sealed class ServicioDeFacturas
             return new ResultadoComando.InvariantesIncumplidas(incumplidas.Fallos);
         }
 
+        // design D1 -- calculado ANTES de sobrescribir NumeroAsiento: un NumeroAsiento ya presente
+        // en este punto es, por construcción, "reconfirmado tras reapertura" (ReabrirAsync es la
+        // única ruta de vuelta a BORRADOR y no lo limpia).
+        var esReconfirmacion = persistido.NumeroAsiento is not null;
+
         var fechaContable = persistido.Asiento.FechaContable;
         var correlativo = await uow.AsignarCorrelativoAsync(
             (short)fechaContable.Year, (byte)fechaContable.Month, OrigenLibro, ct);
@@ -107,7 +120,20 @@ public sealed class ServicioDeFacturas
             return resultadoEscritura;
         }
 
-        await uow.EmitirOutboxAsync(TipoEventoFacturaValidada, persistido.FacturaId, numeroAsiento, ct);
+        // design D10/OQ5 -- state-CAS de fact.Factura.Estado. NoTransicionable (hoy: DESCARTADA) es
+        // terminal: 409 y rollback -- el "await using var uow" del caller ya deshace todo porque
+        // nunca se llega a CommitAsync (ni el asiento CONFIRMADO ni el FACTURA_VALIDADA quedan).
+        var transicion = await uow.MarcarFacturaValidadaAsync(persistido.FacturaId, ct);
+        if (transicion == TransicionEstadoFactura.NoTransicionable)
+        {
+            return new ResultadoComando.Conflicto(
+                CasoConflicto.FacturaDescartada, DescribirCaso(CasoConflicto.FacturaDescartada));
+        }
+
+        // design D1 -- reconfirmación tras reabrir emite ASIENTO_CORREGIDO, no FACTURA_VALIDADA.
+        var tipoEvento = esReconfirmacion ? TipoEventoAsientoCorregido : TipoEventoFacturaValidada;
+        var payload = await PayloadOutbox.ConstruirAsync(uow, tipoEvento, persistido.FacturaId, asientoId, ct);
+        await uow.EmitirOutboxAsync(tipoEvento, persistido.FacturaId, payload, ct);
         await uow.CommitAsync(ct);
         return new ResultadoComando.Aplicado();
     }
@@ -165,6 +191,7 @@ public sealed class ServicioDeFacturas
         CasoConflicto.AsientoYaConfirmado => "El asiento ya fue confirmado o anulado.",
         CasoConflicto.AfectacionMixta => "El comprobante declara más de un código de afectación.",
         CasoConflicto.AfectacionNoVerificada => "La afectación tributaria aún no fue confirmada.",
+        CasoConflicto.FacturaDescartada => "La factura fue descartada; no puede validarse.",
         _ => throw new ArgumentOutOfRangeException(nameof(caso)),
     };
 
@@ -214,6 +241,15 @@ public sealed class ServicioDeFacturas
         foreach (var entrada in entradas)
         {
             await uow.RegistrarAuditoriaAsync(entrada, ct);
+        }
+
+        // outbox-mensajeria (BACKLOG #14, design D8) -- FACTURA_CORREGIDA iff algo cambió de verdad
+        // (entradas.Count > 0 -- Auditar ya descarta reenvíos del mismo valor) y la factura ya está
+        // VALIDADA (spec.md: "update to a non-validated invoice emits no FACTURA_CORREGIDA").
+        if (entradas.Count > 0 && persistida.Estado == FacturaPersistida.Validada)
+        {
+            var payload = await PayloadOutbox.ConstruirAsync(uow, TipoEventoFacturaCorregida, facturaId, null, ct);
+            await uow.EmitirOutboxAsync(TipoEventoFacturaCorregida, facturaId, payload, ct);
         }
 
         await uow.CommitAsync(ct);
@@ -326,7 +362,10 @@ public sealed class ServicioDeFacturas
 
         if (factura.Estado == FacturaPersistida.Validada)
         {
-            await uow.EmitirOutboxAsync(TipoEventoDocumentacionActualizada, facturaId, adjunto.NombreArchivo, ct);
+            // outbox-mensajeria (BACKLOG #14, design D2) -- retrofit: sobre completo vía
+            // PayloadOutbox en vez del escalar suelto NombreArchivo.
+            var payload = await PayloadOutbox.ConstruirAsync(uow, TipoEventoDocumentacionActualizada, facturaId, null, ct);
+            await uow.EmitirOutboxAsync(TipoEventoDocumentacionActualizada, facturaId, payload, ct);
         }
 
         await uow.CommitAsync(ct);
@@ -365,7 +404,10 @@ public sealed class ServicioDeFacturas
 
         if (factura.Estado == FacturaPersistida.Validada)
         {
-            await uow.EmitirOutboxAsync(TipoEventoDocumentacionActualizada, facturaId, adjuntoManualId.ToString(), ct);
+            // outbox-mensajeria (BACKLOG #14, design D2) -- retrofit: sobre completo vía
+            // PayloadOutbox en vez del escalar suelto adjuntoId.ToString().
+            var payload = await PayloadOutbox.ConstruirAsync(uow, TipoEventoDocumentacionActualizada, facturaId, null, ct);
+            await uow.EmitirOutboxAsync(TipoEventoDocumentacionActualizada, facturaId, payload, ct);
         }
 
         await uow.CommitAsync(ct);
@@ -405,6 +447,15 @@ public sealed class ServicioDeFacturas
                 Campo: nameof(FacturaPersistida.AfectacionMixta), ValorOriginal: factura.AfectacionMixta?.ToString(),
                 ValorNuevo: esMixta.ToString(), Motivo: null, usuarioId, ahora),
             ct);
+
+        // outbox-mensajeria (BACKLOG #14, design D8) -- FACTURA_CORREGIDA iff AfectacionMixta
+        // realmente cambió (un valor reenviado idéntico no es un hecho de negocio nuevo) y la
+        // factura ya está VALIDADA (spec.md: "on any accepted update to a validated invoice").
+        if (factura.AfectacionMixta != esMixta && factura.Estado == FacturaPersistida.Validada)
+        {
+            var payload = await PayloadOutbox.ConstruirAsync(uow, TipoEventoFacturaCorregida, facturaId, null, ct);
+            await uow.EmitirOutboxAsync(TipoEventoFacturaCorregida, facturaId, payload, ct);
+        }
 
         await uow.CommitAsync(ct);
         return new ResultadoComando.Aplicado();

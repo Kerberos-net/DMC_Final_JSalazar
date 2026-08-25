@@ -1,0 +1,34 @@
+{
+  "version": 1,
+  "evento": "FACTURA_VALIDADA",
+  "facturaId": 100,
+  "factura": {
+    "estado": "VALIDADA",
+    "proveedorCodigo": "P00234",
+    "rucProveedor": "20100000001",
+    "tipoComprobante": "01",
+    "numero": "F001-123",
+    "totalOrig": 118.00,
+    "moneda": "PEN",
+    "fechaEmision": "2026-08-10",
+    "motivo": null,
+    "afectacion": "GRAVADA",
+    "afectacionMixta": false,
+    "esProveedorGenerico": false,
+    "posibleDuplicado": false,
+    "tieneCamposNoExtraidos": false
+  },
+  "asiento": {
+    "asientoContableId": 5,
+    "numeroAsiento": "02-2026-08-000007",
+    "estado": "CONFIRMADO",
+    "fechaContable": "2026-08-10",
+    "lineas": [
+      {"lineaId": 30, "bloque": "Principal", "tipo": "D", "debe": 118.00, "haber": 0.00, "cuentaCodigo": "601111"}
+    ]
+  },
+  "documentos": [
+    {"origen": "INGESTA", "id": 9, "nombreArchivo": "factura.xml", "rutaRelativa": "2026/08/factura.xml", "mimeType": "application/xml"},
+    {"origen": "ADJUNTO", "id": 700, "nombreArchivo": "f.pdf", "rutaRelativa": "2026/08/f.pdf", "mimeType": "application/pdf"}
+  ]
+}
