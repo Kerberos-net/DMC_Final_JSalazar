@@ -45,6 +45,11 @@ env:
   TESTS_TIPOS_CAMBIO_CORE: SmartNet/tipos-de-cambio/SmartNet.TiposCambio.Core.Tests
   TESTS_INBOX_CORE: SmartNet/inbox/SmartNet.Inbox.Core.Tests
   TESTS_CONTABLE_CORE: SmartNet/contable/SmartNet.Contable.Core.Tests
+  # BACKLOG #11 (tasks.md Phase 4, task 4.4): the facturacion Core project -- ServicioDeFacturas/
+  # ServicioDeAsientos/ServicioDeIntegraciones, TokenDeConcurrencia, ResultadoComando/CasoConflicto
+  # -- has been pure-domain (PurityScanTests-guarded, no DB/HTTP/clock) since PR 1; it was missing
+  # from this manifest, never actually running here despite existing since PR 1.
+  TESTS_FACTURACION_CORE: SmartNet/facturacion/SmartNet.Facturacion.Core.Tests
   # pruebas-de-base-de-datos: every project whose tests use TestDatabaseFixture (throwaway
   # `fact_test_<guid>` databases) or WebApplicationFactory against a real SQL Server.
   TESTS_AUTH_INFRA: SmartNet/auth/SmartNet.Auth.Infrastructure.Tests
@@ -53,6 +58,10 @@ env:
   TESTS_CATALOGOS_INFRA: SmartNet/catalogos/SmartNet.Catalogos.Infrastructure.Tests
   TESTS_TIPOS_CAMBIO_INFRA: SmartNet/tipos-de-cambio/SmartNet.TiposCambio.Infrastructure.Tests
   TESTS_INBOX_INFRA: SmartNet/inbox/SmartNet.Inbox.Infrastructure.Tests
+  # BACKLOG #11 (tasks.md Phase 4, task 4.4): SqlFacturacionStore/SqlUnidadDeTrabajo/
+  # SqlCommandQueueRepository/SqlEstadoIntegracionRepository -- uses TestDatabaseFixture, same as
+  # every other *.Infrastructure.Tests project below. Also missing from this manifest since PR 1.
+  TESTS_FACTURACION_INFRA: SmartNet/facturacion/SmartNet.Facturacion.Infrastructure.Tests
   # pruebas-de-worker-python: the worker's own SQL Server container (own ephemeral usr_worker
   # server-scoped LOGIN, kept out of the .NET DB job's shared container).
   WORKER_DIR: SmartNet/worker
@@ -116,6 +125,15 @@ jobs:
       - name: Nucleo de dominio contable (sin infraestructura)
         run: >
           dotnet test ${{ env.TESTS_CONTABLE_CORE }}
+          --configuration Release --no-build --logger "console;verbosity=normal"
+
+      # Pure orchestration logic (ServicioDeFacturas/ServicioDeAsientos/ServicioDeIntegraciones
+      # command sequencing over a fake IUnidadDeTrabajo; TokenDeConcurrencia codec;
+      # ResultadoComando/CasoConflicto shape). No DB, no HTTP, no wall clock -- PurityScanTests
+      # enforces this at build time, same as the suites above. BACKLOG #11.
+      - name: Nucleo de orquestacion de facturas y asientos (sin infraestructura)
+        run: >
+          dotnet test ${{ env.TESTS_FACTURACION_CORE }}
           --configuration Release --no-build --logger "console;verbosity=normal"
 
       - uses: actions/setup-python@v5
@@ -211,6 +229,11 @@ jobs:
       - name: Inbox.Infrastructure
         run: >
           dotnet test ${{ env.TESTS_INBOX_INFRA }}
+          --configuration Release --no-build --logger "console;verbosity=normal"
+
+      - name: Facturacion.Infrastructure
+        run: >
+          dotnet test ${{ env.TESTS_FACTURACION_INFRA }}
           --configuration Release --no-build --logger "console;verbosity=normal"
 
   pruebas-de-worker-python:

@@ -2,7 +2,19 @@
 
 ## Estado
 
-Aceptado. Revisión 5. Añade `DocumentoIdentidad` como quinta tabla externa: el catálogo se
+Aceptado. Revisión 6. Reclasifica `fact.ProcesamientoError` de privada de Python (clase 1) a
+**lectura asimétrica** (clase 3): Python sigue siendo el único que escribe, pero ambos runtimes
+pueden leer. BACKLOG #13 (bandeja e incidencias) necesita que `.NET` lea el historial de errores de
+procesamiento para el panel de errores de la bandeja — sin esta reclasificación, el `DENY SELECT`
+que `008_usuarios_y_permisos.sql` le puso a `fact_api` (revisión 4, ampliación defensiva del bucket
+"privadas de Python") bloquea una lectura que ningún escenario ratificado de
+`openspec/specs/esquema-y-permisos/spec.md` exige, y que el precedente `fact.Configuracion` ya
+demuestra que este ADR sabe modelar (un solo escritor, ambos lectores). `018_permiso_lectura_
+procesamiento_error.sql` aplica el cambio: `REVOKE` el `DENY SELECT`, `GRANT SELECT` a `fact_api`,
+y re-`DENY INSERT, UPDATE, DELETE` explícitamente — Python sigue siendo el único escritor, la
+frontera de escritura queda igual de reforzada por el motor que antes.
+
+Revisión 5. Añade `DocumentoIdentidad` como quinta tabla externa: el catálogo se
 incorporó después de escribir este ADR y `Proveedor` tiene clave foránea hacia él, de modo que
 omitirlo dejaba sin lectura al tipo de documento del proveedor.
 
@@ -34,7 +46,7 @@ Un solo componente escribe **y** lee.
 
 | Contexto | Propietario | Tablas |
 |---|---|---|
-| Ingesta y procesamiento | Python | `Email`, `DocumentoRecibido`, `Procesamiento`, `DatosExtraidos`, `ProcesamientoError`, `ProcesamientoIntentos` |
+| Ingesta y procesamiento | Python | `Email`, `DocumentoRecibido`, `Procesamiento`, `DatosExtraidos`, `ProcesamientoIntentos` |
 | Negocio | .NET | `Factura`, `AsientoContable`, `AsientoContableDetalle`, `AdjuntoManual`, `AuditoriaCorreccion`, `FacturaExtraccion`, `CorrelativoAsiento` |
 | Satélites de datos maestros | .NET | `ProveedorAtributo`, `MotivoAtributo`, `SugerenciaCuenta` |
 | Seguridad | .NET | `Usuario` |
@@ -77,6 +89,7 @@ Un solo tipo de fila, escrita por distintos componentes según su procedencia.
 | Tabla | Escribe | Lee |
 |---|---|---|
 | `Configuracion` | .NET | Ambos |
+| `ProcesamientoError` | Python | Ambos (revisión 6, BACKLOG #13: panel de errores de la bandeja) |
 
 | Tabla | Filas escritas por Python | Filas escritas por .NET | Discriminador |
 |---|---|---|---|
@@ -137,7 +150,7 @@ Dos usuarios de base de datos, uno por runtime, con permiso explícito por tabla
 | | `usr_api` (.NET) | `usr_worker` (Python) |
 |---|---|---|
 | **Privadas propias** | `SELECT`/`INSERT`/`UPDATE` sobre las de negocio, satélites, seguridad y `fact.CorrelativoAsiento` | `SELECT`/`INSERT`/`UPDATE` sobre las de ingesta y procesamiento |
-| **Privadas del otro** | **Ninguno** sobre `fact.Procesamiento`, `fact.DatosExtraidos` y demás tablas de Python | **Ninguno** sobre `fact.Factura`, `fact.AsientoContable*`, `fact.AdjuntoManual`, `fact.Usuario` |
+| **Privadas del otro** | **Ninguno** sobre `fact.Procesamiento`, `fact.DatosExtraidos` y demás tablas de Python (excepto `fact.ProcesamientoError`, ver fila "Publicación") | **Ninguno** sobre `fact.Factura`, `fact.AsientoContable*`, `fact.AdjuntoManual`, `fact.Usuario` |
 | **`fact.OutboxEvent`** | `INSERT`, `SELECT` | `SELECT`, `UPDATE` — Python **consume** el outbox y mantiene el estado por integración |
 | **`fact.InboxEvent`** | `SELECT`, `UPDATE` — marca el resultado del consumo | `INSERT`, `SELECT` |
 | **`fact.CommandQueue`** | `INSERT`, `SELECT` | `SELECT`, `UPDATE` |

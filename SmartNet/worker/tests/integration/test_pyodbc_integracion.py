@@ -369,6 +369,10 @@ def test_reintentar_el_scan_no_duplica_eventos(worker_db):
             documento_recibido_id=fila.documento_recibido_id,
             tipo_documento=fila.tipo_documento,
             documento_asociado_id=fila.documento_asociado_id,
+            nombre_archivo=fila.nombre_archivo,
+            mime_type=fila.mime_type,
+            ruta_relativa=fila.ruta_relativa,
+            tamano_bytes=fila.tamano_bytes,
             comprobante=None,
         )
         insertar_evento(cursor, procesamiento_id, payload)

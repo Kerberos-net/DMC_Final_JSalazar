@@ -236,6 +236,14 @@ either success or a permission-denied error — never by inspecting a document.
   `fact.ProcesamientoError`, `fact.ProcesamientoIntentos`
 - **Then** every operation succeeds
 
+#### Scenario: usr_api can SELECT fact.ProcesamientoError but is denied INSERT, UPDATE, and DELETE
+- **Given** `usr_api` connected to the database with grants applied (BACKLOG #13, ADR 0003
+  revision 6: `fact.ProcesamientoError` reclassified to asymmetric-read)
+- **When** `usr_api` executes `SELECT` against `fact.ProcesamientoError`
+- **Then** the operation succeeds
+- **When** `usr_api` executes `INSERT`, `UPDATE`, or `DELETE` against `fact.ProcesamientoError`
+- **Then** the engine denies every one of those operations with a permission error
+
 #### Scenario: usr_api can INSERT and SELECT fact.OutboxEvent but not UPDATE it
 - **Given** `usr_api` connected to the database with grants applied
 - **When** `usr_api` executes `INSERT` and `SELECT` against `fact.OutboxEvent`

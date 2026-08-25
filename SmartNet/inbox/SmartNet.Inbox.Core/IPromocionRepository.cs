@@ -22,13 +22,17 @@ public sealed record ProveedorResuelto(bool Existe, string Codigo);
 public interface IPromocionRepository
 {
     /// <summary>
-    /// INSERTs <c>Factura</c> (<c>PENDIENTE_VALIDACION</c>) + <c>FacturaExtraccion</c> rows and
-    /// updates the source <c>InboxEvent</c> to <c>PROMOVIDO</c> in one transaction — or, on a
-    /// duplicate <c>ProcesamientoId</c>, resolves the existing <c>FacturaId</c> without inserting
-    /// a second row (design D2, spec.md "Idempotent promotion").
+    /// INSERTs <c>Factura</c> (<c>PENDIENTE_VALIDACION</c>) + <c>FacturaExtraccion</c> rows, INSERTs
+    /// the projected <c>fact.DocumentoFactura</c> row (BACKLOG #12, design D1, schema 016), and
+    /// updates the source <c>InboxEvent</c> to <c>PROMOVIDO</c> — all in one transaction. On a
+    /// duplicate <c>ProcesamientoId</c>, resolves the existing <c>FacturaId</c> without inserting a
+    /// second <c>Factura</c> row (design D2, spec.md "Idempotent promotion"); on a duplicate
+    /// <c>DocumentoRecibidoId</c> (a re-processed event for the same document), skips the
+    /// <c>DocumentoFactura</c> INSERT the same way (<c>UQ_DocumentoFactura_DocumentoRecibidoId</c>).
     /// </summary>
     Task<ResultadoPromocion> PromoverAsync(
-        long inboxEventId, long procesamientoId, FacturaPromovida factura, CancellationToken ct);
+        long inboxEventId, long procesamientoId, FacturaPromovida factura, DocumentoPromovido documento,
+        CancellationToken ct);
 
     /// <summary>Updates the source <c>InboxEvent</c> to <c>DESCARTADO</c> — creates zero <c>Factura</c> rows.</summary>
     Task DescartarAsync(long inboxEventId, string motivoDescarte, CancellationToken ct);

@@ -4,8 +4,14 @@
   <app-inbox-filter
     [estado]="estado()"
     [orden]="orden()"
+    [desde]="desde()"
+    [hasta]="hasta()"
+    [proveedor]="proveedor()"
     (estadoChange)="onEstadoChange($event)"
     (ordenChange)="onOrdenChange($event)"
+    (desdeChange)="onDesdeChange($event)"
+    (hastaChange)="onHastaChange($event)"
+    (proveedorChange)="onProveedorChange($event)"
   />
 
   @if (loading()) {
@@ -16,5 +22,14 @@
     <p data-testid="inbox-error" role="alert">{{ error() }}</p>
   }
 
-  <app-inbox-list [items]="items()" />
+  <app-inbox-list
+    [items]="items()"
+    [reprocesandoId]="reprocesandoId()"
+    (reprocesarSolicitado)="onReprocesarSolicitado($event)"
+  />
+
+  <app-confirmar-reproceso
+    (confirmar)="onConfirmarReproceso()"
+    (cancelar)="onCancelarReproceso()"
+  />
 </section>

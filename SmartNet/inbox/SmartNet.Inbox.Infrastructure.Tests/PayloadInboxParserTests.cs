@@ -9,7 +9,9 @@ public sealed class PayloadInboxParserTests
     private const string CompletoJson =
         """
         {"version": 1, "estadoProcesamiento": "COMPLETADO",
-         "documento": {"documentoRecibidoId": 8, "tipoDocumento": "XML", "documentoAsociadoId": 9},
+         "documento": {"documentoRecibidoId": 8, "tipoDocumento": "XML", "documentoAsociadoId": 9,
+                       "nombreArchivo": "factura.xml", "mimeType": "application/xml",
+                       "rutaRelativa": "2026/08/factura.xml", "tamanoBytes": 2048},
          "comprobante": {"tipoComprobante": "01", "numero": "F001-123", "rucProveedor": "20100000001",
                          "nombreProveedor": "Acme SAC", "monto": "1180.00", "moneda": "PEN",
                          "fechaEmision": "2026-08-10"},
@@ -27,6 +29,10 @@ public sealed class PayloadInboxParserTests
         Assert.Equal(8, evento.DocumentoRecibidoId);
         Assert.Equal("XML", evento.TipoDocumento);
         Assert.Equal(9, evento.DocumentoAsociadoId);
+        Assert.Equal("factura.xml", evento.NombreArchivo);
+        Assert.Equal("application/xml", evento.MimeType);
+        Assert.Equal("2026/08/factura.xml", evento.RutaRelativa);
+        Assert.Equal(2048, evento.TamanoBytes);
         Assert.NotNull(evento.Comprobante);
         Assert.Equal("01", evento.Comprobante!.TipoComprobante);
         Assert.Equal("F001-123", evento.Comprobante.Numero);
@@ -50,7 +56,9 @@ public sealed class PayloadInboxParserTests
         const string erroJson =
             """
             {"version": 1, "estadoProcesamiento": "ERROR",
-             "documento": {"documentoRecibidoId": 3, "tipoDocumento": "PDF", "documentoAsociadoId": null},
+             "documento": {"documentoRecibidoId": 3, "tipoDocumento": "PDF", "documentoAsociadoId": null,
+                           "nombreArchivo": "factura.pdf", "mimeType": "application/pdf",
+                           "rutaRelativa": "2026/08/factura.pdf", "tamanoBytes": 4096},
              "comprobante": null,
              "evidencia": [], "afectacionMixta": null, "camposNoExtraidos": [], "advertenciasAsociacion": ["SIN_PAREJA"]}
             """;
@@ -70,7 +78,9 @@ public sealed class PayloadInboxParserTests
         const string json =
             """
             {"version": 1, "estadoProcesamiento": "COMPLETADO",
-             "documento": {"documentoRecibidoId": 1, "tipoDocumento": "XML", "documentoAsociadoId": null},
+             "documento": {"documentoRecibidoId": 1, "tipoDocumento": "XML", "documentoAsociadoId": null,
+                           "nombreArchivo": "factura.xml", "mimeType": "application/xml",
+                           "rutaRelativa": "2026/08/factura.xml", "tamanoBytes": 1024},
              "comprobante": {"tipoComprobante": "01", "numero": null, "rucProveedor": null,
                              "nombreProveedor": null, "monto": "0.10", "moneda": "PEN", "fechaEmision": "2026-08-16"},
              "evidencia": [], "afectacionMixta": null, "camposNoExtraidos": [], "advertenciasAsociacion": ["SIN_PAREJA"]}

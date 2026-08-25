@@ -1,0 +1,26 @@
+-- 019_permiso_secuencia_seqoutbox.sql
+-- BACKLOG #14, Fase 5 (tasks.md 5.3, ADR 0019 nivel 2 -- prueba de contrato bidireccional
+-- descubrio esto contra el esquema real, no fue anticipado en design.md). SQL Server exige permiso
+-- UPDATE sobre el objeto SEQUENCE para ejecutar `NEXT VALUE FOR` (no alcanza con el GRANT
+-- SELECT, INSERT, UPDATE que 008 ya le da a fact_api sobre la TABLA fact.OutboxEvent -- una
+-- SEQUENCE es un objeto asegurable distinto). `SqlUnidadDeTrabajo.EmitirOutboxAsync`
+-- (SmartNet.Facturacion.Infrastructure/SqlUnidadDeTrabajo.cs:267) escribe
+-- `VALUES (@tipo, @facturaId, @payload, NEXT VALUE FOR fact.SeqOutbox)` -- sin este GRANT, el
+-- INSERT real bajo el LOGIN de instancia usr_api falla con error 229 ("The UPDATE permission was
+-- denied on the object 'SeqOutbox'"). Las pruebas de item #14 anteriores (SqlUnidadDeTrabajoOutboxTests,
+-- Fase 3) nunca lo detectaron porque corren contra una conexion de confianza/sysadmin
+-- (TestDatabaseFixture), no bajo el LOGIN usr_api real; el arnes de contrato N2 de Fase 5
+-- (conftest.py, tasks.md 5.2) fue el primero en ejercer el INSERT real bajo ese LOGIN y lo expuso.
+--
+-- Python (fact_worker) nunca inserta en fact.OutboxEvent (008: solo SELECT, UPDATE) y por lo tanto
+-- nunca avanza la SEQUENCE -- no necesita ningun permiso sobre ella.
+--
+-- create-if-absent, always-grant (mismo header que 008): GRANT es idempotente por si mismo,
+-- reaplicar este script contra una base ya migrada converge, no falla.
+--
+-- SOLO UPDATE: SQL Server rechaza GRANT SELECT sobre un objeto SEQUENCE ("Granted or revoked
+-- privilege SELECT is not compatible with object", error 4606, descubierto ejecutando este script
+-- contra una base real) -- a diferencia de una tabla, una SEQUENCE no tiene un verbo SELECT de
+-- lectura de fila; UPDATE es el unico permiso de escritura/consumo que existe para ella y es el
+-- unico que NEXT VALUE FOR necesita.
+GRANT UPDATE ON OBJECT::fact.SeqOutbox TO fact_api;

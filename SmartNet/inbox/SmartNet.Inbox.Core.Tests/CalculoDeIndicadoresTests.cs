@@ -13,7 +13,7 @@ public class CalculoDeIndicadoresTests
     private static EventoInbox EventoCon(
         DateOnly? fechaEmision, bool? afectacionMixta, IReadOnlyList<string>? camposNoExtraidos = null) =>
         new(
-            1, "COMPLETADO", 8, "XML", 9,
+            1, "COMPLETADO", 8, "XML", 9, "factura.xml", "application/xml", "2026/08/factura.xml", 2048,
             new ComprobanteExtraido("01", "F001-123", "20100000001", "Acme SAC", 1180.00m, "PEN", fechaEmision),
             Array.Empty<EvidenciaCampo>(),
             afectacionMixta,

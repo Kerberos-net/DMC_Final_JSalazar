@@ -6,6 +6,9 @@ describe('InboxFilter', () => {
     const fixture = TestBed.createComponent(InboxFilter);
     fixture.componentRef.setInput('estado', null);
     fixture.componentRef.setInput('orden', 'desc');
+    fixture.componentRef.setInput('desde', null);
+    fixture.componentRef.setInput('hasta', null);
+    fixture.componentRef.setInput('proveedor', null);
     fixture.detectChanges();
     return fixture;
   };
@@ -65,5 +68,51 @@ describe('InboxFilter', () => {
     select.dispatchEvent(new Event('change'));
 
     expect(emitted).toEqual(['asc']);
+  });
+
+  it('emits desdeChange on change, not on every keystroke', () => {
+    const fixture = createComponent();
+    const emitted: (string | null)[] = [];
+    fixture.componentInstance.desdeChange.subscribe((v) => emitted.push(v));
+
+    const input: HTMLInputElement = fixture.nativeElement.querySelector(
+      'input[data-testid="desde-input"]'
+    );
+    input.value = '2026-01-01';
+    input.dispatchEvent(new Event('input'));
+    expect(emitted).toEqual([]);
+
+    input.dispatchEvent(new Event('change'));
+    expect(emitted).toEqual(['2026-01-01']);
+  });
+
+  it('emits hastaChange on change', () => {
+    const fixture = createComponent();
+    const emitted: (string | null)[] = [];
+    fixture.componentInstance.hastaChange.subscribe((v) => emitted.push(v));
+
+    const input: HTMLInputElement = fixture.nativeElement.querySelector(
+      'input[data-testid="hasta-input"]'
+    );
+    input.value = '2026-01-31';
+    input.dispatchEvent(new Event('change'));
+
+    expect(emitted).toEqual(['2026-01-31']);
+  });
+
+  it('emits proveedorChange on change and on Enter, not on every keystroke', () => {
+    const fixture = createComponent();
+    const emitted: (string | null)[] = [];
+    fixture.componentInstance.proveedorChange.subscribe((v) => emitted.push(v));
+
+    const input: HTMLInputElement = fixture.nativeElement.querySelector(
+      'input[data-testid="proveedor-input"]'
+    );
+    input.value = 'P001';
+    input.dispatchEvent(new Event('input'));
+    expect(emitted).toEqual([]);
+
+    input.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter' }));
+    expect(emitted).toEqual(['P001']);
   });
 });

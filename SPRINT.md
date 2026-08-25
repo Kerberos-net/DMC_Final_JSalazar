@@ -11,9 +11,9 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | **9 de 17 cerrados** |
-| Ciclo SDD activo | Ninguno — último cerrado: ítem #9 |
-| Última fase cerrada | Ítem #9 (Sugerencia de cuenta), 2 PRs apilados, 32/32 tareas cerradas, verify-report PASS WITH WARNINGS (ambos WARNING corregidos antes de archivar), 27/27 + 2/2 tests, build limpio — ítem #9 cerrado 2026-08-20 |
+| Ítems del backlog | **13 de 18 cerrados** (BACKLOG.md tiene 18 ítems: el #18 "Ajuste visual del diseño SPA" nació al cerrar el sub-cambio visual del #12, 2026-08-24) |
+| Ciclo SDD activo | Ninguno — último cerrado: ítem #14 (Outbox y mensajería) |
+| Última fase cerrada | Ítem #14 (Outbox y mensajería), 6 fases, 51/51 tareas cerradas, verify PASS sin CRITICAL/WARNING (2 SUGGESTIONS no bloqueantes), 2 bugs de producción reales encontrados y corregidos (permiso `SEQUENCE` en `fact.SeqOutbox`, `SET NOCOUNT ON`) — ítem #14 cerrado 2026-08-25 |
 
 ---
 
@@ -1055,7 +1055,337 @@ exploración, no en apply.
 
 ---
 
-## ⬜ Ítems 10 a 17 — sin ciclo SDD abierto
+## ✅ 11. API de facturas y asientos
+
+15 rutas HTTP per ADR 0008: `FacturaEndpoints` (PATCH/abrir/validar/descartar/adjuntos),
+`AsientoEndpoints` (PATCH/líneas por `LineaId`/reabrir/anular), `TipoCambioEndpoints` (carga
+manual), `IntegracionEndpoints` (reprocesar/sincronizar/reconectar/estado). Concurrencia
+optimista vía ETag/If-Match (412/428), `CommandQueue` enqueue-only hacia Python — nunca RPC
+directo (ADR 0003) —, correlativo gapless. Depende de los ítems #7 y #8 (completos).
+
+**Entrega:** 5 unidades de trabajo (commits) encadenadas en la rama `feat/api-facturas-asientos-11`,
+sin PR abierto todavía.
+
+**Ciclo SDD:** `openspec/changes/archive/2026-08-23-api-facturas-asientos/` · **29 de 29 tareas cerradas** — ✅ **CERRADO 2026-08-23**
+
+| Fase | Alcance | Tareas | Estado |
+|---|---|---|---|
+| 1 | Core scaffold: `TokenDeConcurrencia`, `ResultadoComando`/`CasoConflicto`, puertos + servicios, `PurityScanTests`, esquema `015`, adaptadores SQL | 11/11 | ✅ |
+| 2 | `FacturaEndpoints` (PATCH/abrir/validar/descartar/adjuntos) + `IfMatch`/`ProblemasDeNegocio` | 6/6 | ✅ |
+| 3 | `AsientoEndpoints` (PATCH/líneas por `LineaId`/reabrir/anular) | 3/3 | ✅ |
+| 4 | `TipoCambioEndpoints`, `IntegracionEndpoints`, *wiring* `Program.cs`, `ci.yml` | 5/5 | ✅ |
+| 5 | Seguimiento post-verify: cierre del gap `SinTipoCambio` (hallazgo CRITICAL) | 4/4 | ✅ |
+
+Pronóstico de revisión: alto riesgo de presupuesto de 400 líneas (~3200-3800 estimadas); PRs
+encadenados, `ask-on-risk`. Detalle completo en `tasks.md`.
+
+### Pruebas
+
+| Proyecto | Pruebas | Qué cubre |
+|---|---|---|
+| `SmartNet.Facturacion.Core.Tests` | 66/66 | Núcleo puro: comandos, invariantes, gate `SinTipoCambio` (fase 5), `PurityScanTests` |
+| `SmartNet.Facturacion.Infrastructure.Tests` | 31/31 | CAS real (*rowversion*), correlativo gapless, adjuntos, líneas por `LineaId`, gate `SinTipoCambio` contra SQL Server real |
+| `SmartNet.TiposCambio.Core.Tests` / `.Infrastructure.Tests` | 20/20 + 12/12 | Heredadas del ítem #4 sin cambio; reutilizadas por `ExisteTipoCambioVigenteAsync` |
+| `SmartNet.Api.Tests` | 83/83 | 15 rutas vía `SmartNetApiFactory` (real DB + *cookie* de sesión): 428/412/200/409/422 |
+| `SmartNet.Contable.Core.Tests` (REGLAS.md) | 41/41 | Sanity check: sin regresión sobre el ítem #8 |
+| **Total** | **253/253** | Confirmado por dos pasadas independientes de `sdd-verify` |
+
+### Lo verificado al cerrar
+
+**Fases 1-4** — 25/25 tareas en verde, 243/243 tests. Primer `sdd-verify`: PASS WITH WARNINGS, 19
+desviaciones no bloqueantes, pero **1 hallazgo CRITICAL real**: `POST /api/facturas/{id}/abrir`
+nunca rechazaba (409 `SinTipoCambio`) abrir una factura en moneda extranjera sin tipo de cambio
+vigente — `CargarAsientoAsync` tenía el campo hardcodeado en `false` desde la fase 2, ya
+documentado como desviación abierta pero nunca cerrado en las fases siguientes.
+
+**Fase 5 (seguimiento post-verify)** — cerró el gap: `ServicioDeFacturas.AbrirAsync` gatea sobre
+`Moneda != PEN` antes de crear el asiento, vía nuevo puerto
+`IUnidadDeTrabajo.ExisteTipoCambioVigenteAsync` que reutiliza `ITipoCambioRepository` (ítem #4)
+en vez de duplicar infraestructura. 10 pruebas nuevas, 253/253 sin regresión sobre las fases 1-4.
+
+**Segundo `sdd-verify` (re-corrida completa)** — PASS, 0 CRITICAL, 13/13 requisitos y 36/36
+escenarios COMPLIANT en los 4 specs (`api-facturas`, `api-asientos`,
+`api-incidencias-integraciones`, `tipos-de-cambio`), 253/253 tests re-corridos de forma
+independiente contra SQL Server real, ADR 0019 (pureza de Core)/0003 (partición Python↔.NET)/0016
+(SQL versionado) y nomenclatura española confirmados por inspección directa del código, no solo
+aceptados del reporte del agente.
+
+**Discrepancia real encontrada al archivar, corregida antes de comitear.** El agente `sdd-archive`
+reportó "carpeta del *change* movida al archivo", pero dejó `openspec/changes/api-facturas-asientos/`
+intacta y solo copió un `archive-report.md` no convencional (sin precedente en los ítems #1-#9)
+junto a `exploration.md`. Verificado con `find`: faltaban `proposal.md`, `design.md`, `tasks.md`,
+`apply-progress.md`, `verify-report.md` y `specs/`. Se movió manualmente todo al patrón real
+—idéntico al del ítem #9— y se eliminó `archive-report.md` por no tener precedente en el proyecto.
+
+**Ledger nativo (`gentle-ai sdd-attempt`):** 8 intentos en total (uno abierto sin código en una
+sesión previa, cerrado como `interrupted`; 4 reseteos por exceso del presupuesto de 200-400 líneas
+por fase, mismo patrón ya aprobado en ítems anteriores). RDD (revisión nativa) sigue deshabilitado
+en este *clone* —condición estructural ya documentada en "Condiciones del entorno"—, no se
+reactivó ni se fabricó una aprobación.
+
+19 desviaciones documentadas en `apply-progress.md`, ninguna bloqueante (no contradicen ningún
+`MUST` de los specs), pendientes de *sign-off* del *product owner* cuando se revisen.
+
+Cero regresión confirmada sobre `SmartNet.Contable.Core.Tests` (ítem #8, REGLAS.md): 41/41 sin
+cambio.
+
+---
+
+## ✅ 12. Detalle y validación
+
+Pantalla lado a lado (factura ↔ asiento), edición inline de líneas por `LineaId`, guardar avance,
+validar, visor de documentos same-origin. Proyección `fact.DocumentoFactura` .NET-owned (nunca un
+`SELECT` cruzado a `fact.DocumentoRecibido`, ADR 0003), lista unificada de documentos, resolución
+factura→asiento, `TipoCambioVenta` congelado expuesto en `AsientoRespuesta`. Añade además el shell
+de autenticación de la SPA (*guard*, interceptor 401, cookie) y la pantalla `/login`, no prevista en
+el `tasks.md` original pero necesaria para que el resto fuera navegable. Depende del ítem #11
+(completo).
+
+**Entrega:** 6 fases (PR1→PR6 sugeridos, no verificado si se abrieron como PRs separados o se
+integraron directo a la rama `feat/detalle-validacion-12`).
+
+**Ciclo SDD:** `openspec/changes/archive/2026-08-23-api-detalle-validacion-facturas-12/` · **46 de 46 tareas cerradas** — ✅ **CERRADO 2026-08-23**
+
+| Fase | Alcance | Tareas | Estado |
+|---|---|---|---|
+| 1 | Esquema `016_documento_factura.sql` + payload de ingesta Python + espejo `EventoInbox` | 6/6 | ✅ |
+| 2 | Persistencia de la promoción a `fact.DocumentoFactura` | 4/4 | ✅ |
+| 3 | Endpoints .NET de lectura: contenido de documento, lista unificada, `GET /api/asientos/{id}`, resolución factura→asiento, `TipoCambioVenta` | 11/11 | ✅ |
+| 4 | Shell de autenticación SPA: `authGuard`, `httpErrorInterceptor` | 5/5 | ✅ |
+| 5 | Feature de detalle SPA (data-access/feature/ui) + pantalla `/login` (añadida por el *owner*, fuera del alcance original) | 16/16 | ✅ |
+| 6 | ADR 0013 Revisión 3 (`fact.DocumentoFactura` es proyección .NET-owned, no lectura cruzada) + enmienda de specs | 2/2 | ✅ |
+| 7 | Verificación: suite completa + smoke E2E manual | 2/2 | ✅ |
+
+Pronóstico de revisión: alto riesgo de presupuesto de 400 líneas (1400-2000 líneas estimadas); PRs
+encadenados recomendados, `ask-on-risk`. Detalle completo en `tasks.md`.
+
+### Pruebas
+
+Verificación independiente (`sdd-verify`) ejecutó las tres suites completas, no solo lectura
+estática del código:
+
+| Suite | Resultado | Nota |
+|---|---|---|
+| `.NET` (`dotnet test SmartNet.sln`) | 689/689 | Fallos transitorios de contención SQL bajo ejecución en paralelo (distintos en cada corrida), reejecutados en aislamiento: 100% verdes |
+| `SPA` (`ng test --watch=false`) | 72/72 | Sin incidencias |
+| `Python` (`pytest`) | 190 passed, 1 skipped | Un fallo transitorio de login `pyodbc` (mismo patrón de contención), reejecutado en aislamiento: verde |
+
+### Lo verificado al cerrar
+
+`DocumentoEndpoints.cs` nunca lee `fact.DocumentoRecibido` — confirmado por código y por
+`PermissionMatrixTests` (`GRANT SELECT, INSERT` a `fact_api`, `DENY` a `fact_worker` sobre
+`fact.DocumentoFactura`, `016_documento_factura.sql`). `TipoCambioVenta` vive solo en
+`AsientoRespuesta`, nunca en `FacturaRespuesta` (design D4), confirmado por inspección directa de
+ambos archivos. El flujo 412/422/409 de `detalle-page.ts` + `problema-ux.ts` implementa los tres
+escenarios del spec: 412 recarga y descarta ediciones locales, 422/409 conserva ediciones y muestra
+error inline/banner — confirmado por el usuario en smoke manual con dos pestañas concurrentes.
+
+**Sin fila semilla de datos tras migrar.** `fact.Usuario` y toda la cadena
+`Email`→`DocumentoRecibido`→`Procesamiento`→`Factura`→`InboxEvent` quedan vacías por diseño; no hay
+ningún `INSERT` versionado que las pueble. El primer usuario se crea con `smartnet-admin usuario
+crear`; una factura de prueba requiere insertar manualmente la cadena completa de FKs hasta
+`InboxEvent` — `GET /api/bandeja` (`SqlBandejaRepository`) hace `FROM fact.InboxEvent LEFT JOIN
+fact.Factura`, así que la tabla que gobierna el listado es `InboxEvent`, no `Factura`; un *insert*
+aislado en `Factura` no es visible en la bandeja.
+
+**Discrepancia real encontrada al archivar, corregida antes de comitear.** El *working tree* traía
+un cambio ajeno a la feature (`SmartNet/spa/angular.json`, un `analytics id` que Angular CLI
+insertó solo al correr `ng test`/`ng serve`); revertido antes de archivar para no colar ruido en el
+*commit* de cierre.
+
+Una desviación no bloqueante documentada por `sdd-verify`: `problema-ux.ts` simplifica el
+discriminador D6 del *design* (distinguir por `type` URI) a un *switch* por *status code* — cubre
+los mismos tres escenarios del spec, queda anotado para quien lea `design.md` después.
+
+### Sub-cambio: Diseño visual SPA + lectura de auditoría (diseno-visual-spa-item-12)
+
+**Ciclo SDD:** `openspec/changes/archive/2026-08-24-diseno-visual-spa-item-12/` · **43 de 43 tareas cerradas** — ✅ **CERRADO 2026-08-24**
+
+Construido sobre el ítem #12 para agregar estilo visual (tokens CSS, tema claro/oscuro),
+indicadores de UI (alertas bloqueantes vs. informativas, distinción de conflicto 412 vs. 422) y una
+API de solo lectura para el historial de correcciones.
+
+| Fase | Unidad | Alcance | Tareas | Estado |
+|---|---|---|---|---|
+| 1 | 1 | Backend — *slice* de lectura de auditoría (índice SQL 017, `IAuditoriaRepository`, `GET /historial`, DI) | 8/8 | ✅ |
+| 2 | 2 | Backend — proyección de indicadores + confirmación de afectación (`FacturaRespuesta` +4 campos, `POST /confirmar-afectacion`) | 8/8 | ✅ |
+| 3 | 3 | SPA — tokens y tema (`TemaService`, `contraste.spec`, `styles.css` con `@layer`, *shell* de la app) | 9/9 | ✅ |
+| 4 | 4 | SPA — componentes visuales y *wiring* de datos (login, historial, `factura-form`, `asiento-lineas`, visor, *banner*) | 14/14 | ✅ |
+| 5 | 5 | Verificación cruzada (`dotnet test`, `ng test`, smoke E2E manual, `PermissionMatrixTests`/`SchemaShapeTests`) | 4/4 | ✅ |
+
+**Pruebas**: 140/140 SPA (Vitest); backend .NET sin regresiones (dos fallos transitorios de
+contención SQL bajo ejecución en paralelo, reconfirmados en verde de forma aislada) + 57/57 en
+`SmartNet.Db.Runner.Tests` (permisos/esquema); smoke E2E manual verificado por el usuario
+(login → detalle, cambio de tema, indicadores, confirmar-afectación).
+
+**Hallazgos**: el tema visual quedó aplicado y funcional. Decisión del usuario: diferir la
+conformidad plena con el *handoff* de diseño al **ítem #18 del backlog** ("Ajuste visual del diseño
+SPA"), para no bloquear el avance de lógica de negocio con retrabajo visual. Se confirmó por
+inspección directa del archivo en disco que el orden documentado en `spec.md`
+(`auditoria-correccion-lectura-api`) ya es "más reciente primero", coincidente con diseño (D7),
+implementación y pruebas — el CRITICAL que reportó `sdd-verify` referenciaba un *snapshot* de
+Engram desactualizado, no el estado real del archivo.
+
+---
+
+## ✅ 13. Bandeja e incidencias
+
+Vista lógica combinada de `GET /api/bandeja` ampliada al contrato completo de ADR 0008 (`estado`,
+`desde`, `hasta`, `proveedor`, `pagina`, `orden`), discriminador `origen` por fila (`FACTURA` |
+`INCIDENCIA`) combinado enteramente server-side (ADR 0008/0003: "Angular nunca combina fuentes"),
+panel de errores sobre `fact.ProcesamientoError`, y acción reprocesar con confirmación obligatoria
+reutilizando el endpoint `POST /api/incidencias/{id}/reprocesar` ya entregado por el ítem #11.
+Depende del ítem #11 (completo).
+
+**Entrega:** un solo PR (`size:exception`), aprobado explícitamente por el dueño del proyecto en
+vez de los 4 PRs encadenados (DB/permisos+ADR → Core+Infrastructure → Api → SPA) que sugería el
+pronóstico de `sdd-tasks`.
+
+**Ciclo SDD:** `openspec/changes/archive/2026-08-24-item-13-bandeja-incidencias/` · **51 de 51 tareas cerradas** — ✅ **CERRADO 2026-08-24**
+
+| Fase | Alcance | Tareas | Estado |
+|---|---|---|---|
+| 1 | DB — migración `018_permiso_lectura_procesamiento_error.sql` + enmienda ADR 0003 | 5/5 | ✅ |
+| 2 | `SmartNet.Inbox.Core` — dominio puro (`OrigenBandeja`, `PoliticaDeReprocesamiento`, envelope de paginación) | 10/10 | ✅ |
+| 3 | `SmartNet.Inbox.Infrastructure` — `SqlBandejaRepository` reescrito en un solo *batch* SQL | 9/9 | ✅ |
+| 4 | `SmartNet.Api` — `BandejaEndpoints` (*binding*/validación de filtros) | 6/6 | ✅ |
+| 5 | SPA `inbox/` — filtros, `panel-errores`, `confirmar-reproceso` | 18/18 | ✅ |
+| 6 | Verificación: suite completa + *cross-check* de *edge cases* de spec | 3/3 | ✅ |
+
+Pronóstico de revisión: alto riesgo de presupuesto de 400 líneas (~520-650 estimadas); PRs
+encadenados recomendados, `ask-on-risk`. El dueño del proyecto eligió explícitamente **un solo PR**
+con `size:exception` en vez de partir la entrega. Detalle completo en `tasks.md`.
+
+### Pruebas
+
+Verificación independiente ejecutando cada proyecto por separado (nunca `dotnet test SmartNet.sln`
+de un tirón como medida única — mismo hallazgo que items anteriores sobre contención SQL en
+paralelo):
+
+| Suite | Resultado | Nota |
+|---|---|---|
+| `SmartNet.Inbox.Core.Tests` | 49/49 | Incluye `PurityScanTests` (ADR 0019, `OrigenBandeja.cs` sin infraestructura) |
+| `SmartNet.Inbox.Infrastructure.Tests` | 41/41 | Corre `AS usr_api` contra SQL Server real — prueba el *grant* D1 al nivel del motor, no mockeado |
+| `SmartNet.Api.Tests` | 132/132 | *Binding*, forma del *envelope*, errores `400` |
+| `SmartNet.Db.Runner.Tests` | 134/134 (aislado) | 2 fallos al correr `SmartNet.sln` completo en paralelo, distintos en cada corrida ("database does not exist" en `DisposeAsync`) — mismo patrón de contención ya documentado en ítems anteriores, no regresión de #13 |
+| `SmartNet.Contable.Core.Tests` | 41/41 | Intocado — confirma ADR 0019 |
+| SPA (`npx ng test --watch=false`) | 162/162 | `npx vitest run` directo da falso negativo masivo (bypassea el *builder* de Angular, `localStorage is not defined`) — el comando correcto es `ng test`, no `vitest run` a secas |
+| `npx ng build` | limpio | Sin *warnings* de *budget* |
+
+### Lo verificado al cerrar
+
+**Hallazgo real encontrado por el diseño, no supuesto.** `fact_api` tenía un `DENY SELECT`
+explícito sobre `fact.ProcesamientoError` desde el ítem #1
+(`SmartNet/db/schema/008_usuarios_y_permisos.sql:85`) — la propuesta había asumido, siguiendo la
+prosa de ADR 0003, que .NET ya podía leer esa tabla. Verificado directamente contra el DDL antes de
+llevarlo al usuario: **`DENY` gana sobre `GRANT`** en SQL Server, así que sin resolverlo el panel de
+errores era inconstruible. Ningún test ratificado dependía de esa denegación en particular (los
+tests de `PermissionMatrixTests` protegían `fact.Procesamiento`/`fact.DatosExtraidos`, no
+`ProcesamientoError`) — era defensa en profundidad de más, no una decisión contable deliberada. El
+dueño del proyecto ratificó otorgar `SELECT` (manteniendo denegados los verbos de escritura), vía
+`018_permiso_lectura_procesamiento_error.sql` + **ADR 0003 Revisión 6**, mismo patrón que
+`fact.Configuracion`.
+
+**Un *batch* de `sdd-apply` se interrumpió por un error de sesión (403, no de código).** Antes de
+descartar o rehacer el trabajo a ciegas, se verificó el *working tree* directamente con `dotnet
+build`/`dotnet test`: la Fase 3 (Infrastructure) ya estaba completa y en verde (40/40 en ese
+momento, luego 41/41 con la fase de verificación final), así que se marcó como cerrada en `tasks.md`
+y se continuó desde ahí en el siguiente *batch*, en vez de re-implementarla.
+
+**El primer borrador del `archive-report` traía un hecho de negocio incorrecto**, corregido antes de
+comitear: decía "entrega vía 4 PRs encadenados", cuando la decisión real y ratificada fue un solo
+PR con `size:exception` (confusión entre la *sugerencia* inicial del pronóstico de `sdd-tasks` y lo
+que efectivamente se decidió). El "*move*" del cambio a `openspec/changes/archive/` tampoco fue
+real — quedó una copia duplicada de la carpeta original sin `archive-report.md`, detectada por
+`diff -rq` y eliminada.
+
+Dos desviaciones documentadas por `sdd-apply`, ninguna oculta: (1) el test de vista por defecto a
+nivel API solo cubre la mitad "excluye filas resueltas" (un `PromocionBackgroundService`
+preexistente rompe el *host* de pruebas con una fila `PENDIENTE` de payload *stub*) — la mitad
+"incluye `PENDIENTE`" quedó cubierta en la capa Infrastructure; (2) `checksums.txt` no traía la
+entrada de la migración `018`, atrapado por la propia suite de *checksums* del proyecto y corregido
+de forma aditiva.
+
+`sdd-verify`: 0 CRITICAL, 0 WARNING, 2 SUGGESTIONS no bloqueantes (nombre de test dedicado para
+"proveedor sin coincidencias"; el re-*enable* de reprocesar depende del próximo *refetch* en vez de
+un *timer* de reloj — *tradeoff* interina ya aceptada, a reemplazar cuando exista el ítem #14).
+
+---
+
+## ✅ 14. Outbox y mensajería
+
+`OutboxEvent`/`OutboxEventIntegracion`/`CommandQueue`/`InboxEvent` ya existían desde el ítem #1
+(ADR 0004), pero solo 2 de los 5 eventos del catálogo se emitían y ningún consumidor leía la cola.
+El diseño amplió el alcance dos veces sobre la propuesta inicial, con decisión explícita del dueño
+del proyecto en cada punto: (1) corregir el payload de los 2 eventos ya emitidos para que sean
+snapshots autosuficientes como los 3 nuevos, en vez de dejarlo como deuda; (2) cerrar el gap del
+ítem #11 donde nada ponía `fact.Factura.Estado = 'VALIDADA'` en producción, dejando 3 guardas
+dormidas (`DOCUMENTACION_ACTUALIZADA`, `FACTURA_CORREGIDA`, `DescartarAsync`) que nunca se activaban.
+Depende del ítem #11 (completo). #15 (Drive) y #16 (Sheets) quedan explícitamente fuera de alcance —
+es infraestructura sin efecto visible por sí sola.
+
+**Entrega:** un solo PR (`size:exception`), aceptado explícitamente por el dueño del proyecto en 3
+rondas distintas conforme el alcance real creció muy por encima del pronóstico inicial de
+`sdd-tasks` (750-950 líneas estimadas → ~1.700+ líneas reales).
+
+**Ciclo SDD:** `openspec/changes/archive/2026-08-25-outbox-mensajeria/` · **51 de 51 tareas cerradas** — ✅ **CERRADO 2026-08-25**
+
+| Fase | Alcance | Tareas | Estado |
+|---|---|---|---|
+| 1 | Core Foundation — `PayloadOutbox`, `IUnidadDeTrabajo.MarcarFacturaValidadaAsync`, `CasoConflicto.FacturaDescartada` | 6/6 | ✅ |
+| 2 | Productor .NET — 4 puntos de emisión (`ASIENTO_CORREGIDO`, `ASIENTO_ANULADO`, `FACTURA_CORREGIDA` ×2), retrofit de los 2 eventos existentes, guarda por-transacción contra doble emisión | 8/8 | ✅ |
+| 3 | Infraestructura — fan-out a `OutboxEventIntegracion` (mapa DRIVE/SHEETS), test de estado-CAS real, aserción 412 por ETag obsoleto | 3/3 | ✅ |
+| 4 | Consumidor Python — reclamo de lote `READPAST` tras interfaz, guarda de obsolescencia, lease 5min, cadencia 1min | 6/6 | ✅ |
+| 5 | Tests de contrato bidireccional (ADR 0019 N2) — matriz de permisos `usr_api`/`usr_worker` contra esquema real | 6/6 | ✅ |
+| 6 | Regresión (#7/#11 sin cambios) + nota de release | 3/3 | ✅ |
+
+Pronóstico de revisión: alto riesgo de presupuesto de 800 líneas (750-950 estimadas por `sdd-tasks`);
+el dueño del proyecto eligió explícitamente **un solo PR** con `size:exception`. El acumulado real
+terminó duplicando la estimación (~1.700+ líneas) al cerrar el gap del ítem #11 dentro del propio
+#14; reafirmado por el dueño del proyecto al superarse la estimación original. Detalle completo en
+`tasks.md`.
+
+### Pruebas
+
+Verificación independiente de `sdd-verify`, corriendo cada suite por separado contra SQL Server real:
+
+| Suite | Resultado | Nota |
+|---|---|---|
+| `SmartNet.Facturacion.Core.Tests` | 88/88 | Incluye `PayloadOutboxTests`, casos `NoTransicionable`/`YaValidada` |
+| `SmartNet.Facturacion.Infrastructure.Tests` | 46/46 | Fan-out a `OutboxEventIntegracion`, guarda por-transacción, contra esquema real |
+| `SmartNet.Inbox.Core.Tests` / `SmartNet.Inbox.Infrastructure.Tests` | 49/49 / 41/41 | Sin regresión del ítem #7 |
+| `SmartNet.Api.Tests` | 143/143 | Incluye los 2 cambios de comportamiento visibles |
+| `SmartNet.Db.Runner.Tests` (`PermissionMatrixTests`) | 27/27 | Confirmado sin tocar por #14 |
+| Worker `pytest tests/unit` | 210/210 | Consumidor Python |
+| Worker `pytest tests/integration -m integracion` | 19/19 (1 no aplicable) | `READPAST` concurrente, lease, ronda bidireccional contra SQL Server real |
+
+### Lo verificado al cerrar
+
+**Dos bugs de producción reales encontrados por los tests de contrato bidireccional (ADR 0019 N2),
+no supuestos.** (1) SQL Server exige permiso `UPDATE` sobre el objeto `SEQUENCE` (no la tabla) para
+`NEXT VALUE FOR`; `008_usuarios_y_permisos.sql` nunca se lo otorgó a `fact_api`, así que el INSERT
+real de `SqlUnidadDeTrabajo.EmitirOutboxAsync` habría fallado (error 229) en producción bajo el login
+`usr_api` real — corregido con la migración nueva `019_permiso_secuencia_seqoutbox.sql` (nunca se
+edita `008` en sitio, ADR 0016) + su rollback. (2) Faltaba `SET NOCOUNT ON` en el *batch* de 3
+sentencias de `outbox_repo.reclamar`, que `pyodbc` real interpretaba como "No results." — los tests
+unitarios con cursor falso nunca lo habrían reproducido. Ambos bugs solo se hicieron visibles porque
+la Fase 5 fue la primera vez que el ítem #14 conectó como el login `usr_api` real en vez de una
+conexión de confianza/sysadmin.
+
+**Dos cambios de comportamiento visibles en endpoints existentes**, documentados en
+`RELEASE-NOTES.md`: `POST /descartar` sobre una factura `VALIDADA` ahora devuelve 409 (guarda
+dormida de ADR 0008 que despierta al cerrarse el gap del ítem #11); `POST /validar` sobre una
+factura `DESCARTADA` ahora devuelve 409 y revierte (`NoTransicionable`, decisión explícita del dueño
+del proyecto).
+
+`sdd-verify`: 0 CRITICAL, 0 WARNING, 2 SUGGESTIONS no bloqueantes (interacción con
+`gentle-ai sdd-attempt` omitida — RDD desactivado a nivel de repo; Open Questions 6/7 del diseño
+quedan deliberadamente diferidas fuera de alcance del #14 — reversión de `Estado` en
+`ReabrirAsync`/`AnularAsync` y *backfill* histórico, ninguna bloqueante).
+
+---
+
+## ⬜ Ítems 10, 15 a 18 — sin ciclo SDD abierto
 
 Las fases de cada ítem **se definen cuando arranca su ciclo SDD**, no antes. Ponerlas aquí ahora
 sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ítem, y ninguno existe.
@@ -1063,13 +1393,14 @@ sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ít
 | # | Ítem | Depende de | Contexto obligatorio | Estado |
 |---|---|---|---|---|
 | 10 | Notas de crédito | #8 | ⚠ `REGLAS.md` §5, §7 | ⬜ |
-| 11 | API de facturas y asientos | #7, #8 | — | ⬜ |
-| 12 | Detalle y validación | #11 | — | ⬜ |
-| 13 | Bandeja e incidencias | #11 | — | ⬜ |
-| 14 | Outbox y mensajería | #11 | — | ⬜ |
 | 15 | Publicación a Drive | #14 | — | ⬜ |
 | 16 | Publicación a Sheets | #14 | — | ⬜ |
 | 17 | Errores, notificaciones y operación | #14 | — | ⬜ |
+| 18 | Ajuste visual del diseño SPA | #12 | ⚠ *Handoff* de diseño | ⬜ |
+
+Ítem #18 nace del cierre del sub-cambio visual del #12 (2026-08-24): el tema aplica y las pantallas
+funcionan, pero el resultado no conforma del todo al *handoff* de diseño. Se separó a propósito en
+vez de reabrir ese cambio, para no bloquear con retrabajo visual el avance de lógica de negocio.
 
 ---
 

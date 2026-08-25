@@ -1,0 +1,87 @@
+<form class="factura-form">
+  <div class="factura-form__cabecera">
+    <span class="chip chip--pendiente">{{ factura().estado }}</span>
+    <p><span>Comprobante:</span> {{ factura().tipoComprobante }} {{ factura().numero }}</p>
+    <p class="tabular-nums"><span>Total:</span> {{ factura().totalOrig }} {{ factura().moneda }}</p>
+    <p><span>Fecha de emisión:</span> {{ factura().fechaEmision }}</p>
+  </div>
+
+  @if (esBloqueante()) {
+    <div class="alerta alerta--bloqueante" role="alert">
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <path d="M8 1 1 14h14L8 1Zm0 4a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1Zm0 7.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z" />
+      </svg>
+      <span>
+        @if (factura().posibleDuplicado) {
+          Posible factura duplicada (mismo RUC + tipo de comprobante + número).
+        }
+        @if (factura().esProveedorGenerico) {
+          Proveedor sin registrar -- asignado P00000 (Varios). No se puede validar así.
+        }
+      </span>
+    </div>
+  }
+
+  @if (esInformativa()) {
+    <div class="alerta alerta--informativa">
+      <svg viewBox="0 0 16 16" aria-hidden="true">
+        <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.4" />
+        <path d="M8 7v4.5M8 4.6h.01" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+      </svg>
+      <span>
+        @if (factura().tieneCamposNoExtraidos) {
+          Hay campos que el OCR no logró extraer.
+        }
+        @if (afectacionNoVerificada()) {
+          Afectación no verificada -- confirme si la factura mezcla líneas gravadas y no gravadas.
+        }
+      </span>
+    </div>
+  }
+
+  @if (tipoCambioVenta(); as tipoCambio) {
+    <p data-testid="tipo-cambio-venta" class="tabular-nums"><span>Tipo de cambio venta:</span> {{ tipoCambio }}</p>
+  }
+
+  <label class="campo">
+    Proveedor
+    <input
+      data-testid="campo-proveedorCodigo"
+      [value]="factura().proveedorCodigo"
+      [disabled]="!editable()"
+      (input)="onCampoInput('proveedorCodigo', $any($event.target).value)"
+    />
+  </label>
+
+  <label class="campo">
+    RUC proveedor
+    <input
+      data-testid="campo-rucProveedor"
+      [value]="factura().rucProveedor"
+      [disabled]="!editable()"
+      (input)="onCampoInput('rucProveedor', $any($event.target).value)"
+    />
+  </label>
+
+  @if (afectacionNoVerificada()) {
+    <div class="factura-form__confirmar-afectacion" data-testid="confirmar-afectacion">
+      <p>¿Esta factura mezcla afectaciones (mixta)?</p>
+      <button
+        class="btn btn--secundario"
+        type="button"
+        data-testid="confirmar-afectacion-mixta"
+        (click)="confirmarAfectacion.emit(true)"
+      >
+        Sí, es mixta
+      </button>
+      <button
+        class="btn btn--secundario"
+        type="button"
+        data-testid="confirmar-afectacion-simple"
+        (click)="confirmarAfectacion.emit(false)"
+      >
+        No, es una sola
+      </button>
+    </div>
+  }
+</form>

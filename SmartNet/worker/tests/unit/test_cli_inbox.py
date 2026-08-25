@@ -74,6 +74,10 @@ def test_ciclo_publica_un_evento_por_fila_completada(monkeypatch):
             8,
             "XML",
             9,
+            "factura.xml",
+            "application/xml",
+            "2026/08/factura.xml",
+            2048,
             "01",
             "F001-123",
             "20100000001",
@@ -93,6 +97,7 @@ def test_ciclo_publica_un_evento_por_fila_completada(monkeypatch):
     insercion = next(e for e in eventos if e.startswith("insertar_evento:"))
     assert insercion.startswith("insertar_evento:10:PROCESAMIENTO_FINALIZADO:")
     assert '"estadoProcesamiento": "COMPLETADO"' in insercion
+    assert '"nombreArchivo": "factura.xml"' in insercion
     assert "commit" in eventos
 
 
@@ -100,7 +105,10 @@ def test_documento_error_publica_evento_sin_comprobante(monkeypatch):
     _preparar_entorno(monkeypatch)
     eventos: list[str] = []
     pendientes_filas = [
-        (11, "ERROR", 5, "PDF", None, None, None, None, None, None, None, None, None, None)
+        (
+            11, "ERROR", 5, "PDF", None, "factura.pdf", "application/pdf",
+            "2026/08/factura.pdf", 4096, None, None, None, None, None, None, None, None, None,
+        )
     ]
     cursor = _FakeCursor(pendientes_filas=pendientes_filas, eventos=eventos)
 
@@ -116,8 +124,14 @@ def test_fallo_de_una_fila_no_aborta_el_batch(monkeypatch):
     _preparar_entorno(monkeypatch)
     eventos: list[str] = []
     pendientes_filas = [
-        (10, "COMPLETADO", 8, "XML", None, None, None, None, None, None, None, None, None, None),
-        (11, "COMPLETADO", 9, "XML", None, None, None, None, None, None, None, None, None, None),
+        (
+            10, "COMPLETADO", 8, "XML", None, "a.xml", "application/xml", "2026/08/a.xml", 100,
+            None, None, None, None, None, None, None, None, None,
+        ),
+        (
+            11, "COMPLETADO", 9, "XML", None, "b.xml", "application/xml", "2026/08/b.xml", 100,
+            None, None, None, None, None, None, None, None, None,
+        ),
     ]
 
     class _CursorConFalloEnPrimeraInsercion(_FakeCursor):

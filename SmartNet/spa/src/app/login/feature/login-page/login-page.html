@@ -1,0 +1,42 @@
+<section class="login-page">
+  <div class="panel login-page__tarjeta">
+    <h1>Iniciar sesión</h1>
+
+    @if (problema(); as p) {
+      <!-- spa-visual-login: uses the shared validation-error token, not the alert-amber family. -->
+      <div class="banner banner--error" role="alert">
+        <svg viewBox="0 0 16 16" aria-hidden="true">
+          <path d="M8 1 1 14h14L8 1Zm0 4a1 1 0 0 1 1 1v4a1 1 0 1 1-2 0V6a1 1 0 0 1 1-1Zm0 7.5a1 1 0 1 1 0 2 1 1 0 0 1 0-2Z" />
+        </svg>
+        <p>{{ p.detail }}</p>
+      </div>
+    }
+
+    <form class="login-page__campo" (submit)="$event.preventDefault(); enviar()">
+      <label class="campo">
+        Usuario
+        <input
+          data-testid="nombreUsuario"
+          [value]="nombreUsuario()"
+          (input)="nombreUsuario.set($any($event.target).value)"
+          autocomplete="username"
+        />
+      </label>
+
+      <label class="campo">
+        Contraseña
+        <input
+          data-testid="clave"
+          type="password"
+          [value]="clave()"
+          (input)="clave.set($any($event.target).value)"
+          autocomplete="current-password"
+        />
+      </label>
+
+      <div class="login-page__acciones">
+        <button class="btn" data-testid="enviar" type="submit" [disabled]="enviando()">Ingresar</button>
+      </div>
+    </form>
+  </div>
+</section>

@@ -1,6 +1,8 @@
-import { ChangeDetectionStrategy, Component, computed, input } from '@angular/core';
+import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { DatePipe } from '@angular/common';
+import { RouterLink } from '@angular/router';
 import { BandejaItem, IndicadoresFactura } from '../../models/bandeja-item.model';
+import { PanelErrores } from '../panel-errores/panel-errores';
 
 interface IndicadorChip {
   readonly clave: string;
@@ -34,23 +36,44 @@ function chipsDe(indicadores: IndicadoresFactura | null): IndicadorChip[] {
 interface FilaInbox {
   readonly item: BandejaItem;
   readonly chips: IndicadorChip[];
+  readonly reprocesarDisponible: boolean;
 }
 
 /**
- * Presentational (dumb) component: renders the Inbox rows. Read-only per spec.md's "Read-only
- * in this item" requirement — the template never renders a button or a role="button" control.
+ * Presentational (dumb) component: renders the Inbox rows. Read-only except for one action
+ * (BACKLOG #13, inbox-screen spec.md "Read-only except the reprocesar action") -- `reprocesar` is
+ * the ONLY control this template ever renders, gated to rows where it applies (`INCIDENCIA` rows
+ * and already-promoted `FACTURA` rows with error history). No approve/edit/discard control exists
+ * here or anywhere else in this component.
  */
 @Component({
   selector: 'app-inbox-list',
   standalone: true,
-  imports: [DatePipe],
+  imports: [DatePipe, RouterLink, PanelErrores],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './inbox-list.html',
 })
 export class InboxList {
   readonly items = input.required<BandejaItem[]>();
+  /** Container-owned optimistic guard (design.md "Double click on reprocesar" edge case). */
+  readonly reprocesandoId = input<number | null>(null);
+
+  readonly reprocesarSolicitado = output<number>();
 
   readonly filas = computed<FilaInbox[]>(() =>
-    this.items().map((item) => ({ item, chips: chipsDe(item.indicadores) }))
+    this.items().map((item) => ({
+      item,
+      chips: chipsDe(item.indicadores),
+      reprocesarDisponible:
+        item.reprocesarDisponibleEn === null || new Date(item.reprocesarDisponibleEn) <= new Date(),
+    }))
   );
+
+  reprocesarDeshabilitado(fila: FilaInbox): boolean {
+    return !fila.reprocesarDisponible || this.reprocesandoId() === fila.item.procesamientoId;
+  }
+
+  onReprocesar(fila: FilaInbox): void {
+    this.reprocesarSolicitado.emit(fila.item.procesamientoId);
+  }
 }

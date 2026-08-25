@@ -234,3 +234,23 @@ pytest -m externa
   contra una instancia SQL Server 2025 local real, aplicando el esquema versionado completo via
   `SmartNet.Db.Runner` y conectando como un LOGIN `usr_worker` efimero real — sin bases ni logins
   huerfanos despues del run (verificado con `sqlcmd`).
+- **BACKLOG #14, Fase 5 (contrato bidireccional N2)**: la misma instancia SQL Server local real
+  estaba alcanzable. `conftest.py::worker_db` gano un segundo LOGIN de instancia efimero real,
+  `usr_api` (antes era `WITHOUT LOGIN`, tasks.md 5.2) — la primera vez que una prueba de #14 ejerce
+  el GRANT/DENY real bajo ESE login, no solo bajo una conexion de confianza/sysadmin. Esa primera
+  ejecucion real encontro y corrigio DOS bugs de produccion genuinos (detalle completo en
+  `tasks.md`, Fase 5): (1) faltaba `GRANT UPDATE ON OBJECT::fact.SeqOutbox TO fact_api` — SQL Server
+  exige permiso `UPDATE` sobre el objeto SEQUENCE para `NEXT VALUE FOR`, un permiso distinto del que
+  008 ya da sobre la TABLA `fact.OutboxEvent`; sin el, el INSERT real de
+  `SqlUnidadDeTrabajo.EmitirOutboxAsync` fallaba bajo el login `usr_api` real (error 229). Cerrado
+  con una migracion NUEVA, `019_permiso_secuencia_seqoutbox.sql` (nunca se edito 008 in-place, ADR
+  0016). (2) `outbox_repo.OutboxRepo.reclamar` fallaba con
+  `pyodbc.ProgrammingError: No results.  Previous SQL was not a query.` contra un driver ODBC real
+  (el fake-cursor unitario nunca reproduce el comportamiento de multiples result-sets) — corregido
+  con `SET NOCOUNT ON;` al inicio de su plantilla SQL. Con ambos fijos: `pytest -m integracion`
+  completo — **19/19 passed** (13 previos + 6 nuevos de Fase 5), cero bases/logins huerfanos despues
+  (verificado con `sqlcmd`); suite unitaria completa `pytest tests/unit -q` → **210/210 passed**
+  (208 previos + 1 contrato de payload + 1 pin de `SET NOCOUNT ON`); `dotnet build SmartNet.sln` →
+  compilacion limpia; `dotnet test` de `SmartNet.Db.Runner.Tests` (134/134, incluye
+  `PermissionMatrixTests` 27/27 sin duplicar ninguna) y `SmartNet.Facturacion.Infrastructure.Tests`
+  (46/46) tambien en verde tras el fix.

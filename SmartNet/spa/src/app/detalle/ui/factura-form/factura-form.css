@@ -1,0 +1,23 @@
+.factura-form {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-3);
+}
+
+.factura-form__cabecera {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.factura-form__confirmar-afectacion {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.factura-form__confirmar-afectacion p {
+  margin: 0;
+  font-size: var(--fs-13);
+}
