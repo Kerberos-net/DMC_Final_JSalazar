@@ -11,9 +11,9 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | **13 de 18 cerrados** (BACKLOG.md tiene 18 ítems: el #18 "Ajuste visual del diseño SPA" nació al cerrar el sub-cambio visual del #12, 2026-08-24) |
-| Ciclo SDD activo | Ninguno — último cerrado: ítem #14 (Outbox y mensajería) |
-| Última fase cerrada | Ítem #14 (Outbox y mensajería), 6 fases, 51/51 tareas cerradas, verify PASS sin CRITICAL/WARNING (2 SUGGESTIONS no bloqueantes), 2 bugs de producción reales encontrados y corregidos (permiso `SEQUENCE` en `fact.SeqOutbox`, `SET NOCOUNT ON`) — ítem #14 cerrado 2026-08-25 |
+| Ítems del backlog | **14 de 18 cerrados** (BACKLOG.md tiene 18 ítems: el #18 "Ajuste visual del diseño SPA" nació al cerrar el sub-cambio visual del #12, 2026-08-24) |
+| Ciclo SDD activo | Ninguno — último cerrado: ítem #17 (Errores, notificaciones y operación) |
+| Última fase cerrada | Ítem #17 (Errores, notificaciones y operación), 7 fases, 35/35 tareas cerradas, verify PASS (0 CRITICAL tras re-verificación, 1 WARNING no bloqueante, 3 SUGGESTIONS de deuda aceptada), 2 gaps reales de proceso encontrados y corregidos (texto de spec desactualizado, manifest de *checksums* sin regenerar) — ítem #17 cerrado 2026-08-25 |
 
 ---
 
@@ -1385,7 +1385,106 @@ quedan deliberadamente diferidas fuera de alcance del #14 — reversión de `Est
 
 ---
 
-## ⬜ Ítems 10, 15 a 18 — sin ciclo SDD abierto
+## ✅ 17. Errores, notificaciones y operación
+
+Tres clases de error, notificación por clase, Telegram con respaldo por correo,
+`EstadoIntegracion`, latido, pantalla de configuración. `EstadoIntegracion`, la clasificación de
+error para ingesta, el latido del worker y los datos semilla de `Configuracion` ya existían
+(ítems #6/#11/#13/#14); el núcleo nuevo real es la notificación Telegram+correo, la envoltura de
+error/reintentos del outbox, el consumidor de `CommandQueue` (ausente hasta ahora — sin él,
+`reprocesar`/`reconectar`/`sincronizar` de ADR 0010 no cerraban el ciclo), y la API+pantalla de
+Configuración. Depende del ítem #14 (completo). Incluye el consumidor de `CommandQueue` por
+decisión explícita del dueño del proyecto — no estaba nombrado en la línea del backlog pero era un
+requisito duro de ADR 0010 sin otro lugar donde vivir.
+
+**Hallazgo de diseño que contradijo la propuesta, ratificado por el dueño**: los errores del
+outbox NO pueden persistir en `fact.ProcesamientoError` (exige `ProcesamientoId`, que el outbox no
+tiene; derivarlo violaría ADR 0003 — `fact_worker` no puede leer `fact.Factura`). Se agregó
+`Clasificacion VARCHAR(20)` + CHECK a `fact.OutboxEventIntegracion` en su lugar, vía
+`020_outbox_clasificacion.sql` + rollback (SQL versionado, ADR 0016) — junto con la fila semilla
+`CORREO.DESTINATARIOS` en `fact.Configuracion`.
+
+**`panel-errores` (#13): sin cambios de código.** La spec inicial pedía un delta (indicador de
+notificación de respaldo enviada), pero el diseño ratificado (D7) determinó que el dato vive a
+nivel de factura (`OutboxEventIntegracion`), no a nivel de documento (`ErrorProcesamiento`, lo que
+renderiza el panel). El dueño del proyecto confirmó seguir el diseño; el delta se retiró de la spec.
+
+**Entrega:** un solo PR (`size:exception`), aceptado explícitamente por el dueño del proyecto
+cuando el estimado de `sdd-tasks` (~1.700–2.200 líneas) superó los 800 de presupuesto de sesión.
+
+**Ciclo SDD:** `openspec/changes/archive/2026-08-25-errores-notificaciones-operacion/` · **35 de 35 tareas cerradas** — ✅ **CERRADO 2026-08-25**
+
+| Fase | Alcance | Tareas | Estado |
+|---|---|---|---|
+| 1 | Esquema DB — `020_outbox_clasificacion.sql` + rollback (columna `Clasificacion` + CHECK, semilla `CORREO.DESTINATARIOS`) | 3/3 | ✅ |
+| 2 | `clasificacion-errores-outbox` — núcleo puro de clasificación (ADR 0019), envoltura de `despacho_outbox.py`, productor DIFERIBLE (429/Retry-After) | 6/6 | ✅ |
+| 3 | `notificaciones-telegram-correo` — notificador Telegram-primario/correo-de-respaldo, ambos intentos logueados, disparo por clase | 7/7 | ✅ |
+| 4 | `consumidor-command-queue` — consumidor Python con lease READPAST (patrón de `reclamo.py`), `REPROCESAR`/`RECONECTAR` conectados | 6/6 | ✅ |
+| 5 | `configuracion-api-spa` — `ConfiguracionEndpoints.cs` nuevo, `ValorDeConfiguracion` puro, pantalla Angular `configuracion/` | 9/9 | ✅ |
+| 6 | `panel-errores` — resuelto sin delta (decisión del dueño, D7) | 1/1 | ✅ |
+| 7 | Verificación — suite completa, idempotencia CI del script 020 | 3/3 | ✅ |
+
+Pronóstico de revisión: alto riesgo de presupuesto de 800 líneas (~1.700–2.200 estimadas por
+`sdd-tasks`); el dueño del proyecto eligió explícitamente **un solo PR** con `size:exception` en
+vez de encadenar. Detalle completo en `tasks.md`.
+
+### Pruebas
+
+Verificación independiente de `sdd-verify` (dos pasadas: la primera encontró 2 gaps, la segunda
+confirmó el cierre), corriendo cada suite por separado:
+
+| Suite | Resultado | Nota |
+|---|---|---|
+| Worker `pytest tests/unit` | 266/266 | Núcleo de clasificación, notificador, consumidor de `CommandQueue` |
+| Worker `pytest tests/integration -m integracion` | Sin base SQL Server viva en la primera pasada de verify | Confirmado no fabricado como PASS — se omite explícitamente |
+| `SmartNet.Facturacion.Core.Tests` (`ValorDeConfiguracion`) | 7/7 | Validación pura por `Tipo` |
+| `SmartNet.Facturacion.Infrastructure.Tests` (`SqlConfiguracionRepository`) | 7/7 | GET/UPDATE-only, clave desconocida → 404 |
+| `SmartNet.Api.Tests` (`ConfiguracionEndpoints`) | 7/7 | `WebApplicationFactory` |
+| SPA `ng test` | 180/180 (29 archivos) | Feature `configuracion/` completa |
+| `SmartNet.Db.Runner.Tests` (`ChecksumManifestTests`) | 6/6 | Tras regenerar el manifest (gap 2, ver abajo) |
+
+### Lo verificado al cerrar
+
+**Dos bugs de producción reales encontrados y corregidos durante la implementación de la Fase 5,
+en trabajo de la Fase 1 que nunca se había corrido contra SQL Server real hasta entonces.** (1) La
+`Descripcion` de la fila semilla del script 020 excedía `NVARCHAR(200)` (error de truncamiento
+2628, 253→167 caracteres). (2) Su propio test de integración tenía una `Secuencia` faltante, un
+`Tipo` inválido y una fila de FK faltante. Ambos corregidos y re-verificados.
+
+**Dos gaps reales encontrados por la primera pasada de `sdd-verify` — ninguno de código, ambos
+mecánicos, corregidos por el orquestador directamente (no por un sub-agente de apply) y
+re-confirmados por una segunda pasada independiente de `sdd-verify`.** (1) `specs/clasificacion-errores-outbox/spec.md`
+seguía describiendo persistencia en `fact.ProcesamientoError` pese a que el diseño ratificado (D1)
+ya la redirigía a `fact.OutboxEventIntegracion` — el código estaba bien, el texto de la spec
+había quedado desactualizado. (2) `SmartNet/db/schema/checksums.txt` nunca se regeneró para
+incluir `020_outbox_clasificacion.sql`, y `ChecksumManifestTests` fallaba de forma determinística;
+al regenerar también se corrigió deriva preexistente en los *hashes* de `018`/`019` (contenido de
+esos scripts sin tocar — confirmado por `git diff --stat` vacío sobre ambos `.sql`).
+
+**Bug de proceso en el propio `sdd-archive`, encontrado y corregido a mano antes del commit.** El
+sub-agente de archivo copió `design.md`/`proposal.md`/`tasks.md`/`verify-report.md` con secciones
+recortadas (perdía detalle del script SQL y notas de diseño) y dejó la carpeta original del cambio
+sin borrar — un duplicado, no el *move* que exige `openspec-convention.md`. Se corrigió reemplazando
+la carpeta de archivo por una copia completa e idéntica del original y borrando el duplicado.
+
+**Ledger nativo de intentos (`gentle-ai sdd-attempt`) activo y usado en este ciclo** — contradice la
+nota de "Condiciones del entorno" más abajo, que documenta RDD como desactivado por ACL/exFAT. Su
+presupuesto por defecto de 200 líneas por intento resultó demasiado chico para los lotes reales de
+este ítem (150–2.079 líneas); cada `finish` que lo superó exigió un `sdd-attempt reset` explícito
+del dueño del proyecto — pasó 4 veces en este ciclo, mismo criterio cada vez (`size:exception` ya
+aceptado a nivel de PR).
+
+`sdd-verify` (segunda pasada, final): 0 CRITICAL, 1 WARNING no bloqueante (`dotnet test SmartNet.sln`
+no determinístico bajo contención local de SQL Server — deuda preexistente, no introducida por
+#17), 3 SUGGESTIONS de deuda aceptada y documentada, no oculta: `SINCRONIZAR_GMAIL`/`SINCRONIZAR_SBS`
+sin *wiring* (`NotImplementedError` explícito, depende de #15/#16 aún no construidos), *dedupe*
+best-effort de notificación DIFERIBLE (ventana de carrera lectura-escritura sin *lock*, mitigada por
+el *lease* de 5 min), contrato del *wrapper* de clasificación sin validar contra un *handler* real
+de Drive/Sheets todavía.
+
+---
+
+## ⬜ Ítems 10, 15, 16 y 18 — sin ciclo SDD abierto
 
 Las fases de cada ítem **se definen cuando arranca su ciclo SDD**, no antes. Ponerlas aquí ahora
 sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ítem, y ninguno existe.
@@ -1395,7 +1494,6 @@ sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ít
 | 10 | Notas de crédito | #8 | ⚠ `REGLAS.md` §5, §7 | ⬜ |
 | 15 | Publicación a Drive | #14 | — | ⬜ |
 | 16 | Publicación a Sheets | #14 | — | ⬜ |
-| 17 | Errores, notificaciones y operación | #14 | — | ⬜ |
 | 18 | Ajuste visual del diseño SPA | #12 | ⚠ *Handoff* de diseño | ⬜ |
 
 Ítem #18 nace del cierre del sub-cambio visual del #12 (2026-08-24): el tema aplica y las pantallas
