@@ -34,39 +34,39 @@ on:
 env:
   DOTNET_NOLOGO: 'true'
   DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
-  SOLUTION: SmartNet/SmartNet.sln
+  SOLUTION: SmartNet/SmartNetApi/SmartNet.sln
   # verificaciones-estaticas: no-database projects. SmartNet.Auth.Core.Tests is pure by
   # construction (PurityScanTests proves zero DB/HTTP/clock) -- the whole project belongs here,
   # no filter needed. SmartNet.Db.Runner.Tests mixes pure and DB-dependent tests in one project,
   # so only its two file-only suites are filtered in.
-  TESTS_RUNNER: SmartNet/db/runner/SmartNet.Db.Runner.Tests
-  TESTS_AUTH_CORE: SmartNet/auth/SmartNet.Auth.Core.Tests
-  TESTS_CATALOGOS_CORE: SmartNet/catalogos/SmartNet.Catalogos.Core.Tests
-  TESTS_TIPOS_CAMBIO_CORE: SmartNet/tipos-de-cambio/SmartNet.TiposCambio.Core.Tests
-  TESTS_INBOX_CORE: SmartNet/inbox/SmartNet.Inbox.Core.Tests
-  TESTS_CONTABLE_CORE: SmartNet/contable/SmartNet.Contable.Core.Tests
+  TESTS_RUNNER: SmartNet/SmartNetApi/db/runner/SmartNet.Db.Runner.Tests
+  TESTS_AUTH_CORE: SmartNet/SmartNetApi/auth/SmartNet.Auth.Core.Tests
+  TESTS_CATALOGOS_CORE: SmartNet/SmartNetApi/catalogos/SmartNet.Catalogos.Core.Tests
+  TESTS_TIPOS_CAMBIO_CORE: SmartNet/SmartNetApi/tipos-de-cambio/SmartNet.TiposCambio.Core.Tests
+  TESTS_INBOX_CORE: SmartNet/SmartNetApi/inbox/SmartNet.Inbox.Core.Tests
+  TESTS_CONTABLE_CORE: SmartNet/SmartNetApi/contable/SmartNet.Contable.Core.Tests
   # BACKLOG #11 (tasks.md Phase 4, task 4.4): the facturacion Core project -- ServicioDeFacturas/
   # ServicioDeAsientos/ServicioDeIntegraciones, TokenDeConcurrencia, ResultadoComando/CasoConflicto
   # -- has been pure-domain (PurityScanTests-guarded, no DB/HTTP/clock) since PR 1; it was missing
   # from this manifest, never actually running here despite existing since PR 1.
-  TESTS_FACTURACION_CORE: SmartNet/facturacion/SmartNet.Facturacion.Core.Tests
+  TESTS_FACTURACION_CORE: SmartNet/SmartNetApi/facturacion/SmartNet.Facturacion.Core.Tests
   # pruebas-de-base-de-datos: every project whose tests use TestDatabaseFixture (throwaway
   # `fact_test_<guid>` databases) or WebApplicationFactory against a real SQL Server.
-  TESTS_AUTH_INFRA: SmartNet/auth/SmartNet.Auth.Infrastructure.Tests
-  TESTS_API: SmartNet/api/SmartNet.Api.Tests
-  TESTS_ADMIN: SmartNet/admin/SmartNet.Admin.Tests
-  TESTS_CATALOGOS_INFRA: SmartNet/catalogos/SmartNet.Catalogos.Infrastructure.Tests
-  TESTS_TIPOS_CAMBIO_INFRA: SmartNet/tipos-de-cambio/SmartNet.TiposCambio.Infrastructure.Tests
-  TESTS_INBOX_INFRA: SmartNet/inbox/SmartNet.Inbox.Infrastructure.Tests
+  TESTS_AUTH_INFRA: SmartNet/SmartNetApi/auth/SmartNet.Auth.Infrastructure.Tests
+  TESTS_API: SmartNet/SmartNetApi/api/SmartNet.Api.Tests
+  TESTS_ADMIN: SmartNet/SmartNetApi/admin/SmartNet.Admin.Tests
+  TESTS_CATALOGOS_INFRA: SmartNet/SmartNetApi/catalogos/SmartNet.Catalogos.Infrastructure.Tests
+  TESTS_TIPOS_CAMBIO_INFRA: SmartNet/SmartNetApi/tipos-de-cambio/SmartNet.TiposCambio.Infrastructure.Tests
+  TESTS_INBOX_INFRA: SmartNet/SmartNetApi/inbox/SmartNet.Inbox.Infrastructure.Tests
   # BACKLOG #11 (tasks.md Phase 4, task 4.4): SqlFacturacionStore/SqlUnidadDeTrabajo/
   # SqlCommandQueueRepository/SqlEstadoIntegracionRepository -- uses TestDatabaseFixture, same as
   # every other *.Infrastructure.Tests project below. Also missing from this manifest since PR 1.
-  TESTS_FACTURACION_INFRA: SmartNet/facturacion/SmartNet.Facturacion.Infrastructure.Tests
+  TESTS_FACTURACION_INFRA: SmartNet/SmartNetApi/facturacion/SmartNet.Facturacion.Infrastructure.Tests
   # pruebas-de-worker-python: the worker's own SQL Server container (own ephemeral usr_worker
   # server-scoped LOGIN, kept out of the .NET DB job's shared container).
-  WORKER_DIR: SmartNet/worker
+  WORKER_DIR: SmartNet/SmartNetWorker
   # pruebas-de-frontend: BACKLOG #7 WU5's Angular workspace. No SQL Server needed.
-  SPA_DIR: SmartNet/spa
+  SPA_DIR: SmartNet/SmartNetWeb
 
 jobs:
   verificaciones-estaticas:

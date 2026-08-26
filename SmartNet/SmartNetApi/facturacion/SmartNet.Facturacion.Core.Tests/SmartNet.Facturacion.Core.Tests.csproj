@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+    <IsPackable>false</IsPackable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="coverlet.collector" Version="6.0.4" />
+    <PackageReference Include="Microsoft.NET.Test.Sdk" Version="17.14.1" />
+    <PackageReference Include="Mono.Cecil" Version="0.11.6" />
+    <PackageReference Include="NetArchTest.Rules" Version="1.3.2" />
+    <PackageReference Include="xunit" Version="2.9.3" />
+    <PackageReference Include="xunit.runner.visualstudio" Version="3.1.4" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Using Include="Xunit" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\SmartNet.Facturacion.Core\SmartNet.Facturacion.Core.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <!-- Fase 5 (tasks.md 5.1, ADR 0019 level 2): the SAME fixture
+         test_outbox_event_payload_contract.py asserts the Python consumer passes through
+         byte-for-byte, proving PayloadOutbox.Serializar and the worker agree on the wire format,
+         not two independently self-asserted shapes. Same linked-Content pattern as
+         PayloadInboxContractTests' inbox_event_payload.golden.json. -->
+    <Content Include="..\..\..\SmartNetWorker\tests\fixtures\outbox_event_payload.golden.json" Link="fixtures\outbox_event_payload.golden.json">
+      <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+  </ItemGroup>
+
+</Project>
