@@ -15,7 +15,8 @@ import { dosDecimales, importeOpcional } from '../../../shared/formato';
  *  - Editable via the .NET PATCH delta (BACKLOG #18 PR5): `tipoComprobante` (select of the 3
  *    comprobante types) and `numero`, bound through the same `cambios` → `borradorFactura` → PATCH
  *    path as every other editable field.
- *  - Read-only display: `base imponible` / `IGV` (placeholder until the Phase 6 projection),
+ *  - Read-only display: `base imponible` / `IGV` (from the `AsientoRespuesta.basePEN` / `igvPEN`
+ *    projection — BACKLOG #18 PR6; `—` placeholder while there is no asiento vigente),
  *    `tipo de cambio (venta)` (design D6 — the rate the engine actually uses), and derived
  *    `mes` / `día` contable from `AsientoContable.FechaContable`.
  *
@@ -35,6 +36,10 @@ export class FacturaForm {
   /** `AsientoContable.FechaContable` (`YYYY-MM-DD`) when an asiento exists — drives the derived
    * `mes` / `día` contable rows. Null when there is no asiento vigente yet. */
   readonly fechaContable = input<string | null>(null);
+  /** `AsientoContable.BasePEN` / `IgvPEN` projected read-only on `AsientoRespuesta` (BACKLOG #18
+   * PR6). Null when there is no asiento vigente yet — the row then shows the `—` placeholder. */
+  readonly basePEN = input<number | null>(null);
+  readonly igvPEN = input<number | null>(null);
   readonly editable = input(true);
 
   readonly cambios = output<CorreccionFacturaRequest>();
@@ -71,8 +76,8 @@ export class FacturaForm {
     return this.factura().moneda === 'PEN' ? 'No aplica' : '0.00';
   });
 
-  readonly baseImponibleTexto = computed(() => importeOpcional(null));
-  readonly igvTexto = computed(() => importeOpcional(null));
+  readonly baseImponibleTexto = computed(() => importeOpcional(this.basePEN()));
+  readonly igvTexto = computed(() => importeOpcional(this.igvPEN()));
 
   readonly mesContable = computed(() => this.fechaContable()?.slice(5, 7) ?? '—');
   readonly diaContable = computed(() => this.fechaContable()?.slice(8, 10) ?? '—');

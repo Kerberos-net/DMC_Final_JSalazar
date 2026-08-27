@@ -41,6 +41,10 @@ export interface AsientoRespuesta {
   readonly fechaContable: string;
   readonly motivoDescripcion: string | null;
   readonly tipoCambioVenta: number | null;
+  /** `fact.AsientoContable.BasePEN` / `IgvPEN` — additive read-only projection (BACKLOG #18 PR6):
+   * feeds the read-only "base imponible" / "IGV" rows in `factura-form`. Not editable. */
+  readonly basePEN: number;
+  readonly igvPEN: number;
   readonly lineas: readonly LineaRespuesta[];
 }
 

@@ -19,6 +19,8 @@ describe('AsientoService', () => {
     fechaContable: '2026-08-10',
     motivoDescripcion: null,
     tipoCambioVenta: null,
+    basePEN: 100,
+    igvPEN: 18,
     lineas: [
       {
         lineaId: 1,

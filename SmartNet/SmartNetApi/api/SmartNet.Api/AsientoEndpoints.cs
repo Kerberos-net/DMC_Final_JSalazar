@@ -231,14 +231,23 @@ internal sealed record ReabrirAnularRequest(string? Motivo);
 /// campo en AMBAS `FacturaRespuesta` y `AsientoRespuesta`): design.md D4 corrige explícitamente la
 /// propuesta -- `FacturaPersistida` no tiene esa columna, y exponer una tasa DISTINTA junto a la
 /// congelada dejaría dos tasas divergiendo en pantalla. Se sigue design.md (la corrección
-/// documentada), no la spec delta sin corregir; ver apply-progress para el detalle.</summary>
+/// documentada), no la spec delta sin corregir; ver apply-progress para el detalle.
+///
+/// <see cref="BasePEN"/> / <see cref="IgvPEN"/> — BACKLOG #18 PR6, proyección aditiva de solo
+/// lectura: <c>fact.AsientoContable.BasePEN</c> / <c>IgvPEN</c> ya se computan al generar el asiento
+/// (ADR 0019 — la lógica contable vive en el núcleo) y ya se cargan en
+/// <see cref="AsientoContable.BasePEN"/> / <see cref="AsientoContable.IgvPEN"/>; este campo solo las
+/// expone para las filas de solo lectura "base imponible" / "IGV" de <c>factura-form</c>. No toca
+/// ninguna ruta de escritura ni las hace editables.</summary>
 internal sealed record AsientoRespuesta(
     long AsientoContableId, string Estado, string? NumeroAsiento, string ProveedorCodigo, DateOnly FechaContable,
-    string? MotivoDescripcion, decimal? TipoCambioVenta, IReadOnlyList<LineaRespuesta> Lineas)
+    string? MotivoDescripcion, decimal? TipoCambioVenta, decimal BasePEN, decimal IgvPEN,
+    IReadOnlyList<LineaRespuesta> Lineas)
 {
     public static AsientoRespuesta De(AsientoPersistido asiento, IReadOnlyList<LineaPersistida> lineas) => new(
         asiento.AsientoContableId, asiento.Estado, asiento.NumeroAsiento, asiento.Asiento.ProveedorCodigo,
         asiento.Asiento.FechaContable, asiento.Asiento.MotivoDescripcion, asiento.Asiento.TipoCambioVenta,
+        asiento.Asiento.BasePEN, asiento.Asiento.IgvPEN,
         lineas.Select(LineaRespuesta.De).ToArray());
 }
 

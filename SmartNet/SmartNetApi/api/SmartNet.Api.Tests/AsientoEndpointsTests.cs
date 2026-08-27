@@ -457,4 +457,28 @@ public sealed class AsientoEndpointsTests : SesionEndpointsTestBase
         var cuerpo = await response.Content.ReadFromJsonAsync<AsientoRespuesta>();
         Assert.Null(cuerpo!.TipoCambioVenta);
     }
+
+    // --- BasePEN / IgvPEN read-only projection (BACKLOG #18 PR6, design "factura-form field grid") ---
+
+    /// <summary>tasks.md Phase 6 (BACKLOG #18) — <c>AsientoRespuesta</c> proyecta
+    /// <c>fact.AsientoContable.BasePEN</c> / <c>IgvPEN</c> (columnas ya computadas al generar el
+    /// asiento, ADR 0019 — aquí solo se exponen, sin tocar el motor contable). La pantalla de
+    /// detalle las muestra como filas de solo lectura en <c>factura-form</c>.</summary>
+    [Fact]
+    public async Task GetAsiento_ExposesBasePenAndIgvPenFromAsientoContable()
+    {
+        var facturaId = await Db.InsertarFacturaAsync();
+        var asientoId = await Db.InsertarAsientoBorradorBalanceadoAsync(facturaId);
+        await Db.ExecuteNonQueryAsync(
+            $"UPDATE fact.AsientoContable SET BasePEN = 100.00, IgvPEN = 18.00 WHERE AsientoContableId = {asientoId};");
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var response = await client.GetAsync($"/api/asientos/{asientoId}");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var cuerpo = await response.Content.ReadFromJsonAsync<AsientoRespuesta>();
+        Assert.Equal(100.00m, cuerpo!.BasePEN);
+        Assert.Equal(18.00m, cuerpo.IgvPEN);
+    }
 }

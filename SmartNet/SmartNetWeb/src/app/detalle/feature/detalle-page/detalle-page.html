@@ -52,6 +52,8 @@
           [factura]="f"
           [tipoCambioVenta]="asiento()?.tipoCambioVenta ?? null"
           [fechaContable]="asiento()?.fechaContable ?? null"
+          [basePEN]="asiento()?.basePEN ?? null"
+          [igvPEN]="asiento()?.igvPEN ?? null"
           [editable]="f.estado !== 'VALIDADA'"
           (cambios)="onCambiosFactura($event)"
           (confirmarAfectacion)="onConfirmarAfectacion($event)"

@@ -25,13 +25,17 @@ describe('FacturaForm', () => {
     f: FacturaRespuesta,
     tipoCambioVenta: number | null = null,
     fechaContable: string | null = null,
-    editable = true
+    editable = true,
+    basePEN: number | null = null,
+    igvPEN: number | null = null
   ) => {
     const fixture = TestBed.createComponent(FacturaForm);
     fixture.componentRef.setInput('factura', f);
     fixture.componentRef.setInput('tipoCambioVenta', tipoCambioVenta);
     fixture.componentRef.setInput('fechaContable', fechaContable);
     fixture.componentRef.setInput('editable', editable);
+    fixture.componentRef.setInput('basePEN', basePEN);
+    fixture.componentRef.setInput('igvPEN', igvPEN);
     fixture.detectChanges();
     return fixture;
   };
@@ -148,11 +152,20 @@ describe('FacturaForm', () => {
   });
 
   describe('read-only display + derived rows', () => {
-    it('renders base imponible / IGV as a neutral placeholder until the Phase 6 projection lands', () => {
+    it('renders base imponible / IGV formatted tabular from the asiento projection (BACKLOG #18 PR6)', () => {
+      const fixture = createComponent(factura, null, null, true, 100, 18);
+      const base = fixture.nativeElement.querySelector('[data-testid="valor-base"]');
+      const igv = fixture.nativeElement.querySelector('[data-testid="valor-igv"]');
+      expect(base.textContent.trim()).toBe('100.00');
+      expect(igv.textContent.trim()).toBe('18.00');
+      expect(base.classList.contains('tabular-nums')).toBe(true);
+      expect(fixture.nativeElement.querySelector('[data-testid="valor-base"] input')).toBeNull();
+    });
+
+    it('renders base imponible / IGV as a neutral placeholder when there is no asiento value', () => {
       const fixture = createComponent(factura);
       expect(fixture.nativeElement.querySelector('[data-testid="valor-base"]').textContent.trim()).toBe('—');
       expect(fixture.nativeElement.querySelector('[data-testid="valor-igv"]').textContent.trim()).toBe('—');
-      expect(fixture.nativeElement.querySelector('[data-testid="valor-base"] input')).toBeNull();
     });
 
     it('shows the tipo de cambio (venta) value right-aligned tabular when present', () => {

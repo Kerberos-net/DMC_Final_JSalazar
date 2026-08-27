@@ -195,6 +195,38 @@ The delta is really **6 small additive touches**, not 4: layers 1–4 as designe
 - **6 touches not 4** — see "Deviation from design finding 3" above; both extra touches are additive and necessary for the spec's mandated 422.
 - **`ValidacionDeCorreccion` does not check `numero` uniqueness / format** — only blank + length; the DB `IX_Factura_Identidad` and server-side duplicate gate remain authoritative for identity collisions.
 
+## Phase 6 — read-only base/IGV projection (PR6, dep PR4) — DONE (4/4)
+
+**Branch**: `pr6/item-18-asientorespuesta-base-igv-projection` (off `pr5/item-18-patch-tipocomprobante-numero`, tip `aa91cda`). Strict TDD, RED→GREEN per task. All suites green, `dotnet build SmartNet.sln` clean, SPA lint clean.
+
+| Task | Status | Notes |
+|---|---|---|
+| 6.1 RED API contract test | [x] | `AsientoEndpointsTests.GetAsiento_ExposesBasePenAndIgvPenFromAsientoContable` — UPDATE `fact.AsientoContable SET BasePEN=100.00, IgvPEN=18.00`, GET `/api/asientos/{id}`, assert `cuerpo.BasePEN`/`IgvPEN`. RED = `AsientoRespuesta` has no `BasePEN`/`IgvPEN` (compile CS1061) |
+| 6.2 GREEN `AsientoRespuesta` projection | [x] | Added `decimal BasePEN, decimal IgvPEN` before `Lineas` in `AsientoEndpoints.cs`; `De(...)` maps `asiento.Asiento.BasePEN` / `.IgvPEN` (already loaded by `SqlUnidadDeTrabajo.CargarAsientoAsync` since #11 — `a.BasePEN, a.IgvPEN` in the SELECT). Additive projection only — no write path, no editability, no asiento-generation change (CLAUDE.md rule 2). `usr_api` already has SELECT on `fact.AsientoContable` (008) — no grant, no versioned SQL |
+| 6.3 RED `factura-form.spec.ts` | [x] | `createComponent` +`basePEN`/`igvPEN` params; new spec asserts `valor-base`=`100.00`, `valor-igv`=`18.00`, `tabular-nums`, no input; plus placeholder spec (`—`) when no asiento value. RED = `NG0303: Can't set value of the 'basePEN' input` (26 failed) |
+| 6.4 GREEN `asiento.model.ts` + bind | [x] | `AsientoRespuesta` model +`basePEN: number` / `igvPEN: number`. `factura-form.ts`: `basePEN`/`igvPEN` = `input<number \| null>(null)`; `baseImponibleTexto`/`igvTexto` now `importeOpcional(this.basePEN())` / `importeOpcional(this.igvPEN())` (2-decimal, `—` when null). `detalle-page.html`: `[basePEN]="asiento()?.basePEN ?? null"` / `[igvPEN]="..."`. Fixtures in `detalle-page.spec.ts` / `asiento.service.spec.ts` gained `basePEN`/`igvPEN` |
+
+### Phase 6 TDD Cycle Evidence
+
+| Task | RED (test first, observed failing) | GREEN | REFACTOR |
+|---|---|---|---|
+| 6.1/6.2 | `GetAsiento_ExposesBasePenAndIgvPenFromAsientoContable` — compile CS1061 `AsientoRespuesta` no `BasePEN`/`IgvPEN` | 2 record params + `De` mapping → `AsientoEndpointsTests` 21/21 pass | N/A — additive projection, no restructure |
+| 6.3/6.4 | `factura-form.spec.ts` — `NG0303` unknown input `basePEN` (26 failed) | inputs + `importeOpcional` binding + model fields + `detalle-page` binding + fixtures → 3 files / 46 pass | doc comment updated; helper reused (no new formatting code) |
+
+### Phase 6 Work Unit Evidence
+
+| Evidence | Value |
+|---|---|
+| Focused test command + result | `dotnet test SmartNet.Api.Tests --filter FullyQualifiedName~Asiento` → **33 passed** (+1). `npx ng test --no-watch --include='**/factura-form.spec.ts' --include='**/detalle-page.spec.ts' --include='**/asiento.service.spec.ts'` → **3 files / 46 passed**. Full `npx ng test --no-watch` → **32 files / 282 passed** (was 281 at PR5; +1). `npm run lint` clean. `dotnet build SmartNet.sln` → 0 warnings / 0 errors. |
+| Runtime harness | Real SQL Server via `SmartNetApiFactory` / `SmartNet.Db.TestBootstrap` — `GetAsiento_ExposesBasePenAndIgvPenFromAsientoContable` UPDATEs `fact.AsientoContable`, GETs `/api/asientos/{id}`, asserts the projected `BasePEN`/`IgvPEN` round-trip. |
+| Rollback boundary | Revert the 2 record params + `De` mapping + doc comment in `AsientoEndpoints.cs`; the new test in `AsientoEndpointsTests.cs`; `basePEN`/`igvPEN` inputs + binding in `factura-form.ts`; the read-only-rows test change in `factura-form.spec.ts`; `basePEN`/`igvPEN` in `asiento.model.ts`; the 2-line `detalle-page.html` binding; the fixture fields in `detalle-page.spec.ts` / `asiento.service.spec.ts`. No PR1–PR5 file touched except `factura-form.*` / `asiento.model.ts` (additive). Reverting the SPA does not break the API and vice versa (field is additive). |
+
+### Phase 6 risks / deviations
+- **`BasePEN`/`IgvPEN` are non-nullable `decimal` on `AsientoRespuesta`** (they are non-nullable on `AsientoContable`, defaulting to `0m` in `CargarAsientoAsync`). The SPA `factura-form` inputs are `number | null` so the `—` placeholder still shows when there is no asiento vigente (`asiento()` is null → `?? null`). When an asiento exists but base/IGV are genuinely `0`, the row shows `0.00` (design-intended).
+- **No `GET /api/facturas/{id}/asiento`-specific test added** — `AsientoRespuesta` is the shared shape and the projection is exercised through `GET /api/asientos/{id}`, matching the existing `TipoCambioVenta` test precedent in the same file.
+- **base imponible / IGV remain read-only** — editability is a REGLAS.md-normative decision deferred by design decision 3 / Open Question 3; not touched.
+- Authored diff well within the 400 review budget (~90 lines).
+
 ## PR boundary
 - PR1 / `size:exception` (~ +480 lines authored). Start: `main`. End: token layer + WCAG guard, `ng test` green.
 - PR2 / `pr2/item-18-shell-header-login` off `pr1/item-18-token-layer-wcag-guard`. ~+170 authored lines (within 400 budget). Start: PR1 tip. End: shell GF badge + login recomposition, `ng test` 247 green, lint clean, prod build no budget warning.
@@ -202,4 +234,5 @@ The delta is really **6 small additive touches**, not 4: layers 1–4 as designe
 - PR3 / `pr3/item-18-detalle-restructure` — committed `93ec9a7`.
 - PR4 / `pr4/item-18-factura-form-grid` — committed `8720f63`.
 - PR5 / `pr5/item-18-patch-tipocomprobante-numero` off `pr4` — committed `0642068`, accepted `size:exception` (~431 authored, ~212 tests). .NET 4-layer PATCH delta + `ValidacionDeCorreccion` guard + `CorreccionInvalida`→422 + `CodigoComprobante` + SPA `tipoComprobante`/`numero` editable binding. All suites green (Facturacion.Core 147, Contable.Core 41, Facturacion.Infra 53, Api FacturaEndpoints 32, SPA 281), lint clean, `dotnet build SmartNet.sln` clean. Not pushed, no PR.
-- Next: Phase 6 (`AsientoRespuesta` basePEN/igvPEN read-only projection), depends on PR4.
+- PR6 / `pr6/item-18-asientorespuesta-base-igv-projection` off `pr5` — additive `AsientoRespuesta.BasePEN`/`IgvPEN` read-only projection + SPA `factura-form` base/IGV row binding. All suites green (Api ~Asiento 33, SPA 282), lint clean, `dotnet build SmartNet.sln` clean. Within 400 budget (~90 authored lines). Not pushed, no PR.
+- Next: Phase 7 (verification) then Phase 8 (functional proveedor picker).

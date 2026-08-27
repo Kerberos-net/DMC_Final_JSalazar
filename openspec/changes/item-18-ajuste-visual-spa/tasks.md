@@ -81,10 +81,10 @@ Chain strategy: pending
 
 ## Phase 6: read-only base/IGV projection (PR6 conditional, dep PR4 — api-facturas / pantalla)
 
-- [ ] 6.1 RED: API contract test — `AsientoRespuesta` includes `basePEN`/`igvPEN` from `AsientoContable`; GET `/api/facturas/{id}/asiento` returns them.
-- [ ] 6.2 GREEN: add `BasePEN`, `IgvPEN` to `AsientoRespuesta` in `AsientoEndpoints.cs` (already on `AsientoContable`; additive only).
-- [ ] 6.3 RED: `factura-form.spec.ts` — read-only `base imponible`/`IGV` rows show formatted tabular values from `asiento().basePEN/igvPEN`.
-- [ ] 6.4 GREEN: add `basePEN`/`igvPEN` to `asiento.model.ts`; bind the read-only rows.
+- [x] 6.1 RED: API contract test — `AsientoRespuesta` includes `basePEN`/`igvPEN` from `AsientoContable`; GET `/api/facturas/{id}/asiento` returns them.
+- [x] 6.2 GREEN: add `BasePEN`, `IgvPEN` to `AsientoRespuesta` in `AsientoEndpoints.cs` (already on `AsientoContable`; additive only).
+- [x] 6.3 RED: `factura-form.spec.ts` — read-only `base imponible`/`IGV` rows show formatted tabular values from `asiento().basePEN/igvPEN`.
+- [x] 6.4 GREEN: add `basePEN`/`igvPEN` to `asiento.model.ts`; bind the read-only rows.
 
 ## Phase 7: Verification
 
