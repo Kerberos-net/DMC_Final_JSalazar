@@ -28,9 +28,9 @@ export class FacturaForm {
   readonly cambios = output<CorreccionFacturaRequest>();
   readonly confirmarAfectacion = output<boolean>();
 
-  readonly esBloqueante = computed(
-    () => this.factura().posibleDuplicado || this.factura().esProveedorGenerico
-  );
+  /** item #18 PR3: the duplicado / P00000 blocking banners were hoisted OUT of this component into
+   * `detalle/ui/indicadores-factura`, rendered by `detalle-page` above the split (design D4). Only
+   * the informational treatment (OCR-missing / afectación-no-verificada) stays here for now. */
   readonly esInformativa = computed(
     () => this.factura().tieneCamposNoExtraidos || this.factura().afectacionMixta === null
   );

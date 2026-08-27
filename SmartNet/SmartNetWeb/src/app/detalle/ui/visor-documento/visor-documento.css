@@ -1,5 +1,5 @@
-/* tasks.md 4.10 -- layout only, no color literal (native <select> already inherits color-scheme
- * from styles.css `base` layer, so it follows the active theme automatically). */
+/* tasks.md 4.10 / item #18 PR3 3.9 -- layout only; radius + elevation from the canonical token
+ * scale (native <select> already inherits color-scheme from styles.css `base` layer). */
 :host {
   display: flex;
   flex-direction: column;
@@ -13,6 +13,7 @@
   width: 100%;
   min-height: 0;
   border: 1px solid var(--borde-sutil);
-  border-radius: var(--radio-panel);
+  border-radius: var(--radio-card);
   background: var(--fondo-superficie);
+  box-shadow: var(--sombra-hairline);
 }

@@ -55,7 +55,9 @@ describe('DetallePage', () => {
     ],
   };
 
-  async function crearPagina() {
+  async function crearPagina(facturaOverride: Partial<FacturaRespuesta> = {}, asientoOverride: Partial<AsientoRespuesta> = {}) {
+    const facturaFlush = { ...factura, ...facturaOverride };
+    const asientoFlush = { ...asiento, ...asientoOverride };
     await TestBed.configureTestingModule({
       imports: [DetallePage],
       providers: [
@@ -69,10 +71,10 @@ describe('DetallePage', () => {
     const fixture = TestBed.createComponent(DetallePage);
     fixture.detectChanges();
 
-    httpMock.expectOne('/api/facturas/42').flush(factura, { headers: { ETag: '"f1"' } });
+    httpMock.expectOne('/api/facturas/42').flush(facturaFlush, { headers: { ETag: '"f1"' } });
     httpMock
       .expectOne('/api/facturas/42/asiento')
-      .flush({ asientoContableId: 7, asiento } as FacturaAsientoRespuesta, { headers: { ETag: '"a1"' } });
+      .flush({ asientoContableId: 7, asiento: asientoFlush } as FacturaAsientoRespuesta, { headers: { ETag: '"a1"' } });
     httpMock.expectOne('/api/facturas/42/documentos').flush([]);
     httpMock.expectOne('/api/facturas/42/historial').flush([]);
     await Promise.resolve();
@@ -158,5 +160,91 @@ describe('DetallePage', () => {
 
     await promesa;
     expect(fixture.componentInstance.factura()?.afectacionMixta).toBe(true);
+  });
+
+  /* tasks.md 3.3 (RED first), spa-visual-detalle-validacion "Page header with back action, title,
+   * estado pill, and top-right actions". */
+  describe('page header', () => {
+    it('renders back "← Volver", the composed title, an estado pill, and top-right Guardar/Validar', async () => {
+      const fixture = await crearPagina();
+      const host: HTMLElement = fixture.nativeElement;
+
+      expect(host.querySelector('[data-testid="volver"]')?.textContent).toContain('Volver');
+      expect(host.querySelector('[data-testid="detalle-titulo"]')?.textContent?.replace(/\s+/g, ' ').trim())
+        .toBe('Factura - F001-100 - P00123');
+      expect(host.querySelector('[data-testid="estado-pill"]')?.textContent).toContain('ABIERTA');
+
+      const acciones = host.querySelector('[data-testid="detalle-acciones"]')!;
+      expect(acciones.querySelector('[data-testid="guardar-avance"]')).toBeTruthy();
+      expect(acciones.querySelector('[data-testid="validar"]')).toBeTruthy();
+    });
+
+    it('uses the pendiente chip token for a non-validada estado', async () => {
+      const fixture = await crearPagina();
+      expect(fixture.nativeElement.querySelector('[data-testid="estado-pill"]').classList).toContain('chip--pendiente');
+    });
+  });
+
+  /* tasks.md 3.3 -- banners live in the detalle-page container, above the split, NEVER in factura-form. */
+  describe('indicator banners placement', () => {
+    it('renders the duplicado banner in the page container and not inside factura-form', async () => {
+      const fixture = await crearPagina({ posibleDuplicado: true });
+      const host: HTMLElement = fixture.nativeElement;
+
+      expect(host.querySelector('app-indicadores-factura [data-testid="indicador-duplicado"]')).toBeTruthy();
+      expect(host.querySelector('app-factura-form [data-testid="indicador-duplicado"]')).toBeNull();
+      expect(host.querySelector('app-factura-form .alerta--bloqueante')).toBeNull();
+    });
+
+    it('renders the P00000 banner above the split', async () => {
+      const fixture = await crearPagina({ esProveedorGenerico: true });
+      expect(fixture.nativeElement.querySelector('app-indicadores-factura [data-testid="indicador-p00000"]')).toBeTruthy();
+    });
+
+    it('renders the TC-faltante banner for a foreign-currency factura with no tipoCambioVenta', async () => {
+      const fixture = await crearPagina({ moneda: 'USD' }, { tipoCambioVenta: null });
+      expect(fixture.nativeElement.querySelector('app-indicadores-factura [data-testid="indicador-tc-faltante"]')).toBeTruthy();
+    });
+
+    it('does not render the TC-faltante banner once a tipoCambioVenta is present', async () => {
+      const fixture = await crearPagina({ moneda: 'USD' }, { tipoCambioVenta: 3.755 });
+      expect(fixture.nativeElement.querySelector('[data-testid="indicador-tc-faltante"]')).toBeNull();
+    });
+  });
+
+  /* tasks.md 3.4 (RED first), pantalla-detalle-validacion "Validar is hard-blocked while P00000 or
+   * a duplicate is unresolved" -- no ack-checkbox bypass. */
+  describe('bloqueosValidar gate', () => {
+    it('lists DUPLICADO when posibleDuplicado is true and blocks Validar', async () => {
+      const fixture = await crearPagina({ posibleDuplicado: true });
+      expect(fixture.componentInstance.bloqueosValidar()).toEqual(['DUPLICADO']);
+      expect(fixture.componentInstance.puedeValidar()).toBe(false);
+      expect(fixture.nativeElement.querySelector('[data-testid="validar"]').disabled).toBe(true);
+
+      await fixture.componentInstance.validar('2026-08-23');
+      httpMock.expectNone((r) => r.url === '/api/facturas/42/validar');
+    });
+
+    it('lists PROVEEDOR_GENERICO when esProveedorGenerico is true and blocks Validar', async () => {
+      const fixture = await crearPagina({ esProveedorGenerico: true });
+      expect(fixture.componentInstance.bloqueosValidar()).toEqual(['PROVEEDOR_GENERICO']);
+      expect(fixture.componentInstance.puedeValidar()).toBe(false);
+
+      await fixture.componentInstance.validar('2026-08-23');
+      httpMock.expectNone((r) => r.url === '/api/facturas/42/validar');
+    });
+
+    it('lists both blockers when both conditions hold', async () => {
+      const fixture = await crearPagina({ posibleDuplicado: true, esProveedorGenerico: true });
+      expect(fixture.componentInstance.bloqueosValidar()).toEqual(['DUPLICADO', 'PROVEEDOR_GENERICO']);
+      expect(fixture.componentInstance.puedeValidar()).toBe(false);
+    });
+
+    it('re-enables Validar when neither blocker applies', async () => {
+      const fixture = await crearPagina();
+      expect(fixture.componentInstance.bloqueosValidar()).toEqual([]);
+      expect(fixture.componentInstance.puedeValidar()).toBe(true);
+      expect(fixture.nativeElement.querySelector('[data-testid="validar"]').disabled).toBe(false);
+    });
   });
 });

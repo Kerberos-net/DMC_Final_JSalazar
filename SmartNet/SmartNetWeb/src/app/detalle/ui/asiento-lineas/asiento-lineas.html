@@ -74,6 +74,28 @@
       }
     }
   </tbody>
+  <tfoot>
+    <tr class="asiento-lineas__total">
+      <td colspan="3">Total</td>
+      <td class="tabular-nums" data-testid="total-debe">{{ formatearMonto(cuadre().debe) }}</td>
+      <td class="tabular-nums" data-testid="total-haber">{{ formatearMonto(cuadre().haber) }}</td>
+      @if (editable()) {
+        <td></td>
+      }
+    </tr>
+    <tr>
+      <td [attr.colspan]="editable() ? 6 : 5">
+        <span
+          class="asiento-lineas__cuadre"
+          [class.asiento-lineas__cuadre--ok]="cuadre().cuadrado"
+          [class.asiento-lineas__cuadre--desbalance]="!cuadre().cuadrado"
+          data-testid="cuadre-pill"
+        >
+          {{ cuadre().cuadrado ? 'Cuadra' : 'No cuadra' }}
+        </span>
+      </td>
+    </tr>
+  </tfoot>
 </table>
 
 @if (editable()) {
@@ -103,7 +125,7 @@
       <button class="btn btn--secundario" type="button" (click)="cancelarAgregar()">Cancelar</button>
     </div>
   } @else {
-    <button class="btn btn--secundario" data-testid="agregar-linea" type="button" (click)="iniciarAgregar()">Agregar línea</button>
+    <button class="asiento-lineas__agregar" data-testid="agregar-linea" type="button" (click)="iniciarAgregar()">+ Agregar línea</button>
   }
 }
 

@@ -2,6 +2,7 @@ import { TestBed } from '@angular/core/testing';
 import { AsientoLineas } from './asiento-lineas';
 import { LineaRespuesta } from '../../models/asiento.model';
 import { EntradaAuditoriaRespuesta } from '../../models/historial.model';
+import { Cuadre, calcularCuadre } from '../../data-access/cuadre';
 
 describe('AsientoLineas', () => {
   const lineaD: LineaRespuesta = {
@@ -29,16 +30,46 @@ describe('AsientoLineas', () => {
     ctaPuenteCodigo: null,
   };
 
-  const createComponent = (lineas: LineaRespuesta[], editable = true) => {
+  const createComponent = (lineas: LineaRespuesta[], editable = true, cuadre?: Cuadre) => {
     const fixture = TestBed.createComponent(AsientoLineas);
     fixture.componentRef.setInput('lineas', lineas);
     fixture.componentRef.setInput('editable', editable);
+    fixture.componentRef.setInput('cuadre', cuadre ?? calcularCuadre(lineas));
     fixture.detectChanges();
     return fixture;
   };
 
   beforeEach(async () => {
     await TestBed.configureTestingModule({ imports: [AsientoLineas] }).compileComponents();
+  });
+
+  /* tasks.md 3.7 (RED first), spa-visual-detalle-validacion "asiento-lineas renders as a tabular
+   * Debe/Haber grid with a total row and cuadre pill". Totals + pill state come from the `cuadre`
+   * already computed in `detalle-page.ts` -- this component never recomputes accounting. */
+  describe('tabular totals and cuadre pill', () => {
+    it('renders a Total row with the per-column sums from the cuadre input, 2-decimal formatted', () => {
+      const fixture = createComponent([lineaD, lineaH]);
+      expect(fixture.nativeElement.querySelector('[data-testid="total-debe"]').textContent.trim()).toBe('118.00');
+      expect(fixture.nativeElement.querySelector('[data-testid="total-haber"]').textContent.trim()).toBe('118.00');
+    });
+
+    it('shows a balanced cuadre pill when the cuadre input is cuadrado', () => {
+      const fixture = createComponent([lineaD, lineaH], true, { debe: 118, haber: 118, cuadrado: true });
+      expect(fixture.nativeElement.querySelector('[data-testid="cuadre-pill"]').textContent).toContain('Cuadra');
+    });
+
+    it('shows an unbalanced cuadre pill when the cuadre input is not cuadrado', () => {
+      const fixture = createComponent([lineaD], true, { debe: 118, haber: 0, cuadrado: false });
+      const pill = fixture.nativeElement.querySelector('[data-testid="cuadre-pill"]');
+      expect(pill.textContent).toContain('No cuadra');
+      expect(fixture.nativeElement.querySelector('[data-testid="total-haber"]').textContent.trim()).toBe('0.00');
+    });
+
+    it('labels the add-línea affordance "+ Agregar línea"', () => {
+      const fixture = createComponent([lineaD, lineaH]);
+      const agregar = fixture.nativeElement.querySelector('[data-testid="agregar-linea"]');
+      expect(agregar.textContent.replace(/\s+/g, ' ').trim()).toBe('+ Agregar línea');
+    });
   });
 
   it('renders one row per línea with its cuentaCodigo and debe/haber', () => {
@@ -131,6 +162,7 @@ describe('AsientoLineas', () => {
     const fixture = TestBed.createComponent(AsientoLineas);
     fixture.componentRef.setInput('lineas', [lineaD, lineaH]);
     fixture.componentRef.setInput('editable', true);
+    fixture.componentRef.setInput('cuadre', calcularCuadre([lineaD, lineaH]));
     const historial: EntradaAuditoriaRespuesta[] = [
       {
         entidadTipo: 'ASIENTO',

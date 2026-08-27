@@ -1,6 +1,7 @@
 import { ChangeDetectionStrategy, Component, input, output, signal } from '@angular/core';
 import { Bloque, LineaAsientoRequest, LineaRespuesta, TipoLinea } from '../../models/asiento.model';
 import { EntradaAuditoriaRespuesta } from '../../models/historial.model';
+import { Cuadre } from '../../data-access/cuadre';
 import { HistorialCorreccion } from '../historial-correccion/historial-correccion';
 
 interface BorradorLinea {
@@ -45,6 +46,9 @@ function aLineaRequest(orden: number, borrador: BorradorLinea): LineaAsientoRequ
 export class AsientoLineas {
   readonly lineas = input.required<readonly LineaRespuesta[]>();
   readonly editable = input(true);
+  /** tasks.md 3.7 -- the balance already computed in `detalle-page.ts` (`calcularCuadre`); this
+   * component only renders it (Total row + cuadre pill), never recomputes accounting. */
+  readonly cuadre = input.required<Cuadre>();
   /** tasks.md 4.9 -- wires the D4 `<details>` panel; empty by default when no historial loaded yet. */
   readonly historial = input<readonly EntradaAuditoriaRespuesta[]>([]);
 
@@ -57,6 +61,12 @@ export class AsientoLineas {
   readonly pendienteEliminarId = signal<number | null>(null);
   readonly agregandoNueva = signal(false);
   readonly borradorNueva = signal<BorradorLinea>(BORRADOR_VACIO);
+
+  /** Display-only mirror of a money amount: always 2 decimals, never 3 (CONVENTIONS.md). The
+   * authoritative sum is server-side; this just formats the `cuadre` the container passed in. */
+  formatearMonto(valor: number): string {
+    return valor.toFixed(2);
+  }
 
   iniciarEdicion(linea: LineaRespuesta): void {
     this.editandoId.set(linea.lineaId);

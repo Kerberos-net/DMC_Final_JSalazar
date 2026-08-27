@@ -75,14 +75,17 @@ describe('FacturaForm', () => {
    * posibleDuplicado || esProveedorGenerico; informativa iff tieneCamposNoExtraidos ||
    * afectacionMixta === null. */
   describe('indicator alert bindings', () => {
-    it('renders .alerta--bloqueante for a duplicate invoice', () => {
+    /* item #18 PR3: the duplicado / P00000 blocking banners moved OUT of factura-form into
+     * `indicadores-factura` (rendered by detalle-page above the split). factura-form must no
+     * longer render a blocking banner for either condition. */
+    it('does NOT render a blocking banner for a duplicate invoice (hoisted to indicadores-factura)', () => {
       const fixture = createComponent({ ...factura, posibleDuplicado: true });
-      expect(fixture.nativeElement.querySelector('.alerta--bloqueante')).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('.alerta--bloqueante')).toBeNull();
     });
 
-    it('renders .alerta--bloqueante for an unregistered provider (P00000)', () => {
+    it('does NOT render a blocking banner for an unregistered provider P00000 (hoisted)', () => {
       const fixture = createComponent({ ...factura, esProveedorGenerico: true });
-      expect(fixture.nativeElement.querySelector('.alerta--bloqueante')).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('.alerta--bloqueante')).toBeNull();
     });
 
     it('renders .alerta--informativa for OCR fields not extracted', () => {

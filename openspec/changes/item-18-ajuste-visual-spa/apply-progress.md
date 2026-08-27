@@ -69,7 +69,45 @@ Dark `--accento-texto` = **`#409cff`** (`--azul-400`), NOT the design's `#0a84ff
 | Runtime harness | N/A automated — SPA visual/shell change, no runtime boundary. `ng serve` → `/login` both themes deferred to reviewer per `ask-on-risk`. `ng build --configuration production` succeeded, no budget warnings. |
 | Rollback boundary | Revert `src/app/app.html`, `src/app/app.css`, `src/app/app.spec.ts`, `src/app/login/feature/login-page/login-page.{html,css,spec.ts}`. `login-page.ts` untouched. No other work affected. |
 
+## Phase 3 — detalle-page restructure + indicadores-factura + asiento-lineas (PR3, dep PR1) — DONE (9/9), COMMIT BLOCKED ON BUDGET
+
+**Branch**: `pr3/item-18-detalle-restructure` (off `pr2/item-18-shell-header-login`). Implemented + all tests green + lint clean + prod build no budget warning. **NOT committed** — authored diff is 579 (add 507 / del 72) vs the ~400 review budget. `delivery_strategy: ask-on-risk` → stopped before committing per the apply prompt. Needs a delivery decision (accept `size:exception` for PR3, or split PR3a component/PR3b detalle-page).
+
+| Task | Status | Notes |
+|---|---|---|
+| 3.1 RED `indicadores-factura.spec.ts` | [x] | 5 specs: none/duplicado-only/P00000-only/TC-only/all-three; role=alert on duplicado+TC; RED = module missing |
+| 3.2 GREEN `detalle/ui/indicadores-factura/*` | [x] | 4 files. Pure inputs `posibleDuplicado`/`esProveedorGenerico`/`tipoCambioFaltante`, zero logic. CSS token-driven (`--alerta-*`, `--accento-suave`, `--info-generico-ink`, `--error-*`, `--radio-card`), 1308 B |
+| 3.3 RED/GREEN detalle-page header | [x] | `tituloDetalle` = `{tipoComprobante} - {numero} - {proveedorCodigo}`; `estadoPill` computed (pendiente/validada/descartada); `← Volver` → `Location.back()`; top-right `detalle-acciones` with Guardar/Validar; `<app-indicadores-factura>` between header and `.detalle-layout` |
+| 3.4 RED `bloqueosValidar` gate | [x] | `computed<readonly string[]>` → `['DUPLICADO']` / `['PROVEEDOR_GENERICO']` / both; `puedeValidar` = length===0; `validar()` early-returns when `!puedeValidar()`; `httpMock.expectNone('/validar')` proves request never sent; `[disabled]="!puedeValidar()"`. No ack-checkbox. |
+| 3.5 GREEN hoist banners + split | [x] | banners in container; `.detalle-layout` `grid-template-columns: 42% 1fr`; visor `position: sticky` REMOVED (not sticky per spec); form column `flex`, `align-items: start` |
+| 3.6 GREEN fecha-corte-contable placement | [x] | moved from header actions into `.detalle-asiento` wrapper next to `<app-asiento-lineas>` |
+| 3.7 RED `asiento-lineas.spec.ts` | [x] | 4 specs: Total row per-column 2-decimal (`118.00`), balanced pill "Cuadra", unbalanced "No cuadra", "+ Agregar línea" label. `createComponent` helper + historial test updated for new required `cuadre` input |
+| 3.8 GREEN `asiento-lineas` tabular | [x] | `cuadre = input.required<Cuadre>()` (passed from `detalle-page` `calcularCuadre` — NOT recomputed); `<tfoot>` Total row (`formatearMonto` = `toFixed(2)`, never 3) + cuadre pill `data-testid="cuadre-pill"` radius `--radio-pill`; "+ Agregar línea" now an accent-text link (`--accento-texto`), keeps `data-testid="agregar-linea"` |
+| 3.9 REFACTOR token follow-through | [x] | `visor-documento.css`: `--radio-panel` alias → canonical `--radio-card`, added `box-shadow: var(--sombra-hairline)`. `conflicto-banner.css` (536 B) / `historial-correccion.css` (795 B) already token-only — confirmed, no change needed. All 6 in-scope component CSS < 4 kB warn |
+
+### factura-form banner removal (scope: "only removal of the banners that move to indicadores-factura")
+Removed the `@if (esBloqueante())` block from `factura-form.html` + the now-unused `esBloqueante` computed from `factura-form.ts`. `esInformativa` (OCR-missing / afectación-no-verificada) stays — its per-field split is Phase 4. `factura-form.spec.ts`: the 2 positive `.alerta--bloqueante` assertions flipped to negative (`toBeNull`, "hoisted to indicadores-factura").
+
+### Phase 3 TDD Cycle Evidence
+
+| Task | RED (test first, observed failing) | GREEN | REFACTOR |
+|---|---|---|---|
+| 3.1/3.2 | `indicadores-factura.spec.ts` — build failed `TS2307: Cannot find module './indicadores-factura'` | component created → 5/5 pass | icons + tone classes token-driven; `[data-testid^="indicador-"]` count assertion for the all-three case |
+| 3.3/3.5/3.6 | `detalle-page.spec.ts` header + placement specs — failed (`[data-testid="volver"]`/`detalle-titulo`/`estado-pill`/`indicador-*` absent; compile also blocked by new required `cuadre` input) | header + `<app-indicadores-factura>` + layout → pass | split ratio literal 42%/1fr; sticky removed |
+| 3.4 | `bloqueosValidar` specs — `bloqueosValidar`/`puedeValidar` undefined; `validar` still dispatched under duplicado | computeds + early-return guard → `expectNone('/validar')` passes | named-list `computed<readonly string[]>` per design D5 |
+| 3.7/3.8 | `asiento-lineas.spec.ts` totals/pill specs — `total-debe`/`cuadre-pill` absent; existing suite RED on missing required `cuadre` input (helper updated) | `<tfoot>` + `cuadre` input → 4 new pass, 7 prior still green | `formatearMonto` pure 2-decimal helper extracted; agregar link |
+| 3.9 | approval: existing `visor-documento`/`asiento-lineas` suites green before touching CSS | alias swap + shadow token; no behavior change | budgets re-confirmed via prod build |
+
+### Phase 3 Work Unit Evidence
+
+| Evidence | Value |
+|---|---|
+| Focused test command + result | `npx ng test --no-watch --include='**/detalle-page.spec.ts' --include='**/asiento-lineas.spec.ts' --include='**/factura-form.spec.ts' --include='**/indicadores-factura.spec.ts'` → **4 files / 45 tests passed**. Full `npx ng test --no-watch` → **31 files / 266 passed** (was 247; +19). `npm run lint` (tsc app + spec) clean. `npx ng build --configuration production` → no budget warnings (`detalle-page` lazy chunk 33.56 kB raw; component CSS all < 4 kB: detalle-page.css 1162 B, indicadores-factura.css 1308 B, asiento-lineas.css 1186 B). |
+| Runtime harness | N/A automated — SPA layout/gate change, no runtime boundary. `ng serve` → factura detalle with duplicado / P00000 / foreign-currency-no-TC fixtures deferred to reviewer per `ask-on-risk`. |
+| Rollback boundary | Revert `detalle/feature/detalle-page/{ts,html,css,spec.ts}`, `detalle/ui/asiento-lineas/{ts,html,css,spec.ts}`, `detalle/ui/factura-form/{html,ts,spec.ts}`, `detalle/ui/visor-documento/visor-documento.css`; delete `detalle/ui/indicadores-factura/`. No other work touched; PR1/PR2 untouched; no .NET / model / token change. |
+
 ## PR boundary
 - PR1 / `size:exception` (~ +480 lines authored). Start: `main`. End: token layer + WCAG guard, `ng test` green.
 - PR2 / `pr2/item-18-shell-header-login` off `pr1/item-18-token-layer-wcag-guard`. ~+170 authored lines (within 400 budget). Start: PR1 tip. End: shell GF badge + login recomposition, `ng test` 247 green, lint clean, prod build no budget warning.
-- Next: Phase 3 (PR3 detalle-page restructure + `indicadores-factura` + asiento-lineas), depends on PR1.
+- PR3 / `pr3/item-18-detalle-restructure` off `pr2/item-18-shell-header-login`. **Authored 579 (add 507 / del 72) — OVER the 400 budget. Uncommitted, staged.** Start: PR2 tip. End (pending): detalle-page restructure + `indicadores-factura` + asiento-lineas tabular, `ng test` 266 green, lint clean, prod build no budget warning. **Blocked: needs `size:exception` acceptance or a PR3a/PR3b split decision.**
+- Next: delivery decision for PR3, then Phase 4 (PR4 factura-form field grid), depends on PR3.

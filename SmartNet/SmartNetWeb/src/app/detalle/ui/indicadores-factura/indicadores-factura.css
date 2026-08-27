@@ -1,0 +1,46 @@
+/* spa-visual-detalle-validacion: up-to-three full-width banners above the split. Composition only
+ * -- 1px border + ~10% tint via existing role tokens, pill/card radius from the token scale. No
+ * color/typography literal (spa-design-tokens "Shared token budget concentration"). */
+:host {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+}
+
+.indicadores-factura__item {
+  display: flex;
+  align-items: flex-start;
+  gap: var(--space-2);
+  width: 100%;
+  font-size: var(--fs-13);
+  padding: var(--space-2) var(--space-3);
+  border-radius: var(--radio-card);
+  border: 1px solid currentColor;
+}
+
+.indicadores-factura__item svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
+  margin-top: 2px;
+}
+
+/* duplicado -- strong amber, solid rule (blocking tone). */
+.indicadores-factura__item--duplicado {
+  color: var(--alerta-ink);
+  background: var(--alerta-fondo);
+  border-left: 4px solid var(--alerta-ink);
+}
+
+/* P00000 -- accent-blue, informational tone (thin border, soft wash). */
+.indicadores-factura__item--generico {
+  color: var(--info-generico-ink);
+  background: var(--accento-suave);
+}
+
+/* tipo de cambio faltante -- strong red, solid rule. */
+.indicadores-factura__item--tc {
+  color: var(--error-ink);
+  background: var(--error-fondo);
+  border-left: 4px solid var(--error-ink);
+}

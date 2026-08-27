@@ -47,15 +47,15 @@ Chain strategy: pending
 
 ## Phase 3: detalle-page restructure (PR3, dep PR1 — spa-visual-detalle-validacion, pantalla-detalle-validacion)
 
-- [ ] 3.1 RED: `indicadores-factura.spec.ts` — new `detalle/ui/indicadores-factura/*` renders up to 3 full-width banners: duplicado strong amber, P00000 accent-blue informational-styled, TC faltante strong red "Se muestra 0.00"; each shows only when its `FacturaRespuesta`/asiento condition true.
-- [ ] 3.2 GREEN: create `detalle/ui/indicadores-factura/` presentational component (inputs only, no `esBloqueante`/`esInformativa` logic).
-- [ ] 3.3 RED: `detalle-page.spec.ts` — banners render in detalle-page container BETWEEN header and split, NEVER inside factura-form; page header = back "← Volver" + title `{tipoComprobante} - {numero} - {proveedor}` + estado pill (real value, "Pendiente"=accent) + top-right "Guardar avance"/"Validar".
-- [ ] 3.4 RED: `detalle-page.spec.ts` — `bloqueosValidar = computed<readonly string[]>` (DUPLICADO | PROVEEDOR_GENERICO); `puedeValidar()` false and request never sent for duplicado-only, P00000-only, and both; re-enables when all clear. No ack-checkbox.
-- [ ] 3.5 GREEN: implement `bloqueosValidar`/`puedeValidar` signals + `[disabled]="!puedeValidar()"`; hoist banners to container; static split visor 42% (not sticky) / form flex:1 top-aligned.
-- [ ] 3.6 GREEN: move "Fecha de corte contable" control adjacent to asiento block (decision 5.1), not header.
-- [ ] 3.7 RED: `asiento-lineas.spec.ts` — tabular grid Cuenta/Debe/Haber, Debe/Haber right-aligned tabular-nums, Total row per column, "+ Agregar línea" accent-text link, cuadre pill from `cuadre` (detalle-page.ts), pill radius token.
-- [ ] 3.8 GREEN: implement `asiento-lineas` tabular layout.
-- [ ] 3.9 REFACTOR: token follow-through for `visor-documento`, `conflicto-banner`, `historial-correccion`; confirm CSS budgets incl. `historial-correccion`.
+- [x] 3.1 RED: `indicadores-factura.spec.ts` — new `detalle/ui/indicadores-factura/*` renders up to 3 full-width banners: duplicado strong amber, P00000 accent-blue informational-styled, TC faltante strong red "Se muestra 0.00"; each shows only when its `FacturaRespuesta`/asiento condition true.
+- [x] 3.2 GREEN: create `detalle/ui/indicadores-factura/` presentational component (inputs only, no `esBloqueante`/`esInformativa` logic).
+- [x] 3.3 RED: `detalle-page.spec.ts` — banners render in detalle-page container BETWEEN header and split, NEVER inside factura-form; page header = back "← Volver" + title `{tipoComprobante} - {numero} - {proveedor}` + estado pill (real value, "Pendiente"=accent) + top-right "Guardar avance"/"Validar".
+- [x] 3.4 RED: `detalle-page.spec.ts` — `bloqueosValidar = computed<readonly string[]>` (DUPLICADO | PROVEEDOR_GENERICO); `puedeValidar()` false and request never sent for duplicado-only, P00000-only, and both; re-enables when all clear. No ack-checkbox.
+- [x] 3.5 GREEN: implement `bloqueosValidar`/`puedeValidar` signals + `[disabled]="!puedeValidar()"`; hoist banners to container; static split visor 42% (not sticky) / form flex:1 top-aligned.
+- [x] 3.6 GREEN: move "Fecha de corte contable" control adjacent to asiento block (decision 5.1), not header.
+- [x] 3.7 RED: `asiento-lineas.spec.ts` — tabular grid Cuenta/Debe/Haber, Debe/Haber right-aligned tabular-nums, Total row per column, "+ Agregar línea" accent-text link, cuadre pill from `cuadre` (detalle-page.ts), pill radius token.
+- [x] 3.8 GREEN: implement `asiento-lineas` tabular layout.
+- [x] 3.9 REFACTOR: token follow-through for `visor-documento`, `conflicto-banner`, `historial-correccion`; confirm CSS budgets incl. `historial-correccion`.
 
 ## Phase 4: factura-form field grid (PR4, dep PR3 — pantalla-detalle-validacion)
 

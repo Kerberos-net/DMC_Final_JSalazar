@@ -9,10 +9,44 @@
     (recargar)="recargar()"
   />
 
-  <div class="detalle-layout">
-    <app-visor-documento class="detalle-layout__visor" [documentos]="documentos()" />
+  @if (factura(); as f) {
+    <header class="detalle-page__cabecera">
+      <button class="btn btn--secundario" type="button" data-testid="volver" (click)="volver()">← Volver</button>
+      <h1 class="detalle-page__titulo" data-testid="detalle-titulo">{{ tituloDetalle() }}</h1>
+      <span
+        class="chip"
+        data-testid="estado-pill"
+        [class.chip--pendiente]="estadoPill() === 'pendiente'"
+        [class.chip--validada]="estadoPill() === 'validada'"
+        [class.chip--descartada]="estadoPill() === 'descartada'"
+      >
+        {{ f.estado }}
+      </span>
+      <div class="detalle-page__acciones" data-testid="detalle-acciones">
+        <button class="btn btn--secundario" type="button" data-testid="guardar-avance" (click)="guardarAvance()">
+          Guardar avance
+        </button>
+        <button
+          class="btn"
+          type="button"
+          data-testid="validar"
+          [disabled]="!puedeValidar()"
+          (click)="validar(fechaCorteContable())"
+        >
+          Validar
+        </button>
+      </div>
+    </header>
 
-    @if (factura(); as f) {
+    <app-indicadores-factura
+      [posibleDuplicado]="f.posibleDuplicado"
+      [esProveedorGenerico]="f.esProveedorGenerico"
+      [tipoCambioFaltante]="tipoCambioFaltante()"
+    />
+
+    <div class="detalle-layout">
+      <app-visor-documento class="detalle-layout__visor" [documentos]="documentos()" />
+
       <div class="detalle-formulario">
         <app-factura-form
           [factura]="f"
@@ -23,35 +57,29 @@
         />
 
         @if (asiento(); as a) {
-          <app-asiento-lineas
-            [lineas]="a.lineas"
-            [editable]="a.estado !== 'CONFIRMADO'"
-            [historial]="historial()"
-            (editarLinea)="onEditarLinea($event)"
-            (agregarLinea)="onAgregarLinea($event)"
-            (eliminarLinea)="onEliminarLinea($event)"
-          />
-        }
-
-        <div class="detalle-formulario__acciones">
-          <button class="btn btn--secundario" type="button" data-testid="guardar-avance" (click)="guardarAvance()">
-            Guardar avance
-          </button>
-
-          <label class="campo">
-            Fecha de corte contable
-            <input
-              data-testid="fecha-corte-contable"
-              type="date"
-              [value]="fechaCorteContable()"
-              (input)="fechaCorteContable.set($any($event.target).value)"
+          <div class="detalle-asiento">
+            <app-asiento-lineas
+              [lineas]="a.lineas"
+              [editable]="a.estado !== 'CONFIRMADO'"
+              [historial]="historial()"
+              [cuadre]="cuadre()"
+              (editarLinea)="onEditarLinea($event)"
+              (agregarLinea)="onAgregarLinea($event)"
+              (eliminarLinea)="onEliminarLinea($event)"
             />
-          </label>
-          <button class="btn" type="button" data-testid="validar" (click)="validar(fechaCorteContable())">
-            Validar
-          </button>
-        </div>
+
+            <label class="campo detalle-asiento__corte">
+              Fecha de corte contable
+              <input
+                data-testid="fecha-corte-contable"
+                type="date"
+                [value]="fechaCorteContable()"
+                (input)="fechaCorteContable.set($any($event.target).value)"
+              />
+            </label>
+          </div>
+        }
       </div>
-    }
-  </div>
+    </div>
+  }
 </section>

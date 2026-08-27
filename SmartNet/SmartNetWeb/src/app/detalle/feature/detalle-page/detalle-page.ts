@@ -1,6 +1,8 @@
 import { HttpErrorResponse } from '@angular/common/http';
+import { Location } from '@angular/common';
 import { ChangeDetectionStrategy, Component, computed, inject, signal } from '@angular/core';
 import { ActivatedRoute } from '@angular/router';
+import { IndicadoresFactura } from '../../ui/indicadores-factura/indicadores-factura';
 import { FacturaService } from '../../data-access/factura.service';
 import { AsientoService } from '../../data-access/asiento.service';
 import { DocumentoService } from '../../data-access/documento.service';
@@ -26,7 +28,7 @@ import { ConflictoBanner } from '../../ui/conflicto-banner/conflicto-banner';
 @Component({
   selector: 'app-detalle-page',
   standalone: true,
-  imports: [FacturaForm, AsientoLineas, VisorDocumento, ConflictoBanner],
+  imports: [FacturaForm, AsientoLineas, VisorDocumento, ConflictoBanner, IndicadoresFactura],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './detalle-page.html',
   styleUrl: './detalle-page.css',
@@ -37,6 +39,7 @@ export class DetallePage {
   private readonly asientoService = inject(AsientoService);
   private readonly documentoService = inject(DocumentoService);
   private readonly historialService = inject(HistorialService);
+  private readonly location = inject(Location);
 
   readonly factura = this.facturaService.factura;
   readonly asiento = this.asientoService.asiento;
@@ -47,6 +50,41 @@ export class DetallePage {
   );
 
   readonly cuadre = computed(() => calcularCuadre(this.asiento()?.lineas ?? []));
+
+  /** spa-visual-detalle-validacion "Page header ... title `{tipoComprobante} - {numero} - {proveedor}`". */
+  readonly tituloDetalle = computed(() => {
+    const f = this.factura();
+    return f ? `${f.tipoComprobante} - ${f.numero} - ${f.proveedorCodigo}` : '';
+  });
+
+  /** Estado pill: real value drives it; "Pendiente" (anything not validada/descartada) uses the
+   * ratified accent chip token (spa-visual-detalle-validacion). */
+  readonly estadoPill = computed<'pendiente' | 'validada' | 'descartada'>(() => {
+    const estado = this.factura()?.estado ?? '';
+    if (estado === 'VALIDADA') return 'validada';
+    if (estado === 'DESCARTADA') return 'descartada';
+    return 'pendiente';
+  });
+
+  /** design D6: the engine converts the pasivo at TC *venta*; the red banner fires on the rate the
+   * engine actually uses being absent for a foreign-currency factura. */
+  readonly tipoCambioFaltante = computed(() => {
+    const f = this.factura();
+    return !!f && f.moneda !== 'PEN' && (this.asiento()?.tipoCambioVenta ?? null) === null;
+  });
+
+  /** design D5, pantalla-detalle-validacion: named list of hard blockers for "Validar". Both
+   * DUPLICADO and PROVEEDOR_GENERICO hard-block (ratified decision 2 -- no ack-checkbox bypass).
+   * The SPA gate is defence-in-depth; `ServicioDeFacturas` still returns 409 server-side. */
+  readonly bloqueosValidar = computed<readonly string[]>(() => {
+    const f = this.factura();
+    if (!f) return [];
+    const bloqueos: string[] = [];
+    if (f.posibleDuplicado) bloqueos.push('DUPLICADO');
+    if (f.esProveedorGenerico) bloqueos.push('PROVEEDOR_GENERICO');
+    return bloqueos;
+  });
+  readonly puedeValidar = computed(() => this.bloqueosValidar().length === 0);
 
   readonly problema = signal<ProblemaDetails | null>(null);
   readonly categoriaProblema = computed(() => {
@@ -140,7 +178,14 @@ export class DetallePage {
     }
   }
 
+  volver(): void {
+    this.location.back();
+  }
+
   async validar(fechaCorteContable: string): Promise<void> {
+    if (!this.puedeValidar()) {
+      return;
+    }
     try {
       await this.facturaService.validar(this.facturaId, fechaCorteContable);
       this.problema.set(null);

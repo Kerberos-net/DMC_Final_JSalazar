@@ -2,6 +2,46 @@
   margin-bottom: var(--space-3);
 }
 
+/* tasks.md 3.8 -- Total row + cuadre pill. Composition only; color/radius from tokens. */
+.asiento-lineas__total td {
+  font-weight: var(--peso-semi);
+  border-top: 2px solid var(--borde-control);
+}
+
+.asiento-lineas__cuadre {
+  display: inline-flex;
+  align-items: center;
+  font-size: var(--fs-12);
+  font-weight: var(--peso-semi);
+  line-height: 1;
+  padding: var(--space-1) var(--space-3);
+  border-radius: var(--radio-pill);
+  border: 1px solid transparent;
+}
+
+.asiento-lineas__cuadre--ok {
+  color: var(--estado-validada-texto);
+  background: var(--estado-validada-fondo);
+  border-color: var(--estado-validada-borde);
+}
+
+.asiento-lineas__cuadre--desbalance {
+  color: var(--error-ink);
+  background: var(--error-fondo);
+  border-color: var(--error-ink);
+}
+
+.asiento-lineas__agregar {
+  font: inherit;
+  font-size: var(--fs-13);
+  font-weight: var(--peso-medio);
+  background: none;
+  border: none;
+  padding: var(--space-2) 0;
+  color: var(--accento-texto);
+  cursor: pointer;
+}
+
 .nueva-linea {
   display: flex;
   align-items: center;
