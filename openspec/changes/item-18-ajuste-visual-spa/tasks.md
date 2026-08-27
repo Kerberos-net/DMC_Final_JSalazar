@@ -39,11 +39,11 @@ Chain strategy: pending
 
 ## Phase 2: Shell header + login (PR2, dep PR1 — spa-visual-login, spa-theme-toggle)
 
-- [ ] 2.1 RED: `app.spec.ts` — header renders native `<select>` with light/dark/system options; no sun/moon toggle, no sidebar redesign.
-- [ ] 2.2 GREEN: update `app.html`/`app.css` header; tokens only.
-- [ ] 2.3 RED: `login-page.spec.ts` — card order (GF badge → title "Gestor de Facturas de Compra" → subtitle "Inicia sesion para revisar y validar facturas" → placeholder inputs → inline error slot → full-width "Ingresar" → footer "Credenciales verificadas contra SQL Server"); inputs have accessible names, no visible `<label>`; error uses validation-error token message not `.banner--error`.
-- [ ] 2.4 GREEN: update `login-page/*` template + styles; consume radius/elevation tokens, zero color/font literals.
-- [ ] 2.5 REFACTOR: verify component style budget (4kB/8kB) for `app` and `login-page`.
+- [x] 2.1 RED: `app.spec.ts` — header renders native `<select>` with light/dark/system options; no sun/moon toggle, no sidebar redesign.
+- [x] 2.2 GREEN: update `app.html`/`app.css` header; tokens only.
+- [x] 2.3 RED: `login-page.spec.ts` — card order (GF badge → title "Gestor de Facturas de Compra" → subtitle "Inicia sesion para revisar y validar facturas" → placeholder inputs → inline error slot → full-width "Ingresar" → footer "Credenciales verificadas contra SQL Server"); inputs have accessible names, no visible `<label>`; error uses validation-error token message not `.banner--error`.
+- [x] 2.4 GREEN: update `login-page/*` template + styles; consume radius/elevation tokens, zero color/font literals.
+- [x] 2.5 REFACTOR: verify component style budget (4kB/8kB) for `app` and `login-page`.
 
 ## Phase 3: detalle-page restructure (PR3, dep PR1 — spa-visual-detalle-validacion, pantalla-detalle-validacion)
 

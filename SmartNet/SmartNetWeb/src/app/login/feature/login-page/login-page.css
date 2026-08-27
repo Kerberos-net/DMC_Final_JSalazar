@@ -1,5 +1,5 @@
-/* tasks.md 4.1 (spa-visual-login) -- centered card, layout only; every color/typography value
- * comes from the global tokens/primitives in `styles.css` (no literal here). */
+/* tasks.md 2.4 (spa-visual-login) -- centered card, layout only. Every color/typography/radius/
+ * elevation value comes from the global tokens in `styles.css` (zero literals here). */
 .login-page {
   display: flex;
   align-items: center;
@@ -13,16 +13,70 @@
   max-width: 360px;
   display: flex;
   flex-direction: column;
-  gap: var(--space-4);
+  align-items: center;
+  gap: var(--space-3);
+  padding: var(--space-6);
+  border: 1px solid var(--borde-sutil);
+  border-radius: var(--radio-modal);
+  box-shadow: var(--sombra-prominente);
+  text-align: center;
 }
 
-.login-page__campo {
+.login-page__logo {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 44px;
+  height: 44px;
+  border-radius: var(--radio-card);
+  background: var(--accento);
+  color: var(--accento-contraste);
+  font-size: var(--fs-16);
+  font-weight: var(--peso-semi);
+  letter-spacing: 0.02em;
+}
+
+.login-page__titulo {
+  margin: 0;
+  font-size: var(--fs-20);
+}
+
+.login-page__subtitulo {
+  margin: 0;
+  font-size: var(--fs-13);
+  color: var(--texto-secundario);
+}
+
+.login-page__form {
+  width: 100%;
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: var(--space-3);
+  margin-top: var(--space-3);
 }
 
-.login-page__acciones {
-  display: flex;
-  justify-content: flex-end;
+.login-page__input {
+  text-align: left;
+}
+
+.login-page__error {
+  min-height: var(--space-4);
+  text-align: left;
+}
+
+.login-page__error-texto {
+  margin: 0;
+  font-size: var(--fs-13);
+  color: var(--error-ink);
+}
+
+.login-page__enviar {
+  width: 100%;
+  justify-content: center;
+}
+
+.login-page__pie {
+  margin: 0;
+  font-size: var(--fs-12);
+  color: var(--texto-secundario);
 }
