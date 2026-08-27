@@ -2,109 +2,55 @@
  * primitives. Per-component `styleUrl` files own layout/composition only and sit OUTSIDE this
  * `@layer` stack so they win over these primitives without `!important` (Angular emulated
  * encapsulation already isolates them). No component redefines a color/typography literal --
- * spa-design-tokens spec "Shared token budget concentration". */
+ * spa-design-tokens spec "Shared token budget concentration".
+ *
+ * item #18 (BACKLOG) -- two-tier token layer (design.md D1): a private `--azul-*` ramp holds
+ * every blue literal; semantic role aliases below name what each blue is FOR. `contraste.spec.ts`
+ * + `paleta.spec.ts` parse this file so a bad token declaration goes RED. */
 
 @layer tokens, base, primitives;
 
 @layer tokens {
-  /* Tema claro (default, no explicit choice needed) -- design.md "Palette and verified contrast".
-   * Every ratio below is the one design.md computed and `contraste.spec.ts` re-verifies. */
-  :root,
-  :root[data-tema='claro'] {
-    color-scheme: light;
-
-    --fondo-app: #f7f8fa;
-    --fondo-superficie: #ffffff;
-    --texto-principal: #16191d;
-    --texto-secundario: #5a6270;
-    --borde-control: #767e8c;
-    --borde-sutil: #d5d9e0;
-
-    --alerta-ink: #b45309;
-    --alerta-texto: #7c3d00;
-    --alerta-fondo: #fdf0e1;
-
-    --conflicto-ink: #6d28d9;
-    --conflicto-fondo: #f1ebfd;
-
-    --error-ink: #b91c1c;
-    --error-fondo: #fdecec;
-
-    --estado-pendiente-texto: #363c46;
-    --estado-pendiente-fondo: #eaecf0;
-    --estado-pendiente-borde: #767e8c;
-
-    --estado-validada-texto: #14532d;
-    --estado-validada-fondo: #dcf3e3;
-    --estado-validada-borde: #1e7a44;
-
-    --estado-descartada-texto: #5a6270;
-    --estado-descartada-fondo: transparent;
-    --estado-descartada-borde: #9aa1ac;
-
-    --accion-fondo: #1f2937;
-    --accion-texto: #ffffff;
-
-    --focus-ring: #1d4ed8;
-
-    --sombra-panel: 0 1px 2px rgb(22 25 29 / 8%), 0 1px 1px rgb(22 25 29 / 6%);
-  }
-
-  /* Tema oscuro -- design.md D1: always explicit via [data-tema], never a bare media-query
-   * override, so the dark block exists exactly once. */
-  :root[data-tema='oscuro'] {
-    color-scheme: dark;
-
-    --fondo-app: #12151a;
-    --fondo-superficie: #1a1f26;
-    --texto-principal: #e8ebf0;
-    --texto-secundario: #a2abba;
-    --borde-control: #6e7787;
-    --borde-sutil: #2a3038;
-
-    --alerta-ink: #e8a33d;
-    --alerta-texto: #e8ebf0;
-    --alerta-fondo: #3a2a14;
-
-    --conflicto-ink: #b79bf5;
-    --conflicto-fondo: #241c3d;
-
-    --error-ink: #f58787;
-    --error-fondo: #3a1e1e;
-
-    --estado-pendiente-texto: #e8ebf0;
-    --estado-pendiente-fondo: #23272e;
-    --estado-pendiente-borde: #8a93a3;
-
-    --estado-validada-texto: #e8ebf0;
-    --estado-validada-fondo: #16301f;
-    --estado-validada-borde: #58c97f;
-
-    --estado-descartada-texto: #a2abba;
-    --estado-descartada-fondo: transparent;
-    --estado-descartada-borde: #4a5160;
-
-    --accion-fondo: #e8ebf0;
-    --accion-texto: #12151a;
-
-    --focus-ring: #7fa9ff;
-
-    /* Shadows do not read on dark; degrade to a border (design.md palette note). */
-    --sombra-panel: 0 0 0 1px var(--borde-sutil);
-  }
-
+  /* ---------------------------------------------------------------------------------------------
+   * Theme-independent primitives: the private color ramp, radii, type scale, spacing, shadows.
+   * These do not change between light and dark, so they live in a bare `:root`.
+   * ------------------------------------------------------------------------------------------- */
   :root {
-    /* Typography -- design.md D5: system stack, no webfont; dense 14px base scale. */
-    --fuente-ui: ui-sans-serif, 'Segoe UI Variable Text', 'Segoe UI', system-ui, -apple-system, Arial,
+    /* --- Private blue ramp (design.md D1) -----------------------------------------------------
+     * This is the ONLY place a blue literal exists in the codebase. `rg -- '--azul-'` finds
+     * every role that consumes it.
+     *
+     * RATIFIED EXCEPTION (item #18, user decision 1): this blue is deliberately reused for
+     *   (a) the primary action fill        -> --accento
+     *   (b) the "Pendiente" estado chip    -> --estado-pendiente-ink
+     *   (c) the P00000 informational banner -> --info-generico-ink
+     * That is an intentional departure from the brief's "un estado = un color" rule and from
+     * the first design pass D3. It MUST be preserved. A reviewer MUST NOT "fix" it into three
+     * separate hues without re-ratification. */
+    --azul-600: #0071e3;
+    --azul-700: #0a63c9;
+    --azul-400: #409cff;
+
+    /* Accent roles identical in both themes. --accento-texto / --accento-suave differ per theme
+     * (AA on the warm dark surfaces needs the lighter ramp step) and live in the theme blocks. */
+    --accento: var(--azul-600);
+    --accento-contraste: #ffffff;
+
+    /* --- Typography (design.md D5) --------------------------------------------------------------
+     * Segoe-first stack, rounded INTEGER px scale (no half-px steps). */
+    --fuente-ui:
+      'Segoe UI', 'Segoe UI Variable Text', system-ui, -apple-system, 'Helvetica Neue', Arial,
       sans-serif;
     --fuente-mono: ui-monospace, 'Cascadia Code', 'Consolas', monospace;
 
-    --fs-12: 0.75rem;
-    --fs-13: 0.8125rem;
-    --fs-14: 0.875rem;
-    --fs-16: 1rem;
-    --fs-20: 1.25rem;
-    --fs-24: 1.5rem;
+    --fs-12: 12px;
+    --fs-13: 13px;
+    --fs-14: 14px;
+    --fs-16: 16px;
+    --fs-18: 18px;
+    --fs-20: 20px;
+    --fs-24: 24px;
+    --fs-28: 28px;
 
     --peso-normal: 400;
     --peso-medio: 500;
@@ -121,8 +67,147 @@
     --space-5: 1.5rem;
     --space-6: 2rem;
 
-    --radio-control: 6px;
-    --radio-panel: 8px;
+    /* --- Radius scale 8 / 12 / 16 / 20 (design.md, spa-design-tokens) --------------------------
+     * 8 inputs+buttons, 12 inner cards, 16 modals+login, 20 pills. */
+    --radio-input: 8px;
+    --radio-card: 12px;
+    --radio-modal: 16px;
+    --radio-pill: 20px;
+    /* Back-compat aliases for components authored against the old names. */
+    --radio-control: var(--radio-input);
+    --radio-panel: var(--radio-card);
+
+    /* --- Elevation scale: hairline -> prominent (light values; dark overrides below) ----------- */
+    --sombra-hairline: 0 1px 1px rgb(15 23 42 / 4%);
+    --sombra-suave: 0 1px 2px rgb(15 23 42 / 8%), 0 1px 1px rgb(15 23 42 / 6%);
+    --sombra-elevada: 0 4px 12px rgb(15 23 42 / 10%), 0 2px 4px rgb(15 23 42 / 8%);
+    --sombra-prominente: 0 16px 40px rgb(15 23 42 / 18%), 0 4px 10px rgb(15 23 42 / 12%);
+    --sombra-panel: var(--sombra-suave);
+  }
+
+  /* ---------------------------------------------------------------------------------------------
+   * Tema claro (default) -- design.md "Palette and verified contrast". Every ratio below is what
+   * `contraste.spec.ts` re-verifies against ALL FOUR surface levels.
+   * ------------------------------------------------------------------------------------------- */
+  :root,
+  :root[data-tema='claro'] {
+    color-scheme: light;
+
+    /* 4-level surface hierarchy. */
+    --fondo-app: #f5f5f7;
+    --fondo-superficie: #ffffff;
+    --fondo-superficie-2: #f0f0f2;
+    --fondo-sidebar: #eeeef1;
+
+    --texto-principal: #16191d;
+    --texto-secundario: #44474e;
+    /* Decorative / non-text only (design.md D3): never used as body text. */
+    --texto-terciario: #5f6570;
+
+    --borde-control: #767e8c;
+    /* Translucent hairline borders. */
+    --borde-hairline: rgba(15, 23, 42, 0.08);
+    --borde-sutil: rgba(15, 23, 42, 0.09);
+
+    /* Accent text/link + soft accent wash (P00000 banner). Links use --accento-texto; the
+     * --accento fill takes white (--accento-contraste). */
+    --accento-texto: var(--azul-700);
+    --accento-suave: #e6f1fc;
+
+    --alerta-ink: #8a4300;
+    --alerta-texto: #7c3d00;
+    --alerta-fondo: #fdf0e1;
+
+    --conflicto-ink: #6d28d9;
+    --conflicto-fondo: #f1ebfd;
+
+    --error-ink: #b3211f;
+    --error-fondo: #fdecec;
+
+    /* "Pendiente" chip + P00000 banner share the ratified accent ink. */
+    --estado-pendiente-ink: var(--azul-700);
+    --info-generico-ink: var(--azul-700);
+    --estado-pendiente-texto: var(--estado-pendiente-ink);
+    --estado-pendiente-fondo: #e6f1fc;
+    --estado-pendiente-borde: #767e8c;
+
+    --estado-validada-texto: #14532d;
+    --estado-validada-fondo: #dcf3e3;
+    --estado-validada-borde: #1e7a44;
+
+    --estado-descartada-texto: #5a6270;
+    --estado-descartada-fondo: transparent;
+    --estado-descartada-borde: #9aa1ac;
+
+    --accion-fondo: #1f2937;
+    --accion-texto: #ffffff;
+
+    --focus-ring: #1d4ed8;
+  }
+
+  /* ---------------------------------------------------------------------------------------------
+   * Tema oscuro -- design.md D1: always explicit via [data-tema], never a bare media query, so
+   * the dark block exists exactly once. Warm neutral surfaces (#1c1c1e family).
+   * ------------------------------------------------------------------------------------------- */
+  :root[data-tema='oscuro'] {
+    color-scheme: dark;
+
+    --fondo-app: #1c1c1e;
+    --fondo-superficie: #2c2c2e;
+    --fondo-superficie-2: #242426;
+    --fondo-sidebar: #232326;
+
+    --texto-principal: #e8ebf0;
+    --texto-secundario: #a2abba;
+    --texto-terciario: #8b93a1;
+
+    --borde-control: #6e7787;
+    --borde-hairline: rgba(255, 255, 255, 0.09);
+    --borde-sutil: rgba(255, 255, 255, 0.11);
+
+    /* --accento-texto: ratified decision 5 asked for #0a84ff, but that scores 3.82:1 on the
+     * raised dark surface #2c2c2e (design.md D3) -- fails AA. --azul-400 (#409cff) is
+     * handoff-native (it is the dark "pendiente" step) and clears AA on all four surfaces
+     * (4.92 .. 6.01). User ratified #409cff over #0a84ff for AA. */
+    --accento-texto: var(--azul-400);
+    --accento-suave: #14263d;
+
+    --alerta-ink: #f0b45f;
+    --alerta-texto: #e8ebf0;
+    --alerta-fondo: #3a2a14;
+
+    --conflicto-ink: #c4aef8;
+    --conflicto-fondo: #241c3d;
+
+    --error-ink: #f58787;
+    --error-fondo: #3a1e1e;
+
+    --estado-pendiente-ink: var(--azul-400);
+    --info-generico-ink: var(--azul-400);
+    --estado-pendiente-texto: var(--estado-pendiente-ink);
+    --estado-pendiente-fondo: #1f2b3a;
+    --estado-pendiente-borde: #8a93a3;
+
+    --estado-validada-texto: #e8ebf0;
+    --estado-validada-fondo: #16301f;
+    --estado-validada-borde: #58c97f;
+
+    --estado-descartada-texto: #a2abba;
+    --estado-descartada-fondo: transparent;
+    --estado-descartada-borde: #4a5160;
+
+    --accion-fondo: #e8ebf0;
+    --accion-texto: #1c1c1e;
+
+    --focus-ring: #7fa9ff;
+
+    /* Shadows barely read on dark; degrade the low steps to a hairline, keep depth only for the
+     * elevated / prominent (login, modal) steps. */
+    --sombra-hairline: 0 0 0 1px var(--borde-hairline);
+    --sombra-suave: 0 0 0 1px var(--borde-hairline);
+    --sombra-elevada: 0 0 0 1px var(--borde-sutil), 0 8px 24px rgb(0 0 0 / 45%);
+    --sombra-prominente: 0 0 0 1px var(--borde-sutil), 0 16px 48px rgb(0 0 0 / 58%);
+    --sombra-panel: var(--sombra-suave);
   }
 }
 
@@ -167,7 +252,7 @@
   }
 
   a {
-    color: var(--focus-ring);
+    color: var(--accento-texto);
   }
 
   label {
@@ -204,7 +289,7 @@
     font-size: var(--fs-14);
     font-weight: var(--peso-medio);
     padding: var(--space-2) var(--space-4);
-    border-radius: var(--radio-control);
+    border-radius: var(--radio-input);
     border: 1px solid transparent;
     background: var(--accion-fondo);
     color: var(--accion-texto);
@@ -237,7 +322,7 @@
     color: var(--texto-principal);
     background: var(--fondo-superficie);
     border: 1px solid var(--borde-control);
-    border-radius: var(--radio-control);
+    border-radius: var(--radio-input);
     padding: var(--space-2) var(--space-3);
     width: 100%;
   }
@@ -254,7 +339,7 @@
     border-width: 2px;
   }
 
-  /* .chip -- estado de la factura (D3: un hue = un significado). */
+  /* .chip -- estado de la factura. "Pendiente" intentionally uses the accent ink (ratified). */
   .chip {
     display: inline-flex;
     align-items: center;
@@ -263,7 +348,7 @@
     font-weight: var(--peso-semi);
     line-height: 1;
     padding: var(--space-1) var(--space-2);
-    border-radius: 999px;
+    border-radius: var(--radio-pill);
     border: 1px solid transparent;
   }
 
@@ -313,10 +398,9 @@
     text-align: right;
   }
 
-  /* .alerta -- design D2: one ink, two treatments. Bloqueante = fill + 4px rule (the rule, not the
-   * tint, is what actually reaches 4.73:1 -- mandatory, not decorative). Informativa = 1px border
-   * + icon, no fill. Never color alone (WCAG 1.4.1) -- callers pair this with an inline SVG icon
-   * and a text label. */
+  /* .alerta -- design D2: one ink, two treatments. Bloqueante = fill + 4px rule. Informativa =
+   * 1px border + icon, no fill. Never color alone (WCAG 1.4.1) -- callers pair this with an
+   * inline SVG icon and a text label. */
   .alerta {
     display: flex;
     align-items: flex-start;
@@ -324,7 +408,7 @@
     font-size: var(--fs-13);
     color: var(--alerta-texto);
     padding: var(--space-2) var(--space-3);
-    border-radius: var(--radio-control);
+    border-radius: var(--radio-input);
   }
 
   .alerta svg {
@@ -350,7 +434,7 @@
   .panel {
     background: var(--fondo-superficie);
     border: 1px solid var(--borde-sutil);
-    border-radius: var(--radio-panel);
+    border-radius: var(--radio-card);
     box-shadow: var(--sombra-panel);
     padding: var(--space-3);
   }
@@ -368,7 +452,7 @@
     align-items: flex-start;
     gap: var(--space-3);
     padding: var(--space-3) var(--space-4);
-    border-radius: var(--radio-panel);
+    border-radius: var(--radio-card);
     font-size: var(--fs-14);
   }
 

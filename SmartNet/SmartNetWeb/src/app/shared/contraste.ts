@@ -3,6 +3,8 @@
  * "WCAG AA contrast compliance per token pair"). No DOM, no Angular -- a regression guard the
  * palette in `styles.css` must keep satisfying, exercised by `contraste.spec.ts`.
  */
+import { componer } from './paleta';
+
 function aLinear(canal: number): number {
   const s = canal / 255;
   return s <= 0.03928 ? s / 12.92 : Math.pow((s + 0.055) / 1.055, 2.4);
@@ -23,4 +25,15 @@ export function contraste(hexA: string, hexB: string): number {
   const masClaro = Math.max(l1, l2);
   const masOscuro = Math.min(l1, l2);
   return (masClaro + 0.05) / (masOscuro + 0.05);
+}
+
+/**
+ * Contrast of a foreground token over an opaque background, flattening the foreground first when
+ * it is a translucent `rgb()/rgba()` value (the new hairline borders). A plain `#rrggbb`
+ * foreground is rated as-is. Lets `contraste.spec.ts` feed values straight from `componer()`.
+ */
+export function contrasteSobre(color: string, fondoHex: string): number {
+  const limpio = color.trim();
+  const primerPlano = limpio.startsWith('#') ? limpio : componer(limpio, fondoHex);
+  return contraste(primerPlano, fondoHex);
 }

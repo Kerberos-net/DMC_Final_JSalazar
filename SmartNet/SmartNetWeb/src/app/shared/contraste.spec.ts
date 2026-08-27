@@ -1,64 +1,108 @@
+import { readFileSync } from 'node:fs';
+import { fileURLToPath } from 'node:url';
+import { dirname, resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
-import { contraste } from './contraste';
+import { contraste, contrasteSobre } from './contraste';
+import { tokensPorTema, type Tema } from './paleta';
 
 /**
- * tasks.md 3.2 (RED first, design.md D5/palette) -- regression guard against the exact hex pairs
- * design.md's "Palette and verified contrast" table already computed. Floors: 4.5:1 text, 3:1
- * non-text UI, per spec.md `spa-design-tokens` "WCAG AA contrast compliance per token pair".
+ * tasks.md 1.3 (RED first, design.md D2/D3) -- regression guard driven by the REAL tokens parsed
+ * from `src/styles.css`, not hard-coded hex. Every text/ink token is checked against ALL FOUR
+ * surface levels in BOTH themes, so the 3.82:1 dark `--accento-texto` regression (design.md D3)
+ * turns this suite RED. Floors: 4.5:1 text, 3:1 non-text UI (spec.md `spa-design-tokens`).
  */
-describe('contraste', () => {
-  it('returns 21 for pure black vs pure white', () => {
+const RUTA_STYLES = resolve(dirname(fileURLToPath(import.meta.url)), '../../styles.css');
+const CSS = readFileSync(RUTA_STYLES, 'utf8');
+
+const TEXTO = 4.5;
+const NO_TEXTO = 3;
+
+const SUPERFICIES = [
+  '--fondo-app',
+  '--fondo-superficie',
+  '--fondo-superficie-2',
+  '--fondo-sidebar',
+] as const;
+
+/** Tokens that render as text/ink over a surface -> full AA text floor on every surface. */
+const TINTAS_TEXTO = [
+  '--texto-principal',
+  '--texto-secundario',
+  '--accento-texto',
+  '--alerta-ink',
+  '--conflicto-ink',
+  '--error-ink',
+] as const;
+
+/** Tokens that only ever act as non-text UI (borders, decorative) -> 3:1 floor (design.md D3). */
+const TINTAS_NO_TEXTO = ['--borde-control', '--texto-terciario'] as const;
+
+/** Ink over its own tinted background. */
+const PARES_TINTA_FONDO: readonly [string, string, number][] = [
+  ['--accento-texto', '--accento-suave', TEXTO],
+  ['--estado-pendiente-ink', '--estado-pendiente-fondo', TEXTO],
+  ['--alerta-ink', '--alerta-fondo', TEXTO],
+  ['--conflicto-ink', '--conflicto-fondo', TEXTO],
+  ['--error-ink', '--error-fondo', TEXTO],
+];
+
+describe('contraste -- sanidad de la formula', () => {
+  it('devuelve 21 para negro vs blanco', () => {
     expect(contraste('#000000', '#FFFFFF')).toBeCloseTo(21, 0);
   });
 
-  it('returns 1 for identical colors', () => {
+  it('devuelve 1 para colores identicos', () => {
     expect(contraste('#B45309', '#B45309')).toBe(1);
   });
 
-  it('is symmetric regardless of argument order', () => {
+  it('es simetrico sin importar el orden', () => {
     expect(contraste('#16191D', '#F7F8FA')).toBeCloseTo(contraste('#F7F8FA', '#16191D'), 5);
   });
+});
 
-  const TEXTO = 4.5;
-  const NO_TEXTO = 3;
+for (const tema of ['claro', 'oscuro'] as Tema[]) {
+  describe(`contraste -- tema ${tema}`, () => {
+    const tokens = tokensPorTema(CSS, tema);
+    const hex = (nombre: string): string => {
+      const v = tokens.get(nombre);
+      expect(v, `token ${nombre} ausente en tema ${tema}`).toMatch(/^#[0-9a-f]{3,8}$/i);
+      return v!;
+    };
 
-  describe.each([
-    // Tema claro -- fondo-app #F7F8FA / fondo-superficie #FFFFFF
-    ['claro texto-principal / fondo-app', '#16191D', '#F7F8FA', TEXTO],
-    ['claro texto-secundario / fondo-app', '#5A6270', '#F7F8FA', TEXTO],
-    ['claro borde-control / fondo-app', '#767E8C', '#F7F8FA', NO_TEXTO],
-    ['claro alerta-ink / fondo-app', '#B45309', '#F7F8FA', TEXTO],
-    ['claro alerta-texto / alerta-fondo', '#7C3D00', '#FDF0E1', TEXTO],
-    ['claro conflicto-ink / fondo-app', '#6D28D9', '#F7F8FA', TEXTO],
-    ['claro conflicto-ink / conflicto-fondo', '#6D28D9', '#F1EBFD', TEXTO],
-    ['claro error-ink / fondo-app', '#B91C1C', '#F7F8FA', TEXTO],
-    ['claro error-ink / error-fondo', '#B91C1C', '#FDECEC', TEXTO],
-    ['claro estado-pendiente-texto / estado-pendiente-fondo', '#363C46', '#EAECF0', TEXTO],
-    ['claro estado-pendiente-borde / fondo-app', '#767E8C', '#F7F8FA', NO_TEXTO],
-    ['claro estado-validada-texto / estado-validada-fondo', '#14532D', '#DCF3E3', TEXTO],
-    ['claro estado-validada-borde / fondo-app', '#1E7A44', '#F7F8FA', NO_TEXTO],
-    ['claro accion-texto / accion-fondo', '#FFFFFF', '#1F2937', TEXTO],
-    ['claro focus-ring / fondo-app', '#1D4ED8', '#F7F8FA', NO_TEXTO],
-    // Tema oscuro -- fondo-app #12151A / fondo-superficie #1A1F26
-    ['oscuro texto-principal / fondo-app', '#E8EBF0', '#12151A', TEXTO],
-    ['oscuro texto-principal / superficie', '#E8EBF0', '#1A1F26', TEXTO],
-    ['oscuro texto-secundario / fondo-app', '#A2ABBA', '#12151A', TEXTO],
-    ['oscuro texto-secundario / superficie', '#A2ABBA', '#1A1F26', TEXTO],
-    ['oscuro borde-control / fondo-app', '#6E7787', '#12151A', NO_TEXTO],
-    ['oscuro borde-control / superficie', '#6E7787', '#1A1F26', NO_TEXTO],
-    ['oscuro alerta-ink / superficie', '#E8A33D', '#1A1F26', TEXTO],
-    ['oscuro alerta-ink / alerta-fondo', '#E8A33D', '#3A2A14', TEXTO],
-    ['oscuro conflicto-ink / superficie', '#B79BF5', '#1A1F26', TEXTO],
-    ['oscuro conflicto-ink / conflicto-fondo', '#B79BF5', '#241C3D', TEXTO],
-    ['oscuro error-ink / superficie', '#F58787', '#1A1F26', TEXTO],
-    ['oscuro error-ink / error-fondo', '#F58787', '#3A1E1E', TEXTO],
-    ['oscuro estado-pendiente-borde / fondo-app', '#8A93A3', '#12151A', NO_TEXTO],
-    ['oscuro estado-validada-borde / fondo-app', '#58C97F', '#12151A', NO_TEXTO],
-    ['oscuro accion-texto / accion-fondo', '#12151A', '#E8EBF0', TEXTO],
-    ['oscuro focus-ring / fondo-app', '#7FA9FF', '#12151A', NO_TEXTO],
-  ])('%s meets its WCAG AA floor', (_nombre, hexA, hexB, piso) => {
-    it(`contraste(${hexA}, ${hexB}) >= ${piso}`, () => {
-      expect(contraste(hexA, hexB)).toBeGreaterThanOrEqual(piso);
+    describe.each(TINTAS_TEXTO.flatMap((tinta) => SUPERFICIES.map((sup) => [tinta, sup] as const)))(
+      '%s sobre %s',
+      (tinta, sup) => {
+        it(`>= ${TEXTO}:1`, () => {
+          expect(contraste(hex(tinta), hex(sup))).toBeGreaterThanOrEqual(TEXTO);
+        });
+      },
+    );
+
+    describe.each(
+      TINTAS_NO_TEXTO.flatMap((tinta) => SUPERFICIES.map((sup) => [tinta, sup] as const)),
+    )('%s sobre %s', (tinta, sup) => {
+      it(`>= ${NO_TEXTO}:1`, () => {
+        expect(contraste(hex(tinta), hex(sup))).toBeGreaterThanOrEqual(NO_TEXTO);
+      });
+    });
+
+    describe.each(PARES_TINTA_FONDO)('%s sobre %s', (tinta, fondo, piso) => {
+      it(`>= ${piso}:1`, () => {
+        expect(contraste(hex(tinta), hex(fondo))).toBeGreaterThanOrEqual(piso);
+      });
+    });
+
+    it('etiqueta blanca sobre el fill --accento >= 4.5:1', () => {
+      expect(contraste(hex('--accento-contraste'), hex('--accento'))).toBeGreaterThanOrEqual(TEXTO);
+    });
+
+    it('el borde hairline translucido compuesto sobre cada superficie es un hex valido', () => {
+      const hairline = tokens.get('--borde-hairline')!;
+      for (const sup of SUPERFICIES) {
+        const ratio = contrasteSobre(hairline, hex(sup));
+        expect(ratio).toBeGreaterThanOrEqual(1);
+        expect(ratio).toBeLessThanOrEqual(21);
+      }
     });
   });
-});
+}
