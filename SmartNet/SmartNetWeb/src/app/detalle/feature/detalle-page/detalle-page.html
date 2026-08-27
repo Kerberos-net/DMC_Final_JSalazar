@@ -51,6 +51,7 @@
         <app-factura-form
           [factura]="f"
           [tipoCambioVenta]="asiento()?.tipoCambioVenta ?? null"
+          [fechaContable]="asiento()?.fechaContable ?? null"
           [editable]="f.estado !== 'VALIDADA'"
           (cambios)="onCambiosFactura($event)"
           (confirmarAfectacion)="onConfirmarAfectacion($event)"

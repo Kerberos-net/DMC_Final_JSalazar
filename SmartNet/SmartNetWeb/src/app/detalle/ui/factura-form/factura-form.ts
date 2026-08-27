@@ -1,17 +1,24 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
 import { CorreccionFacturaRequest, FacturaRespuesta } from '../../models/factura.model';
+import { dosDecimales, importeOpcional } from '../../../shared/formato';
 
 /**
- * Presentational (dumb) component: factura header display + editable fields (spec.md "Side-by-side
- * layout ... form MUST show fields for factura header data, TipoCambioVenta (when applicable)").
- * Emits one partial {@link CorreccionFacturaRequest} per edited field — the container accumulates
- * them into a draft and sends the merged patch on "Guardar avance" (this batch's own UX decision,
- * see apply-progress: líneas send eagerly per spec.md's línea scenario, factura fields batch).
+ * Presentational (dumb) component: the factura header two-column field grid
+ * (spa-visual-detalle-validacion / pantalla-detalle-validacion). Each label is secondary-style
+ * text ABOVE its input, never a wrapping `<label>`.
  *
- * diseno-visual-spa-item-12 (design D9/D10, spa-visual-detalle-validacion spec): also renders the
- * 4 indicator fields as `.alerta--bloqueante`/`.alerta--informativa`, and the afectación
- * confirmation control -- emits `confirmarAfectacion`, stays presentational (the container is the
- * one that calls `POST /confirmar-afectacion`, matching the `cambios` output's own split).
+ * Field split by accounting cost (design "`factura-form` field grid — binding model"):
+ *  - Editable, pure SPA binding (already on GET + PATCH): `monto` (`totalOrig`), `moneda`,
+ *    `fechaEmision`, `proveedorCodigo`, `rucProveedor`. Emits one partial
+ *    {@link CorreccionFacturaRequest} per edit; the container batches them and sends on
+ *    "Guardar avance". `buscarProveedor` just asks the container to open its picker.
+ *  - Read-only this phase: `tipoComprobante`, `numero` (need the .NET PATCH delta — Phase 5).
+ *  - Read-only display: `base imponible` / `IGV` (placeholder until the Phase 6 projection),
+ *    `tipo de cambio (venta)` (design D6 — the rate the engine actually uses), and derived
+ *    `mes` / `día` contable from `AsientoContable.FechaContable`.
+ *
+ * The duplicado / P00000 blocking banners live in `detalle/ui/indicadores-factura` (design D4);
+ * only the per-field OCR-missing highlight and the dedicated TC-faltante indicator stay here.
  */
 @Component({
   selector: 'app-factura-form',
@@ -23,20 +30,48 @@ import { CorreccionFacturaRequest, FacturaRespuesta } from '../../models/factura
 export class FacturaForm {
   readonly factura = input.required<FacturaRespuesta>();
   readonly tipoCambioVenta = input<number | null>(null);
+  /** `AsientoContable.FechaContable` (`YYYY-MM-DD`) when an asiento exists — drives the derived
+   * `mes` / `día` contable rows. Null when there is no asiento vigente yet. */
+  readonly fechaContable = input<string | null>(null);
   readonly editable = input(true);
 
   readonly cambios = output<CorreccionFacturaRequest>();
   readonly confirmarAfectacion = output<boolean>();
+  /** Asks the container to open its proveedor picker (the container owns the actual lookup). */
+  readonly buscarProveedor = output<void>();
 
-  /** item #18 PR3: the duplicado / P00000 blocking banners were hoisted OUT of this component into
-   * `detalle/ui/indicadores-factura`, rendered by `detalle-page` above the split (design D4). Only
-   * the informational treatment (OCR-missing / afectación-no-verificada) stays here for now. */
-  readonly esInformativa = computed(
-    () => this.factura().tieneCamposNoExtraidos || this.factura().afectacionMixta === null
-  );
+  readonly montoTexto = computed(() => dosDecimales(this.factura().totalOrig));
+
+  /** Coarsest correct OCR-missing signal: `FacturaRespuesta` only exposes the invoice-wide
+   * `tieneCamposNoExtraidos` boolean (no per-field granularity server-side yet), so every
+   * OCR-sourced field carries the highlight together. */
+  readonly campoResaltado = computed(() => this.factura().tieneCamposNoExtraidos);
+
   readonly afectacionNoVerificada = computed(() => this.factura().afectacionMixta === null);
+
+  /** design D6 — dedicated indicator: foreign currency and the TC *venta* the engine uses is
+   * absent, so the converted amount shows as 0.00. */
+  readonly tipoCambioFaltante = computed(
+    () => this.factura().moneda !== 'PEN' && this.tipoCambioVenta() === null
+  );
+
+  readonly tipoCambioTexto = computed(() => {
+    const tc = this.tipoCambioVenta();
+    if (tc !== null) return String(tc);
+    return this.factura().moneda === 'PEN' ? 'No aplica' : '0.00';
+  });
+
+  readonly baseImponibleTexto = computed(() => importeOpcional(null));
+  readonly igvTexto = computed(() => importeOpcional(null));
+
+  readonly mesContable = computed(() => this.fechaContable()?.slice(5, 7) ?? '—');
+  readonly diaContable = computed(() => this.fechaContable()?.slice(8, 10) ?? '—');
 
   onCampoInput(campo: keyof CorreccionFacturaRequest, valor: string): void {
     this.cambios.emit({ [campo]: valor } as CorreccionFacturaRequest);
+  }
+
+  onMonto(valor: string): void {
+    this.cambios.emit({ totalOrig: valor === '' ? null : Number(valor) });
   }
 }

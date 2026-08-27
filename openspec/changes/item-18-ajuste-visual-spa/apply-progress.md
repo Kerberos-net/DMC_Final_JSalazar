@@ -106,8 +106,56 @@ Removed the `@if (esBloqueante())` block from `factura-form.html` + the now-unus
 | Runtime harness | N/A automated — SPA layout/gate change, no runtime boundary. `ng serve` → factura detalle with duplicado / P00000 / foreign-currency-no-TC fixtures deferred to reviewer per `ask-on-risk`. |
 | Rollback boundary | Revert `detalle/feature/detalle-page/{ts,html,css,spec.ts}`, `detalle/ui/asiento-lineas/{ts,html,css,spec.ts}`, `detalle/ui/factura-form/{html,ts,spec.ts}`, `detalle/ui/visor-documento/visor-documento.css`; delete `detalle/ui/indicadores-factura/`. No other work touched; PR1/PR2 untouched; no .NET / model / token change. |
 
+## Phase 4 — factura-form field grid (PR4, dep PR3) — DONE (7/7), COMMIT BLOCKED ON BUDGET
+
+**Branch**: `pr4/item-18-factura-form-grid` (off `pr3/item-18-detalle-restructure`). Implemented + all tests green + lint clean + prod build no budget warning. **NOT committed** — authored diff is **516 (add 404 / del 112)** vs the ~400 review budget. `delivery_strategy: ask-on-risk` → stopped before committing per the apply prompt. Needs a delivery decision (accept `size:exception` for PR4, or split PR4a form.ts+html+css / PR4b specs, or PR4a editable-grid / PR4b read-only+derived+TC-faltante).
+
+| Task | Status | Notes |
+|---|---|---|
+| 4.1 RED grid + editable fields spec | [x] | `.factura-form__grid`, `.campo__etiqueta` text above input, no `<label>` wrap; `campo-monto/-moneda/-fechaEmision/-proveedorCodigo` + `abrir-picker-proveedor` |
+| 4.2 GREEN editable zero-backend fields | [x] | `onMonto` emits `{ totalOrig: Number \| null }`; others `onCampoInput`. New shared pure helper `src/app/shared/formato.ts` (`dosDecimales`, `importeOpcional`) + `formato.spec.ts` (asserts never-3-decimals). Monto input shows `dosDecimales(totalOrig)` = `118.00`. |
+| 4.3 RED read-only + derived spec | [x] | `valor-base`/`valor-igv` = `—`; `valor-tc` tabular; `valor-mes`/`valor-dia` from `fechaContable`; no `glosa` |
+| 4.4 GREEN read-only + derived rows | [x] | `<output class="campo__valor tabular-nums">`; `baseImponibleTexto`/`igvTexto` = `importeOpcional(null)` → `—` (Phase 6 adds projection); `tipoCambioTexto` = raw TC value / `No aplica` (PEN) / `0.00`; `mesContable`/`diaContable` = `fechaContable().slice(5,7)/(8,10)` ?? `—` |
+| 4.5 RED per-field highlight + TC-faltante spec | [x] | `.campo--resaltado` count > 1 when `tieneCamposNoExtraidos`; `indicador-tc-faltante` for USD+null, absent for PEN / TC-present |
+| 4.6 GREEN highlight + TC-faltante indicator | [x] | `campoResaltado = computed(() => factura().tieneCamposNoExtraidos)` bound on every OCR-sourced field (coarsest correct — see risks); `tipoCambioFaltante = computed(() => moneda !== 'PEN' && tipoCambioVenta() === null)` → red `.factura-form__tc-faltante` "se muestra 0.00" + `.campo__valor--alerta` on the TC row. `esInformativa` computed + `.alerta--informativa` block removed. |
+| 4.7 REFACTOR budget + literals | [x] | `factura-form.css` ~1.6 kB, prod build no budget warning; all values `var(--token)` (`--space-*`, `--fs-12/13/14`, `--texto-secundario/-terciario/-principal`, `--error-ink/-fondo`, `--borde-sutil`, `--radio-input/-card`) |
+
+### Necessary minimal deviation — detalle-page.html (+1 line)
+Added `[fechaContable]="asiento()?.fechaContable ?? null"` to the `<app-factura-form>` binding. Task 4.3/4.4 require the derived `mes`/`día` rows to read `AsientoContable.FechaContable`; without this single additive binding the feature is dead in prod (tests-only green would be fake). No `.ts` / logic / layout change to `detalle-page`. `detalle-page.spec.ts` asiento fixture already carries `fechaContable`.
+
+### Proveedor picker
+No picker component/dialog exists anywhere in the SPA today. Rendered a presentational trigger (`abrir-picker-proveedor` button → `buscarProveedor` output, `[disabled]="!editable()"`). The container binding is intentionally NOT wired (would need a `detalle-page` method — out of PR4 scope). Picker dialog + lookup is follow-up work.
+
+### tipoComprobante / numero
+Rendered READ-ONLY (`disabled` inputs, `campo-tipoComprobante` / `campo-numero`) this phase — the editable PATCH delta is Phase 5 (4-layer .NET change + `factura.model.ts`).
+
+### Phase 4 TDD Cycle Evidence
+
+| Task | RED (test first, observed failing) | GREEN | REFACTOR |
+|---|---|---|---|
+| 4.1/4.2 | `factura-form.spec.ts` rewrite — build failed `TS2339: Property 'buscarProveedor' does not exist on type 'FacturaForm'`; grid/monto/picker assertions absent | grid template + `buscarProveedor` output + `onMonto` + `montoTexto` → pass | `formato.spec.ts` first failed on a float assertion (`(3.755).toFixed(2)` === `'3.75'` not `'3.76'`) → switched to decimal-count property assertion |
+| 4.3/4.4 | `valor-base`/`valor-tc`/`valor-mes` testids absent; `tipo-cambio-venta` row logic replaced | `<output>` read-only rows + derived computeds → pass | values right-aligned tabular via `.campo__valor` + `tabular-nums` |
+| 4.5/4.6 | `.campo--resaltado` count assertion (>1) fails (old single `.alerta--informativa` sentence); `indicador-tc-faltante` absent | `campoResaltado` binding on each field + dedicated TC banner; removed `esInformativa` | no color/font literals; prod build budget re-confirmed |
+
+### Phase 4 Work Unit Evidence
+
+| Evidence | Value |
+|---|---|
+| Focused test command + result | `npx ng test --no-watch --include='**/factura-form.spec.ts' --include='**/formato.spec.ts' --include='**/detalle-page.spec.ts'` → **3 files / 41 tests passed**. Full `npx ng test --no-watch` → **32 files / 278 passed** (was 266 at PR3; +12). `npm run lint` (tsc app + spec) clean. `npx ng build --configuration production` → no budget warnings (`detalle-page` lazy chunk 37.61 kB raw; styles 7.41 kB). |
+| Runtime harness | N/A automated — SPA presentational component, no runtime boundary. `ng serve` → edit monto/moneda/fechaEmision/proveedor + foreign-currency-no-TC fixture deferred to reviewer per `ask-on-risk`. |
+| Rollback boundary | Revert `detalle/ui/factura-form/{ts,html,css,spec.ts}`, the 1-line `detalle/feature/detalle-page/detalle-page.html` binding; delete `src/app/shared/formato.{ts,spec.ts}`. No other work touched; PR1/PR2/PR3 untouched; no .NET / model / token change. |
+
+### Phase 4 risks / deviations
+- **base imponible / IGV are `—` placeholders** — neither `FacturaRespuesta` nor `AsientoRespuesta` projects them. Phase 6 adds `AsientoRespuesta.basePEN/igvPEN`; the rows + `importeOpcional` helper are ready to bind then.
+- **OCR highlight is invoice-wide, not per-field** — `FacturaRespuesta` only exposes `tieneCamposNoExtraidos: boolean`. Every OCR-sourced field carries `.campo--resaltado` together. True per-field granularity needs a backend field (not invented here).
+- **TC row shows the raw projected `tipoCambioVenta`** (not `toFixed(2)`) — SBS publishes 3-decimal rates; forcing 2 decimals would misstate the rate the engine uses. The CONVENTIONS 2-decimal rule is applied to money (`monto`, base/IGV), not the exchange rate. Open question in design.md ("(venta)" label / TC display) still stands.
+- **Label uses design D6 "(venta)"** not the spec's literal "TC compra" — ratified: ADR 0018 makes venta the operative rate; compra is unprojected reference data.
+- **Authored diff 516 lines > 400 budget** — commit blocked pending orchestrator delivery decision.
+
 ## PR boundary
 - PR1 / `size:exception` (~ +480 lines authored). Start: `main`. End: token layer + WCAG guard, `ng test` green.
 - PR2 / `pr2/item-18-shell-header-login` off `pr1/item-18-token-layer-wcag-guard`. ~+170 authored lines (within 400 budget). Start: PR1 tip. End: shell GF badge + login recomposition, `ng test` 247 green, lint clean, prod build no budget warning.
 - PR3 / `pr3/item-18-detalle-restructure` off `pr2/item-18-shell-header-login`. **Authored 579 (add 507 / del 72) — OVER the 400 budget. Uncommitted, staged.** Start: PR2 tip. End (pending): detalle-page restructure + `indicadores-factura` + asiento-lineas tabular, `ng test` 266 green, lint clean, prod build no budget warning. **Blocked: needs `size:exception` acceptance or a PR3a/PR3b split decision.**
-- Next: delivery decision for PR3, then Phase 4 (PR4 factura-form field grid), depends on PR3.
+- PR3 / `pr3/item-18-detalle-restructure` — committed `93ec9a7`.
+- PR4 / `pr4/item-18-factura-form-grid` off `pr3`. **Authored 516 (add 404 / del 112) — OVER the 400 budget. Uncommitted, unstaged.** Start: PR3 tip. End (pending): factura-form 2-col grid + editable zero-backend fields + read-only/derived rows + per-field highlight + TC-faltante indicator, `ng test` 278 green, lint clean, prod build no budget warning. **Blocked: needs `size:exception` acceptance or a PR4a/PR4b split decision.**
+- Next: delivery decision for PR4, then Phase 5 (.NET PATCH delta + tipoComprobante/numero binding), depends on PR4.

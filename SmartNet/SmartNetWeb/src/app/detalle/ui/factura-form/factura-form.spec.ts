@@ -21,10 +21,16 @@ describe('FacturaForm', () => {
     afectacionMixta: false,
   };
 
-  const createComponent = (f: FacturaRespuesta, tipoCambioVenta: number | null = null, editable = true) => {
+  const createComponent = (
+    f: FacturaRespuesta,
+    tipoCambioVenta: number | null = null,
+    fechaContable: string | null = null,
+    editable = true
+  ) => {
     const fixture = TestBed.createComponent(FacturaForm);
     fixture.componentRef.setInput('factura', f);
     fixture.componentRef.setInput('tipoCambioVenta', tipoCambioVenta);
+    fixture.componentRef.setInput('fechaContable', fechaContable);
     fixture.componentRef.setInput('editable', editable);
     fixture.detectChanges();
     return fixture;
@@ -34,79 +40,164 @@ describe('FacturaForm', () => {
     await TestBed.configureTestingModule({ imports: [FacturaForm] }).compileComponents();
   });
 
-  it('shows the factura header fields', () => {
-    const fixture = createComponent(factura);
-    const proveedorInput: HTMLInputElement = fixture.nativeElement.querySelector(
-      '[data-testid="campo-proveedorCodigo"]'
-    );
-    expect(proveedorInput.value).toBe('P00123');
-    expect(fixture.nativeElement.textContent).toContain('F001-100');
+  describe('two-column field grid', () => {
+    it('renders a grid container and labels as text above the input (no <label> wrap)', () => {
+      const fixture = createComponent(factura);
+      expect(fixture.nativeElement.querySelector('.factura-form__grid')).toBeTruthy();
+      const proveedorInput: HTMLInputElement = fixture.nativeElement.querySelector(
+        '[data-testid="campo-proveedorCodigo"]'
+      );
+      expect(proveedorInput.closest('label')).toBeNull();
+      const campo = proveedorInput.closest('.campo')!;
+      expect(campo.querySelector('.campo__etiqueta')?.textContent?.trim()).toBe('Proveedor');
+    });
+
+    it('renders the editable zero-backend fields bound to the factura', () => {
+      const fixture = createComponent(factura);
+      const q = (id: string): HTMLInputElement => fixture.nativeElement.querySelector(`[data-testid="${id}"]`);
+      expect(q('campo-monto').value).toBe('118.00');
+      expect(q('campo-moneda').value).toBe('USD');
+      expect(q('campo-fechaEmision').value).toBe('2026-08-10');
+      expect(q('campo-proveedorCodigo').value).toBe('P00123');
+      expect(fixture.nativeElement.querySelector('[data-testid="abrir-picker-proveedor"]')).toBeTruthy();
+    });
+
+    it('renders tipoComprobante and numero as read-only this phase (PATCH delta is Phase 5)', () => {
+      const fixture = createComponent(factura);
+      const tipo: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="campo-tipoComprobante"]');
+      const numero: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="campo-numero"]');
+      expect(tipo.disabled).toBe(true);
+      expect(numero.disabled).toBe(true);
+      expect(tipo.value).toBe('Factura');
+      expect(numero.value).toBe('F001-100');
+    });
   });
 
-  it('shows TipoCambioVenta when present (foreign currency)', () => {
-    const fixture = createComponent(factura, 3.755);
-    expect(fixture.nativeElement.textContent).toContain('3.755');
+  describe('editable field bindings (pure SPA, existing PATCH contract)', () => {
+    it('emits cambios with { totalOrig } as a number when monto changes', () => {
+      const fixture = createComponent(factura);
+      let emitido: unknown = null;
+      fixture.componentInstance.cambios.subscribe((c) => (emitido = c));
+      const input: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="campo-monto"]');
+      input.value = '200.50';
+      input.dispatchEvent(new Event('input'));
+      expect(emitido).toEqual({ totalOrig: 200.5 });
+    });
+
+    it('emits cambios with only the edited field for moneda / fechaEmision / proveedorCodigo', () => {
+      const fixture = createComponent(factura);
+      const emitidos: unknown[] = [];
+      fixture.componentInstance.cambios.subscribe((c) => emitidos.push(c));
+      const setInput = (id: string, value: string) => {
+        const el: HTMLInputElement = fixture.nativeElement.querySelector(`[data-testid="${id}"]`);
+        el.value = value;
+        el.dispatchEvent(new Event('input'));
+      };
+      setInput('campo-moneda', 'PEN');
+      setInput('campo-fechaEmision', '2026-09-01');
+      setInput('campo-proveedorCodigo', 'P00999');
+      expect(emitidos).toEqual([
+        { moneda: 'PEN' },
+        { fechaEmision: '2026-09-01' },
+        { proveedorCodigo: 'P00999' },
+      ]);
+    });
+
+    it('emits buscarProveedor when the picker button is pressed', () => {
+      const fixture = createComponent(factura);
+      let emitido = false;
+      fixture.componentInstance.buscarProveedor.subscribe(() => (emitido = true));
+      (fixture.nativeElement.querySelector('[data-testid="abrir-picker-proveedor"]') as HTMLButtonElement).click();
+      expect(emitido).toBe(true);
+    });
+
+    it('disables editable inputs when editable=false (e.g. VALIDADA)', () => {
+      const fixture = createComponent(factura, null, null, false);
+      const input: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="campo-monto"]');
+      const boton: HTMLButtonElement = fixture.nativeElement.querySelector('[data-testid="abrir-picker-proveedor"]');
+      expect(input.disabled).toBe(true);
+      expect(boton.disabled).toBe(true);
+    });
   });
 
-  it('does not show a TipoCambioVenta row for a PEN factura (null)', () => {
-    const fixture = createComponent(factura, null);
-    expect(fixture.nativeElement.querySelector('[data-testid="tipo-cambio-venta"]')).toBeNull();
+  describe('read-only display + derived rows', () => {
+    it('renders base imponible / IGV as a neutral placeholder until the Phase 6 projection lands', () => {
+      const fixture = createComponent(factura);
+      expect(fixture.nativeElement.querySelector('[data-testid="valor-base"]').textContent.trim()).toBe('—');
+      expect(fixture.nativeElement.querySelector('[data-testid="valor-igv"]').textContent.trim()).toBe('—');
+      expect(fixture.nativeElement.querySelector('[data-testid="valor-base"] input')).toBeNull();
+    });
+
+    it('shows the tipo de cambio (venta) value right-aligned tabular when present', () => {
+      const fixture = createComponent(factura, 3.755);
+      const tc = fixture.nativeElement.querySelector('[data-testid="valor-tc"]');
+      expect(tc.textContent).toContain('3.755');
+      expect(tc.classList.contains('tabular-nums')).toBe(true);
+    });
+
+    it('derives mes / día contable from fechaContable (read-only)', () => {
+      const fixture = createComponent(factura, 3.5, '2026-08-09');
+      expect(fixture.nativeElement.querySelector('[data-testid="valor-mes"]').textContent.trim()).toBe('08');
+      expect(fixture.nativeElement.querySelector('[data-testid="valor-dia"]').textContent.trim()).toBe('09');
+    });
+
+    it('shows an em dash for mes / día when there is no asiento fechaContable', () => {
+      const fixture = createComponent(factura, 3.5, null);
+      expect(fixture.nativeElement.querySelector('[data-testid="valor-mes"]').textContent.trim()).toBe('—');
+    });
+
+    it('has no glosa field', () => {
+      const fixture = createComponent(factura);
+      expect(fixture.nativeElement.textContent.toLowerCase()).not.toContain('glosa');
+    });
   });
 
-  it('emits cambios with only the edited field when an editable input changes', () => {
-    const fixture = createComponent(factura);
-    let emitido: unknown = null;
-    fixture.componentInstance.cambios.subscribe((c) => (emitido = c));
+  describe('per-field OCR-missing highlight', () => {
+    it('applies .campo--resaltado to multiple fields (not one generic sentence) when tieneCamposNoExtraidos', () => {
+      const fixture = createComponent({ ...factura, tieneCamposNoExtraidos: true });
+      const resaltados = fixture.nativeElement.querySelectorAll('.campo--resaltado');
+      expect(resaltados.length).toBeGreaterThan(1);
+      expect(fixture.nativeElement.querySelector('.alerta--informativa')).toBeNull();
+    });
 
-    const input: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="campo-rucProveedor"]');
-    input.value = '20999999999';
-    input.dispatchEvent(new Event('input'));
-
-    expect(emitido).toEqual({ rucProveedor: '20999999999' });
+    it('applies no highlight when every field was extracted', () => {
+      const fixture = createComponent(factura);
+      expect(fixture.nativeElement.querySelector('.campo--resaltado')).toBeNull();
+    });
   });
 
-  it('disables editable inputs when editable=false (e.g. CONFIRMADO asiento)', () => {
-    const fixture = createComponent(factura, null, false);
-    const input: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="campo-rucProveedor"]');
-    expect(input.disabled).toBe(true);
+  describe('dedicated tipo-de-cambio-faltante indicator', () => {
+    it('shows the red "0.00" indicator for a foreign-currency factura with no TC venta', () => {
+      const fixture = createComponent({ ...factura, moneda: 'USD' }, null);
+      const indicador = fixture.nativeElement.querySelector('[data-testid="indicador-tc-faltante"]');
+      expect(indicador).toBeTruthy();
+      expect(indicador.textContent).toContain('0.00');
+      expect(fixture.nativeElement.querySelector('[data-testid="valor-tc"]').textContent).toContain('0.00');
+    });
+
+    it('does not show the indicator for a PEN factura', () => {
+      const fixture = createComponent({ ...factura, moneda: 'PEN' }, null);
+      expect(fixture.nativeElement.querySelector('[data-testid="indicador-tc-faltante"]')).toBeNull();
+    });
+
+    it('does not show the indicator once a TC venta is available', () => {
+      const fixture = createComponent({ ...factura, moneda: 'USD' }, 3.72);
+      expect(fixture.nativeElement.querySelector('[data-testid="indicador-tc-faltante"]')).toBeNull();
+    });
   });
 
-  /* tasks.md 4.6 (RED first), spa-visual-detalle-validacion: bloqueante iff
-   * posibleDuplicado || esProveedorGenerico; informativa iff tieneCamposNoExtraidos ||
-   * afectacionMixta === null. */
-  describe('indicator alert bindings', () => {
-    /* item #18 PR3: the duplicado / P00000 blocking banners moved OUT of factura-form into
-     * `indicadores-factura` (rendered by detalle-page above the split). factura-form must no
-     * longer render a blocking banner for either condition. */
-    it('does NOT render a blocking banner for a duplicate invoice (hoisted to indicadores-factura)', () => {
+  describe('indicator banners were hoisted to indicadores-factura (PR3)', () => {
+    it('does NOT render a blocking banner for a duplicate invoice', () => {
       const fixture = createComponent({ ...factura, posibleDuplicado: true });
       expect(fixture.nativeElement.querySelector('.alerta--bloqueante')).toBeNull();
     });
 
-    it('does NOT render a blocking banner for an unregistered provider P00000 (hoisted)', () => {
+    it('does NOT render a blocking banner for an unregistered provider P00000', () => {
       const fixture = createComponent({ ...factura, esProveedorGenerico: true });
       expect(fixture.nativeElement.querySelector('.alerta--bloqueante')).toBeNull();
     });
-
-    it('renders .alerta--informativa for OCR fields not extracted', () => {
-      const fixture = createComponent({ ...factura, tieneCamposNoExtraidos: true });
-      expect(fixture.nativeElement.querySelector('.alerta--informativa')).toBeTruthy();
-    });
-
-    it('renders .alerta--informativa for an unverified afectación (afectacionMixta === null)', () => {
-      const fixture = createComponent({ ...factura, afectacionMixta: null });
-      expect(fixture.nativeElement.querySelector('.alerta--informativa')).toBeTruthy();
-    });
-
-    it('renders neither alert treatment when no indicator is active', () => {
-      const fixture = createComponent(factura);
-      expect(fixture.nativeElement.querySelector('.alerta--bloqueante')).toBeNull();
-      expect(fixture.nativeElement.querySelector('.alerta--informativa')).toBeNull();
-    });
   });
 
-  /* tasks.md 4.8 (RED+GREEN): afectación-confirmation control visible iff
-   * AfectacionMixta === null; confirming emits `confirmarAfectacion`. */
   describe('afectación confirmation control', () => {
     it('is visible when afectacionMixta is null (unverified)', () => {
       const fixture = createComponent({ ...factura, afectacionMixta: null });
@@ -122,9 +213,7 @@ describe('FacturaForm', () => {
       const fixture = createComponent({ ...factura, afectacionMixta: null });
       let emitido: unknown = 'sin-emitir';
       fixture.componentInstance.confirmarAfectacion.subscribe((v) => (emitido = v));
-
       (fixture.nativeElement.querySelector('[data-testid="confirmar-afectacion-mixta"]') as HTMLButtonElement).click();
-
       expect(emitido).toBe(true);
     });
   });

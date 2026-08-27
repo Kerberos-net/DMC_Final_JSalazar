@@ -1,13 +1,72 @@
 .factura-form {
   display: flex;
   flex-direction: column;
-  gap: var(--space-3);
+  gap: var(--space-4);
 }
 
-.factura-form__cabecera {
+.factura-form__grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: var(--space-3) var(--space-4);
+}
+
+.campo {
   display: flex;
   flex-direction: column;
   gap: var(--space-1);
+}
+
+.campo__etiqueta {
+  font-size: var(--fs-12);
+  color: var(--texto-secundario);
+}
+
+.campo__fila {
+  display: flex;
+  gap: var(--space-2);
+}
+
+.campo__fila input {
+  flex: 1;
+}
+
+.campo--lectura .campo__valor {
+  display: block;
+  text-align: right;
+  font-size: var(--fs-14);
+  color: var(--texto-principal);
+  padding: var(--space-2) var(--space-3);
+  border: 1px solid var(--borde-sutil);
+  border-radius: var(--radio-input);
+}
+
+.campo__valor--alerta {
+  color: var(--error-ink);
+  border-color: var(--error-ink);
+}
+
+.campo__nota {
+  font-size: var(--fs-12);
+  color: var(--texto-terciario);
+}
+
+.factura-form__tc-faltante {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0;
+  padding: var(--space-3);
+  font-size: var(--fs-13);
+  background: var(--error-fondo);
+  color: var(--error-ink);
+  border: 1px solid var(--error-ink);
+  border-radius: var(--radio-card);
+}
+
+.factura-form__tc-faltante svg {
+  flex: none;
+  width: 16px;
+  height: 16px;
 }
 
 .factura-form__confirmar-afectacion {

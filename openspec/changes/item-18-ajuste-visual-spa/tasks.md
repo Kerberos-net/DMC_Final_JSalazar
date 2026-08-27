@@ -59,13 +59,13 @@ Chain strategy: pending
 
 ## Phase 4: factura-form field grid (PR4, dep PR3 — pantalla-detalle-validacion)
 
-- [ ] 4.1 RED: `factura-form.spec.ts` — 2-col grid, label as secondary text above input; renders `monto`, `moneda`, `fechaEmision`, `proveedorCodigo` + picker; each emits `cambios` → `borradorFactura`.
-- [ ] 4.2 GREEN: implement editable zero-backend fields; money via shared pure 2-decimal helper (never 3).
-- [ ] 4.3 RED: `factura-form.spec.ts` — read-only tabular rows for `base imponible`, `IGV`, `TC (venta)` + SBS note from `asiento().tipoCambioVenta`; derived `mes`/`día` computed over `asiento().fechaContable`; `glosa` absent.
-- [ ] 4.4 GREEN: implement read-only + derived display rows (base/IGV placeholder until PR6).
-- [ ] 4.5 RED: `factura-form.spec.ts` — per-field `.campo--resaltado` bound to real OCR-missing data (not one generic sentence); dedicated TC-faltante indicator when `moneda !== 'PEN' && asiento()?.tipoCambioVenta === null`.
-- [ ] 4.6 GREEN: implement per-field highlight + TC-faltante indicator; remove `esBloqueante`/`esInformativa` from factura-form.
-- [ ] 4.7 REFACTOR: verify `factura-form` style budget; no color/font literals.
+- [x] 4.1 RED: `factura-form.spec.ts` — 2-col grid, label as secondary text above input; renders `monto`, `moneda`, `fechaEmision`, `proveedorCodigo` + picker; each emits `cambios` → `borradorFactura`.
+- [x] 4.2 GREEN: implement editable zero-backend fields; money via shared pure 2-decimal helper (never 3). Helper: `src/app/shared/formato.ts` (`dosDecimales` / `importeOpcional`).
+- [x] 4.3 RED: `factura-form.spec.ts` — read-only tabular rows for `base imponible`, `IGV`, `TC (venta)` + SBS note; derived `mes`/`día` computed over `fechaContable` input; `glosa` absent.
+- [x] 4.4 GREEN: implement read-only + derived display rows (base/IGV `—` placeholder until PR6).
+- [x] 4.5 RED: `factura-form.spec.ts` — per-field `.campo--resaltado` bound to `tieneCamposNoExtraidos` (coarsest correct signal — no per-field data server-side); dedicated TC-faltante indicator when `moneda !== 'PEN' && tipoCambioVenta() === null`.
+- [x] 4.6 GREEN: implement per-field highlight + TC-faltante indicator; `esInformativa` removed from factura-form (`esBloqueante` already removed in PR3).
+- [x] 4.7 REFACTOR: verify `factura-form` style budget (prod build: no budget warning); no color/font literals — all `var(--token)`.
 
 ## Phase 5: .NET PATCH delta + binding (PR5, dep PR4 — api-facturas)
 

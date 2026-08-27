@@ -1,51 +1,120 @@
 <form class="factura-form">
-  <div class="factura-form__cabecera">
-    <span class="chip chip--pendiente">{{ factura().estado }}</span>
-    <p><span>Comprobante:</span> {{ factura().tipoComprobante }} {{ factura().numero }}</p>
-    <p class="tabular-nums"><span>Total:</span> {{ factura().totalOrig }} {{ factura().moneda }}</p>
-    <p><span>Fecha de emisión:</span> {{ factura().fechaEmision }}</p>
+  <div class="factura-form__grid">
+    <div class="campo" [class.campo--resaltado]="campoResaltado()">
+      <span class="campo__etiqueta">Monto</span>
+      <input
+        data-testid="campo-monto"
+        class="tabular-nums"
+        inputmode="decimal"
+        [value]="montoTexto()"
+        [disabled]="!editable()"
+        (input)="onMonto($any($event.target).value)"
+      />
+    </div>
+
+    <div class="campo" [class.campo--resaltado]="campoResaltado()">
+      <span class="campo__etiqueta">Moneda</span>
+      <input
+        data-testid="campo-moneda"
+        [value]="factura().moneda"
+        [disabled]="!editable()"
+        (input)="onCampoInput('moneda', $any($event.target).value)"
+      />
+    </div>
+
+    <div class="campo" [class.campo--resaltado]="campoResaltado()">
+      <span class="campo__etiqueta">Fecha de emisión</span>
+      <input
+        data-testid="campo-fechaEmision"
+        type="date"
+        [value]="factura().fechaEmision"
+        [disabled]="!editable()"
+        (input)="onCampoInput('fechaEmision', $any($event.target).value)"
+      />
+    </div>
+
+    <div class="campo campo--con-accion" [class.campo--resaltado]="campoResaltado()">
+      <span class="campo__etiqueta">Proveedor</span>
+      <div class="campo__fila">
+        <input
+          data-testid="campo-proveedorCodigo"
+          [value]="factura().proveedorCodigo"
+          [disabled]="!editable()"
+          (input)="onCampoInput('proveedorCodigo', $any($event.target).value)"
+        />
+        <button
+          class="btn btn--secundario"
+          type="button"
+          data-testid="abrir-picker-proveedor"
+          [disabled]="!editable()"
+          (click)="buscarProveedor.emit()"
+        >
+          Buscar
+        </button>
+      </div>
+    </div>
+
+    <div class="campo" [class.campo--resaltado]="campoResaltado()">
+      <span class="campo__etiqueta">RUC proveedor</span>
+      <input
+        data-testid="campo-rucProveedor"
+        [value]="factura().rucProveedor"
+        [disabled]="!editable()"
+        (input)="onCampoInput('rucProveedor', $any($event.target).value)"
+      />
+    </div>
+
+    <div class="campo" [class.campo--resaltado]="campoResaltado()">
+      <span class="campo__etiqueta">Tipo de comprobante</span>
+      <input data-testid="campo-tipoComprobante" [value]="factura().tipoComprobante" disabled />
+    </div>
+
+    <div class="campo" [class.campo--resaltado]="campoResaltado()">
+      <span class="campo__etiqueta">Número</span>
+      <input data-testid="campo-numero" [value]="factura().numero" disabled />
+    </div>
+
+    <div class="campo campo--lectura">
+      <span class="campo__etiqueta">Base imponible</span>
+      <output class="campo__valor tabular-nums" data-testid="valor-base">{{ baseImponibleTexto() }}</output>
+    </div>
+
+    <div class="campo campo--lectura">
+      <span class="campo__etiqueta">IGV</span>
+      <output class="campo__valor tabular-nums" data-testid="valor-igv">{{ igvTexto() }}</output>
+    </div>
+
+    <div class="campo campo--lectura">
+      <span class="campo__etiqueta">Tipo de cambio (venta)</span>
+      <output
+        class="campo__valor tabular-nums"
+        data-testid="valor-tc"
+        [class.campo__valor--alerta]="tipoCambioFaltante()"
+        >{{ tipoCambioTexto() }}</output
+      >
+      <span class="campo__nota">Tipo de cambio SBS de la fecha de emisión</span>
+    </div>
+
+    <div class="campo campo--lectura">
+      <span class="campo__etiqueta">Mes contable</span>
+      <output class="campo__valor tabular-nums" data-testid="valor-mes">{{ mesContable() }}</output>
+    </div>
+
+    <div class="campo campo--lectura">
+      <span class="campo__etiqueta">Día contable</span>
+      <output class="campo__valor tabular-nums" data-testid="valor-dia">{{ diaContable() }}</output>
+    </div>
   </div>
 
-  @if (esInformativa()) {
-    <div class="alerta alerta--informativa">
+  @if (tipoCambioFaltante()) {
+    <p class="factura-form__tc-faltante" data-testid="indicador-tc-faltante" role="alert">
       <svg viewBox="0 0 16 16" aria-hidden="true">
-        <circle cx="8" cy="8" r="7" fill="none" stroke="currentColor" stroke-width="1.4" />
-        <path d="M8 7v4.5M8 4.6h.01" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
+        <path d="M8 1.6 15 14H1z" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linejoin="round" />
+        <path d="M8 6v3.4M8 11.4h.01" stroke="currentColor" stroke-width="1.4" stroke-linecap="round" />
       </svg>
-      <span>
-        @if (factura().tieneCamposNoExtraidos) {
-          Hay campos que el OCR no logró extraer.
-        }
-        @if (afectacionNoVerificada()) {
-          Afectación no verificada -- confirme si la factura mezcla líneas gravadas y no gravadas.
-        }
-      </span>
-    </div>
+      <span>No hay tipo de cambio disponible para la fecha de emisión: se muestra 0.00.</span>
+    </p>
   }
-
-  @if (tipoCambioVenta(); as tipoCambio) {
-    <p data-testid="tipo-cambio-venta" class="tabular-nums"><span>Tipo de cambio venta:</span> {{ tipoCambio }}</p>
-  }
-
-  <label class="campo">
-    Proveedor
-    <input
-      data-testid="campo-proveedorCodigo"
-      [value]="factura().proveedorCodigo"
-      [disabled]="!editable()"
-      (input)="onCampoInput('proveedorCodigo', $any($event.target).value)"
-    />
-  </label>
-
-  <label class="campo">
-    RUC proveedor
-    <input
-      data-testid="campo-rucProveedor"
-      [value]="factura().rucProveedor"
-      [disabled]="!editable()"
-      (input)="onCampoInput('rucProveedor', $any($event.target).value)"
-    />
-  </label>
 
   @if (afectacionNoVerificada()) {
     <div class="factura-form__confirmar-afectacion" data-testid="confirmar-afectacion">
