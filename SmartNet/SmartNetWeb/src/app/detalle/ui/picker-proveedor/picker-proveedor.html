@@ -1,0 +1,67 @@
+<dialog
+  #dialogo
+  class="picker-proveedor"
+  data-testid="picker-proveedor"
+  role="dialog"
+  aria-modal="true"
+  aria-label="Buscar proveedor"
+  (keydown)="onKeydown($event)"
+>
+  <header class="picker-proveedor__cabecera">
+    <span class="picker-proveedor__titulo">Buscar proveedor</span>
+    <button
+      type="button"
+      class="btn btn--secundario"
+      data-testid="picker-cerrar"
+      aria-label="Cerrar"
+      (click)="onCerrar()"
+    >
+      ✕
+    </button>
+  </header>
+
+  <input
+    class="picker-proveedor__buscar"
+    data-testid="picker-buscar"
+    type="search"
+    autocomplete="off"
+    placeholder="Nombre o RUC"
+    aria-label="Nombre o RUC del proveedor"
+    (input)="onBuscar($any($event.target).value)"
+  />
+
+  <ul class="picker-proveedor__lista" role="listbox" aria-label="Resultados">
+    @for (proveedor of resultados(); track proveedor.codigo; let i = $index) {
+      <li
+        class="picker-proveedor__fila"
+        data-testid="picker-fila"
+        role="option"
+        [attr.aria-selected]="i === indiceActivo()"
+        [class.picker-proveedor__fila--activa]="i === indiceActivo()"
+        (click)="elegir(proveedor)"
+      >
+        <span class="picker-proveedor__nombre">{{ proveedor.nombre }}</span>
+        <span class="picker-proveedor__meta">{{ proveedor.codigo }}<span aria-hidden="true"> · </span>{{ proveedor.ruc ?? 'sin RUC' }}</span>
+      </li>
+    } @empty {
+      <li class="picker-proveedor__vacio" data-testid="picker-vacio">
+        @if (buscando()) {
+          Buscando…
+        } @else {
+          Escribe para buscar un proveedor.
+        }
+      </li>
+    }
+  </ul>
+
+  @if (hayMas()) {
+    <button
+      type="button"
+      class="btn btn--secundario picker-proveedor__mas"
+      data-testid="picker-mas"
+      (click)="masResultados()"
+    >
+      Ver más resultados
+    </button>
+  }
+</dialog>

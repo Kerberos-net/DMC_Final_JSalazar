@@ -82,4 +82,106 @@ public sealed class SqlProveedorRepositoryTests : IAsyncLifetime
         Assert.Contains(proveedores, p => p.Codigo == "P00002");
         Assert.Contains(proveedores, p => p.Codigo == "P00003");
     }
+
+    // BACKLOG #18 PR8 (api-catalogos-proveedores): paged name/RUC search for the SPA picker.
+    // Read-only SELECT on dbo.Proveedor, ordered by `proveedor`, P00000 ("Varios") filtered out.
+
+    [Fact]
+    public async Task BuscarAsync_MatchesByNameFragment_OrderedByNombre()
+    {
+        await _db.SeedProveedorAsync("P00010", "ACME PERU SAC", coddocide: "06", rucpro: "20100000001");
+        await _db.SeedProveedorAsync("P00011", "ACME ANDINA EIRL", coddocide: "06", rucpro: "20100000002");
+        await _db.SeedProveedorAsync("P00012", "OTRO PROVEEDOR", coddocide: "06", rucpro: "20100000003");
+        var sut = new SqlProveedorRepository(_db.ConnectionString);
+
+        var busqueda = await sut.BuscarAsync("ACME", 1, CancellationToken.None);
+
+        Assert.False(busqueda.HayMas);
+        Assert.Equal(new[] { "ACME ANDINA EIRL", "ACME PERU SAC" }, busqueda.Resultados.Select(p => p.Nombre));
+        Assert.Equal("20100000002", busqueda.Resultados[0].Ruc);
+    }
+
+    [Fact]
+    public async Task BuscarAsync_MatchesByRuc()
+    {
+        await _db.SeedProveedorAsync("P00013", "COMERCIAL DELTA", coddocide: "06", rucpro: "20555555555");
+        await _db.SeedProveedorAsync("P00014", "COMERCIAL GAMMA", coddocide: "06", rucpro: "20111111111");
+        var sut = new SqlProveedorRepository(_db.ConnectionString);
+
+        var busqueda = await sut.BuscarAsync("20555555555", 1, CancellationToken.None);
+
+        Assert.Single(busqueda.Resultados);
+        Assert.Equal("P00013", busqueda.Resultados[0].Codigo);
+    }
+
+    [Fact]
+    public async Task BuscarAsync_ExcludesP00000_EvenWhenItMatchesTextually()
+    {
+        await _db.SeedProveedorAsync("P00000", "VARIOS", coddocide: "06", rucpro: null);
+        await _db.SeedProveedorAsync("P00015", "VARIOS HERMANOS SAC", coddocide: "06", rucpro: "20222222222");
+        var sut = new SqlProveedorRepository(_db.ConnectionString);
+
+        var busqueda = await sut.BuscarAsync("VARIOS", 1, CancellationToken.None);
+
+        Assert.Equal(new[] { "P00015" }, busqueda.Resultados.Select(p => p.Codigo));
+    }
+
+    [Fact]
+    public async Task BuscarAsync_PagesResults_AndReportsHayMas()
+    {
+        for (var i = 0; i < SqlProveedorRepository.TamanoPagina + 3; i++)
+        {
+            await _db.SeedProveedorAsync($"Q{i:D5}", $"PAGINADO {i:D3}", coddocide: "06", rucpro: null);
+        }
+        var sut = new SqlProveedorRepository(_db.ConnectionString);
+
+        var primera = await sut.BuscarAsync("PAGINADO", 1, CancellationToken.None);
+        var segunda = await sut.BuscarAsync("PAGINADO", 2, CancellationToken.None);
+
+        Assert.Equal(SqlProveedorRepository.TamanoPagina, primera.Resultados.Count);
+        Assert.True(primera.HayMas);
+        Assert.Equal(3, segunda.Resultados.Count);
+        Assert.False(segunda.HayMas);
+        Assert.Equal("PAGINADO 000", primera.Resultados[0].Nombre);
+        Assert.Equal("PAGINADO 020", segunda.Resultados[0].Nombre);
+    }
+
+    [Fact]
+    public async Task BuscarAsync_PagePastTheEnd_ReturnsEmpty_HayMasFalse()
+    {
+        await _db.SeedProveedorAsync("P00016", "SIGMA UNO", coddocide: "06", rucpro: null);
+        var sut = new SqlProveedorRepository(_db.ConnectionString);
+
+        var busqueda = await sut.BuscarAsync("SIGMA", 5, CancellationToken.None);
+
+        Assert.Empty(busqueda.Resultados);
+        Assert.False(busqueda.HayMas);
+    }
+
+    [Theory]
+    [InlineData("")]
+    [InlineData(" ")]
+    [InlineData("a")]
+    public async Task BuscarAsync_BlankOrShortQuery_ReturnsEmpty(string consulta)
+    {
+        await _db.SeedProveedorAsync("P00017", "ALGUN PROVEEDOR", coddocide: "06", rucpro: null);
+        var sut = new SqlProveedorRepository(_db.ConnectionString);
+
+        var busqueda = await sut.BuscarAsync(consulta, 1, CancellationToken.None);
+
+        Assert.Empty(busqueda.Resultados);
+        Assert.False(busqueda.HayMas);
+    }
+
+    [Fact]
+    public async Task BuscarAsync_NoMatches_ReturnsEmpty()
+    {
+        await _db.SeedProveedorAsync("P00018", "PROVEEDOR REAL", coddocide: "06", rucpro: null);
+        var sut = new SqlProveedorRepository(_db.ConnectionString);
+
+        var busqueda = await sut.BuscarAsync("ZZZNOEXISTE", 1, CancellationToken.None);
+
+        Assert.Empty(busqueda.Resultados);
+        Assert.False(busqueda.HayMas);
+    }
 }

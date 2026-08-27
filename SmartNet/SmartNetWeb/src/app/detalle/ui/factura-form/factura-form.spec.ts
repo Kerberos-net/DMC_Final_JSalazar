@@ -142,6 +142,17 @@ describe('FacturaForm', () => {
       expect(emitido).toBe(true);
     });
 
+    /* tasks.md 8.13 -- the picker slice must not change factura-form's save contract: the
+     * buscarProveedor output stays a payload-less request, and the form owns no dialog itself. */
+    it('emits buscarProveedor with no payload and renders no picker dialog of its own', () => {
+      const fixture = createComponent(factura);
+      let payload: unknown = 'sin-emitir';
+      fixture.componentInstance.buscarProveedor.subscribe((v) => (payload = v));
+      (fixture.nativeElement.querySelector('[data-testid="abrir-picker-proveedor"]') as HTMLButtonElement).click();
+      expect(payload).toBeUndefined();
+      expect(fixture.nativeElement.querySelector('dialog')).toBeNull();
+    });
+
     it('disables editable inputs when editable=false (e.g. VALIDADA)', () => {
       const fixture = createComponent(factura, null, null, false);
       const input: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="campo-monto"]');

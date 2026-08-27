@@ -11,9 +11,59 @@ namespace SmartNet.Catalogos.Infrastructure;
 /// </summary>
 public sealed class SqlProveedorRepository : IProveedorRepository
 {
+    /// <summary>Fixed server-side page size for <see cref="BuscarAsync"/> (api-catalogos-proveedores
+    /// "fixed server-side page size"). <c>LIKE</c> over ~6600 <c>dbo.Proveedor</c> rows is accepted
+    /// without a name index (ADR 0003 — a <c>dbo.*</c> index is out of scope, flagged decision).</summary>
+    public const int TamanoPagina = 20;
+
+    /// <summary>Minimum trimmed length before a query runs — a shorter term returns an empty page
+    /// and issues no scan (api-catalogos-proveedores "Empty, short, and no-match queries").</summary>
+    private const int LongitudMinima = 2;
+
     private readonly string _connectionString;
 
     public SqlProveedorRepository(string connectionString) => _connectionString = connectionString;
+
+    public async Task<BusquedaProveedores> BuscarAsync(string consulta, int pagina, CancellationToken ct)
+    {
+        var termino = (consulta ?? string.Empty).Trim();
+        if (termino.Length < LongitudMinima)
+        {
+            return new BusquedaProveedores(Array.Empty<Proveedor>(), HayMas: false);
+        }
+
+        var paginaNormalizada = pagina < 1 ? 1 : pagina;
+        var salto = (paginaNormalizada - 1) * TamanoPagina;
+
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync(ct);
+        await using var command = connection.CreateCommand();
+        // Fetch one extra row so `HayMas` is known without a second COUNT round-trip.
+        command.CommandText =
+            """
+            SELECT codpro, proveedor, coddocide, rucpro
+            FROM dbo.Proveedor
+            WHERE (proveedor LIKE @patron OR rucpro LIKE @patron)
+              AND codpro <> 'P00000'
+            ORDER BY proveedor
+            OFFSET @salto ROWS FETCH NEXT @tamano ROWS ONLY;
+            """;
+        command.Parameters.AddWithValue("@patron", "%" + termino + "%");
+        command.Parameters.AddWithValue("@salto", salto);
+        command.Parameters.AddWithValue("@tamano", TamanoPagina + 1);
+
+        var filas = new List<Proveedor>();
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            filas.Add(Map(reader));
+        }
+
+        var hayMas = filas.Count > TamanoPagina;
+        return new BusquedaProveedores(
+            hayMas ? filas.GetRange(0, TamanoPagina) : filas,
+            hayMas);
+    }
 
     public async Task<Proveedor?> ObtenerPorCodigoAsync(string codigo, CancellationToken ct)
     {

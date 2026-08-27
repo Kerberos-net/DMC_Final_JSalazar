@@ -13,6 +13,7 @@ import { CorreccionFacturaRequest } from '../../models/factura.model';
 import { LineaAsientoRequest } from '../../models/asiento.model';
 import { ProblemaDetails } from '../../../shared/problema.model';
 import { FacturaForm } from '../../ui/factura-form/factura-form';
+import { PickerProveedor } from '../../ui/picker-proveedor/picker-proveedor';
 import { AsientoLineas } from '../../ui/asiento-lineas/asiento-lineas';
 import { VisorDocumento } from '../../ui/visor-documento/visor-documento';
 import { ConflictoBanner } from '../../ui/conflicto-banner/conflicto-banner';
@@ -28,7 +29,7 @@ import { ConflictoBanner } from '../../ui/conflicto-banner/conflicto-banner';
 @Component({
   selector: 'app-detalle-page',
   standalone: true,
-  imports: [FacturaForm, AsientoLineas, VisorDocumento, ConflictoBanner, IndicadoresFactura],
+  imports: [FacturaForm, PickerProveedor, AsientoLineas, VisorDocumento, ConflictoBanner, IndicadoresFactura],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './detalle-page.html',
   styleUrl: './detalle-page.css',
@@ -123,6 +124,18 @@ export class DetallePage {
 
   onCambiosFactura(cambio: CorreccionFacturaRequest): void {
     this.borradorFactura.set({ ...this.borradorFactura(), ...cambio });
+  }
+
+  /** BACKLOG #18 PR8 — the proveedor picker's selection goes through the SAME draft path as every
+   * other editable field (spa-picker-proveedor "Selection updates the draft, not the server"):
+   * no new save contract, no direct PATCH; it persists only on "Guardar avance". `rucProveedor`
+   * is included only when the chosen proveedor actually carries one. */
+  onProveedorSeleccionado(seleccion: { codigo: string; ruc: string | null }): void {
+    const cambio: CorreccionFacturaRequest =
+      seleccion.ruc === null
+        ? { proveedorCodigo: seleccion.codigo }
+        : { proveedorCodigo: seleccion.codigo, rucProveedor: seleccion.ruc };
+    this.onCambiosFactura(cambio);
   }
 
   async guardarAvance(): Promise<void> {

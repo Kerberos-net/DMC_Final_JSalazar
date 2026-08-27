@@ -23,6 +23,10 @@
          same Core/Infrastructure pair shape as above, never SmartNet.Db.Runner. -->
     <ProjectReference Include="..\..\tipos-de-cambio\SmartNet.TiposCambio.Core\SmartNet.TiposCambio.Core.csproj" />
     <ProjectReference Include="..\..\tipos-de-cambio\SmartNet.TiposCambio.Infrastructure\SmartNet.TiposCambio.Infrastructure.csproj" />
+    <!-- BACKLOG #18 PR8: read-only proveedor search over dbo.Proveedor (ADR 0003 external catalog),
+         same Core/Infrastructure pair shape as above, never SmartNet.Db.Runner. -->
+    <ProjectReference Include="..\..\catalogos\SmartNet.Catalogos.Core\SmartNet.Catalogos.Core.csproj" />
+    <ProjectReference Include="..\..\catalogos\SmartNet.Catalogos.Infrastructure\SmartNet.Catalogos.Infrastructure.csproj" />
   </ItemGroup>
 
   <!-- Makes the top-level-statements Program class visible to WebApplicationFactory<Program> in

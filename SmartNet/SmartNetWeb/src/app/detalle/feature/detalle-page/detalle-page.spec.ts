@@ -4,9 +4,13 @@ import {
   provideHttpClientTesting,
 } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
+import { By } from '@angular/platform-browser';
 import { ActivatedRoute } from '@angular/router';
 import { of } from 'rxjs';
 import { DetallePage } from './detalle-page';
+import { FacturaForm } from '../../ui/factura-form/factura-form';
+import { PickerProveedor } from '../../ui/picker-proveedor/picker-proveedor';
+import { ProveedorService } from '../../../catalogos/data-access/proveedor.service';
 import { FacturaRespuesta } from '../../models/factura.model';
 import { AsientoRespuesta, FacturaAsientoRespuesta } from '../../models/asiento.model';
 
@@ -247,6 +251,49 @@ describe('DetallePage', () => {
       expect(fixture.componentInstance.bloqueosValidar()).toEqual([]);
       expect(fixture.componentInstance.puedeValidar()).toBe(true);
       expect(fixture.nativeElement.querySelector('[data-testid="validar"]').disabled).toBe(false);
+    });
+  });
+
+  /* tasks.md 8.12 (RED first), spa-picker-proveedor "Opened from factura-form, selection flows
+   * through borradorFactura". */
+  describe('proveedor picker wiring', () => {
+    it('opens the picker dialog when factura-form emits buscarProveedor', async () => {
+      const fixture = await crearPagina();
+      TestBed.inject(ProveedorService).debounceMs = 5;
+
+      const form = fixture.debugElement.query(By.directive(FacturaForm)).componentInstance as FacturaForm;
+      form.buscarProveedor.emit();
+      fixture.detectChanges();
+
+      const dialogo: HTMLDialogElement = fixture.nativeElement.querySelector('[data-testid="picker-proveedor"]');
+      expect(dialogo.open).toBe(true);
+    });
+
+    it('pushes { proveedorCodigo, rucProveedor } into borradorFactura via onCambiosFactura, no PATCH', async () => {
+      const fixture = await crearPagina();
+      const picker = fixture.debugElement.query(By.directive(PickerProveedor)).componentInstance as PickerProveedor;
+
+      picker.seleccionar.emit({ codigo: 'P00999', ruc: '20999999999' });
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.borradorFactura()).toEqual({
+        proveedorCodigo: 'P00999',
+        rucProveedor: '20999999999',
+      });
+      httpMock.expectNone((r) => r.method === 'PATCH');
+    });
+
+    it('persists the picked proveedor only on "Guardar avance"', async () => {
+      const fixture = await crearPagina();
+      const picker = fixture.debugElement.query(By.directive(PickerProveedor)).componentInstance as PickerProveedor;
+      picker.seleccionar.emit({ codigo: 'P00999', ruc: null });
+
+      const guardar = fixture.componentInstance.guardarAvance();
+      const req = httpMock.expectOne('/api/facturas/42');
+      expect(req.request.method).toBe('PATCH');
+      expect(req.request.body).toEqual({ proveedorCodigo: 'P00999' });
+      req.flush({ ...factura, proveedorCodigo: 'P00999' }, { headers: { ETag: '"f9"' } });
+      await guardar;
     });
   });
 });

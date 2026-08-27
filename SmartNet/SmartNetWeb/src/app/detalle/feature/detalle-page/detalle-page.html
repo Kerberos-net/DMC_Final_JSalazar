@@ -57,7 +57,10 @@
           [editable]="f.estado !== 'VALIDADA'"
           (cambios)="onCambiosFactura($event)"
           (confirmarAfectacion)="onConfirmarAfectacion($event)"
+          (buscarProveedor)="picker.abrir()"
         />
+
+        <app-picker-proveedor #picker (seleccionar)="onProveedorSeleccionado($event)" />
 
         @if (asiento(); as a) {
           <div class="detalle-asiento">

@@ -4,6 +4,8 @@ using Microsoft.AspNetCore.DataProtection.Repositories;
 using SmartNet.Api;
 using SmartNet.Auth.Core;
 using SmartNet.Auth.Infrastructure;
+using SmartNet.Catalogos.Core;
+using SmartNet.Catalogos.Infrastructure;
 using SmartNet.Facturacion.Core;
 using SmartNet.Facturacion.Infrastructure;
 using SmartNet.Inbox.Core;
@@ -90,6 +92,13 @@ builder.Services.AddSingleton<IAuditoriaRepository>(sp =>
 builder.Services.AddSingleton<IConfiguracionRepository>(sp =>
     new SqlConfiguracionRepository(ApiConnectionOptions.Resolve(sp.GetRequiredService<IConfiguration>())));
 
+// BACKLOG #18 PR8 composition root: api-catalogos-proveedores — read-only proveedor search over
+// dbo.Proveedor (ADR 0003 external catalog). Same lazy-resolution pattern as every repo above; a
+// plain Singleton like the other read-only catalog/config repos, not Scoped like the *Servicio*
+// facades.
+builder.Services.AddSingleton<IProveedorRepository>(sp =>
+    new SqlProveedorRepository(ApiConnectionOptions.Resolve(sp.GetRequiredService<IConfiguration>())));
+
 // design D7: PeriodicTimer(1 min) with the DI-registered TimeProvider.System above -- so a test
 // that substitutes a FakeTimeProvider via SmartNetApiFactory could drive it deterministically the
 // same way SmartNet.Inbox.Infrastructure.Tests.PromocionBackgroundServiceTests already does for
@@ -164,6 +173,7 @@ app.MapIntegracionEndpoints();
 app.MapDocumentoEndpoints();
 app.MapAuditoriaEndpoints();
 app.MapConfiguracionEndpoints();
+app.MapCatalogoEndpoints();
 
 app.Run();
 

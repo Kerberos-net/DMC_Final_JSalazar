@@ -94,6 +94,68 @@ Chain strategy: pending
 - [ ] 7.4 Confirm no versioned SQL added, data partition (ADR 0003) untouched, money helper never 3-decimal.
 - [ ] 7.5 Update `BACKLOG.md` #18 status.
 
+## Phase 8: Functional proveedor picker (PR-picker, dep PR4 — api-catalogos-proveedores, spa-picker-proveedor)
+
+New slice pulled in by user decision (investigation `item-18/proveedor-picker-investigation`).
+No proveedor search endpoint and no SPA `catalogos` slice exist today. Strict TDD: RED test
+task before every GREEN impl task. Test runners: `dotnet test` (.NET) and
+`npx ng test --no-watch` (SPA). No versioned SQL, no new grant (`usr_api` already has
+`SELECT ON dbo.Proveedor`, `schema/008_usuarios_y_permisos.sql:149`). No `dbo.*` writes, no
+`fact.*` access, no accounting logic (ADR 0003, CLAUDE.md rules 2/3).
+
+### 8a — .NET search endpoint (~185 authored lines)
+
+- [x] 8.1 GREEN: add `SmartNet.Catalogos.Core` + `SmartNet.Catalogos.Infrastructure` project references to `SmartNet.Api.csproj` (no prod code yet — enables the test project to compile against the host).
+- [x] 8.2 RED: infra test — `SqlProveedorRepository.BuscarAsync(q, pagina)` returns rows matching `proveedor LIKE @q OR rucpro LIKE @q`, ordered by `proveedor`, paged (fixed page size, `OFFSET/FETCH` or `TOP N` — impl decides), excludes `P00000`, empty for blank/short `q`.
+- [x] 8.3 GREEN: extend `IProveedorRepository` + `SqlProveedorRepository` with paged `BuscarAsync(string q, int pagina)` returning results + `hayMas` signal. Read-only `SELECT` on `dbo.Proveedor` only.
+- [x] 8.4 RED: API contract test — `GET /api/catalogos/proveedores?q=&pagina=`: match by name fragment, match by RUC, ordering by `nombre`, page two, page past end (empty + `hayMas=false`), empty/short `q` (empty, no scan), no-match, `P00000` excluded, `401` when unauthenticated.
+- [x] 8.5 GREEN: create `CatalogoEndpoints.cs` (`GET /api/catalogos/proveedores` → `{ resultados: { codigo, nombre, ruc }[], hayMas }`, same auth as other `/api/*`); register in `Program.cs`.
+- [x] 8.6 REFACTOR: confirm no `fact.*` access, no writes, no versioned SQL / grant added; `P00000` rule matches the spec's flagged decision (see OPEN QUESTION below).
+
+### 8b — SPA data-access + picker dialog (~300 authored lines)
+
+- [x] 8.7 RED: `proveedor.service.spec.ts` — `ProveedorService` (`providedIn: 'root'`, private signal + `asReadonly()`), debounced input issues exactly one `GET /api/catalogos/proveedores?q=` via `HttpTestingController`; pagination appends; response parsed into the readonly signal.
+- [x] 8.8 GREEN: create `catalogos/data-access/proveedor.service.ts` + `proveedor.model.ts` (`{ codigo, nombre, ruc }`); `firstValueFrom(http.get(...))`, debounce, no state library (ADR 0009).
+- [x] 8.9 RED: picker dialog spec — renders debounced search input + result list (`nombre`, `codigo`, `ruc`); keyboard nav; `Enter` selects focused row and emits `{ codigo }` (+ `ruc` if present); `Escape` closes; focus trap; `aria` role/label on dialog; no PATCH issued; `contraste.spec.ts` / palette guard unchanged.
+- [x] 8.10 GREEN: create presentational picker dialog component (modal radius/elevation tokens from PR1, NO new token); wire `ProveedorService` search; emit selection + close.
+- [x] 8.11 REFACTOR: component style budget (4kB/8kB) ok; all `var(--token)`, no literals; confirm no new palette token.
+
+### 8c — Wiring into detalle-page (~90 authored lines)
+
+- [x] 8.12 RED: `detalle-page.spec.ts` — `factura-form`'s existing `buscarProveedor` output opens the picker; picker selection pushes `{ proveedorCodigo }` (+ `rucProveedor` if applicable) into `borradorFactura` via the existing `onCambiosFactura` path; no PATCH sent; value persists only on "Guardar avance".
+- [x] 8.13 RED: `factura-form.spec.ts` — `buscarProveedor` output still emitted unchanged (no new save contract).
+- [x] 8.14 GREEN: wire `buscarProveedor` → open picker in `detalle-page`; route selection through `onCambiosFactura` → `borradorFactura`.
+- [x] 8.15 REFACTOR: confirm reuse of the existing draft path only; run full `npx ng test --no-watch` + `dotnet test` green.
+
+### Phase 8 Review Workload Forecast
+
+| Field | Value |
+|-------|-------|
+| Estimated authored lines | ~575 across the slice (8a ~185, 8b ~300, 8c ~90) |
+| 400-line budget risk | High |
+| Decision needed before apply | Yes |
+| Chained PRs recommended | Yes |
+
+Decision needed before apply: Yes
+Chained PRs recommended: Yes
+400-line budget risk: High
+
+The whole slice (~575) exceeds the 400-line budget. Recommended sub-split into three
+stacked PRs on the feature-branch chain (predecessor targeting):
+
+- **PR8a** (.NET endpoint, ~185) — under budget, ships alone.
+- **PR8b** (SPA service + picker dialog, ~300) — under budget, depends on PR8a.
+- **PR8c** (detalle-page wiring, ~90) — under budget, depends on PR8b.
+
+If 8b + 8c are combined (~390) they stay just under budget but leave no review headroom;
+prefer the three-way split. A single PR8 (~575) would require an explicitly accepted
+`size:exception` and is not recommended.
+
+### Phase 8 Open Questions
+
+1. `P00000` ("Varios") in search results — spec assumes EXCLUDED (human-search safety; generic path stays reachable via the existing generic-proveedor flow). Confirm against product intent before 8.5; if product wants it shown-but-marked, `resultados` gains an `esGenerico` flag instead.
+2. Nonclustered index on `dbo.Proveedor(proveedor)` — a `dbo.*` external-catalog object per ADR 0003; left OUT OF SCOPE as a flagged decision. `LIKE` over ~6600 rows is acceptable without it; revisit only if search latency is a problem.
+
 ## Threat Matrix
 
-N/A — design records no routing, shell, subprocess, VCS/PR automation, executable-file classification, or process-integration boundary. API delta is an additive DTO field. No RED threat-case tasks required.
+N/A — design records no routing, shell, subprocess, VCS/PR automation, executable-file classification, or process-integration boundary. API delta is an additive DTO field. The Phase 8 catalog endpoint is an additive read-only `GET` over an already-granted `dbo.*` table, not a new process boundary. No RED threat-case tasks required.
