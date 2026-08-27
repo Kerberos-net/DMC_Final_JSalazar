@@ -229,6 +229,15 @@ public sealed class ServicioDeFacturas
             return new ResultadoComando.NoEncontrado();
         }
 
+        // BACKLOG #18 PR5 (api-facturas delta) -- guarda pura ANTES de escribir: una corrección
+        // inválida (numero en blanco / muy largo, tipo de comprobante desconocido) -> 422 sin tocar
+        // ninguna fila ni hacer commit.
+        var invalida = ValidacionDeCorreccion.Validar(cambios);
+        if (invalida is not null)
+        {
+            return invalida;
+        }
+
         var (actualizada, entradas) = AplicarCorreccion(persistida, cambios, usuarioId, ahora);
 
         var escritura = await uow.GuardarFacturaAsync(facturaId, versionEsperada, actualizada, ct);
@@ -525,6 +534,20 @@ public sealed class ServicioDeFacturas
         {
             Auditar(nameof(FacturaPersistida.Afectacion), original.Afectacion, cambios.Afectacion);
             actualizada = actualizada with { Afectacion = cambios.Afectacion };
+        }
+
+        // BACKLOG #18 PR5 (api-facturas delta) -- mismos dos campos que la SPA ahora edita; el
+        // conjunto de valores aceptados de TipoComprobante ya lo validó ValidacionDeCorreccion.
+        if (cambios.TipoComprobante is not null)
+        {
+            Auditar(nameof(FacturaPersistida.TipoComprobante), original.TipoComprobante, cambios.TipoComprobante);
+            actualizada = actualizada with { TipoComprobante = cambios.TipoComprobante };
+        }
+
+        if (cambios.Numero is not null)
+        {
+            Auditar(nameof(FacturaPersistida.Numero), original.Numero, cambios.Numero);
+            actualizada = actualizada with { Numero = cambios.Numero };
         }
 
         return (actualizada, entradas);

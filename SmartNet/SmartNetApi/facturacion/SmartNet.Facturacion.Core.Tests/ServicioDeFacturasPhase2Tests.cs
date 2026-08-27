@@ -98,6 +98,75 @@ public class ServicioDeFacturasPhase2Tests
         Assert.Empty(store.UnidadDeTrabajo.AuditoriasRegistradas);
     }
 
+    // --- PatchAsync -- Phase 5 (PR 5): tipoComprobante / numero become PATCH-editable (api-facturas
+    // delta, tasks.md 5.1/5.3). Same audit contract as every other field (design D6). ---
+
+    [Fact]
+    public async Task PatchAsync_ChangingTipoComprobanteAndNumero_WritesOneAuditRowPerChangedField()
+    {
+        var store = new FakeFacturacionStore();
+        store.UnidadDeTrabajo.FacturaACargar = FacturaPendiente(); // TipoComprobante "01", Numero "F001-1"
+        var sut = new ServicioDeFacturas(store);
+
+        var resultado = await sut.PatchAsync(
+            100, VersionInicial,
+            new CorreccionFactura(TipoComprobante: "07", Numero: "FC01-9"),
+            usuarioId: 7, Ahora, CancellationToken.None);
+
+        Assert.IsType<ResultadoComando.Aplicado>(resultado);
+        Assert.Equal(2, store.UnidadDeTrabajo.AuditoriasRegistradas.Count);
+        Assert.Contains(store.UnidadDeTrabajo.AuditoriasRegistradas, e => e.Campo == nameof(FacturaPersistida.TipoComprobante));
+        Assert.Contains(store.UnidadDeTrabajo.AuditoriasRegistradas, e => e.Campo == nameof(FacturaPersistida.Numero));
+        Assert.All(store.UnidadDeTrabajo.AuditoriasRegistradas, e =>
+            Assert.Equal(EntradaAuditoria.Acciones.Correccion, e.Accion));
+        Assert.Equal("07", store.UnidadDeTrabajo.UltimaFacturaGuardada!.TipoComprobante);
+        Assert.Equal("FC01-9", store.UnidadDeTrabajo.UltimaFacturaGuardada.Numero);
+    }
+
+    [Fact]
+    public async Task PatchAsync_ResendingTheSameTipoComprobante_WritesNoAuditRow()
+    {
+        var store = new FakeFacturacionStore();
+        store.UnidadDeTrabajo.FacturaACargar = FacturaPendiente();
+        var sut = new ServicioDeFacturas(store);
+
+        var resultado = await sut.PatchAsync(
+            100, VersionInicial, new CorreccionFactura(TipoComprobante: "01"), usuarioId: 1, Ahora, CancellationToken.None);
+
+        Assert.IsType<ResultadoComando.Aplicado>(resultado);
+        Assert.Empty(store.UnidadDeTrabajo.AuditoriasRegistradas);
+    }
+
+    [Fact]
+    public async Task PatchAsync_WithAnInvalidTipoComprobante_ReturnsCorreccionInvalida_AndNeverSavesOrCommits()
+    {
+        var store = new FakeFacturacionStore();
+        store.UnidadDeTrabajo.FacturaACargar = FacturaPendiente();
+        var sut = new ServicioDeFacturas(store);
+
+        var resultado = await sut.PatchAsync(
+            100, VersionInicial, new CorreccionFactura(TipoComprobante: "99"), usuarioId: 1, Ahora, CancellationToken.None);
+
+        Assert.IsType<ResultadoComando.CorreccionInvalida>(resultado);
+        Assert.DoesNotContain(nameof(IUnidadDeTrabajo.GuardarFacturaAsync), store.UnidadDeTrabajo.Llamadas);
+        Assert.False(store.UnidadDeTrabajo.Committed);
+    }
+
+    [Fact]
+    public async Task PatchAsync_WithABlankNumero_ReturnsCorreccionInvalida_AndNeverSavesOrCommits()
+    {
+        var store = new FakeFacturacionStore();
+        store.UnidadDeTrabajo.FacturaACargar = FacturaPendiente();
+        var sut = new ServicioDeFacturas(store);
+
+        var resultado = await sut.PatchAsync(
+            100, VersionInicial, new CorreccionFactura(Numero: "  "), usuarioId: 1, Ahora, CancellationToken.None);
+
+        Assert.IsType<ResultadoComando.CorreccionInvalida>(resultado);
+        Assert.DoesNotContain(nameof(IUnidadDeTrabajo.GuardarFacturaAsync), store.UnidadDeTrabajo.Llamadas);
+        Assert.False(store.UnidadDeTrabajo.Committed);
+    }
+
     // --- AbrirAsync ---
 
     [Fact]

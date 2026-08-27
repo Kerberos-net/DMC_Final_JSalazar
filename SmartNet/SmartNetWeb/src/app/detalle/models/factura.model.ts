@@ -34,4 +34,7 @@ export interface CorreccionFacturaRequest {
   readonly fechaEmision?: string | null;
   readonly motivo?: number | null;
   readonly afectacion?: string | null;
+  /** BACKLOG #18 PR5 (api-facturas delta): tipoComprobante/numero ya son PATCH-editables. */
+  readonly tipoComprobante?: string | null;
+  readonly numero?: string | null;
 }

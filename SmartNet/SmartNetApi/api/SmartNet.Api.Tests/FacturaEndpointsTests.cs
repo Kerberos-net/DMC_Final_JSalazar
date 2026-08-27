@@ -108,6 +108,81 @@ public sealed class FacturaEndpointsTests : SesionEndpointsTestBase
         Assert.Equal(1, cantidad);
     }
 
+    // --- PATCH: tipoComprobante / numero (api-facturas delta, BACKLOG #18 PR5, tasks.md 5.6) ---
+
+    [Fact]
+    public async Task PatchFactura_UpdatesTipoComprobanteAndNumero_AndGetReflectsThem()
+    {
+        var facturaId = await Db.InsertarFacturaAsync(tipoComprobante: "01", numero: "F001-1");
+        var etag = TokenDeConcurrencia.Codificar(await Db.ObtenerVersionFacturaAsync(facturaId));
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var request = new HttpRequestMessage(HttpMethod.Patch, $"/api/facturas/{facturaId}")
+        {
+            Content = JsonContent.Create(new CorreccionFacturaRequest(
+                ProveedorCodigo: null, RucProveedor: null, Moneda: null, TotalOrig: null, FechaEmision: null,
+                Motivo: null, Afectacion: null, TipoComprobante: "07", Numero: "FC01-42")),
+        };
+        request.Headers.TryAddWithoutValidation("If-Match", etag);
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var enBd = await Db.ExecuteScalarAsync<string>(
+            $"SELECT CONCAT(RTRIM(TipoComprobante), '|', RTRIM(Numero)) FROM fact.Factura WHERE FacturaId = {facturaId};");
+        Assert.Equal("07|FC01-42", enBd);
+
+        var cuerpo = await client.GetFromJsonAsync<FacturaRespuesta>($"/api/facturas/{facturaId}");
+        Assert.Equal("07", cuerpo!.TipoComprobante.TrimEnd());
+        Assert.Equal("FC01-42", cuerpo.Numero!.TrimEnd());
+    }
+
+    [Fact]
+    public async Task PatchFactura_WithABlankNumero_Returns422_AndLeavesTheRowUnchanged()
+    {
+        var facturaId = await Db.InsertarFacturaAsync(numero: "F001-1");
+        var etag = TokenDeConcurrencia.Codificar(await Db.ObtenerVersionFacturaAsync(facturaId));
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var request = new HttpRequestMessage(HttpMethod.Patch, $"/api/facturas/{facturaId}")
+        {
+            Content = JsonContent.Create(new CorreccionFacturaRequest(
+                null, null, null, null, null, null, null, TipoComprobante: null, Numero: "   ")),
+        };
+        request.Headers.TryAddWithoutValidation("If-Match", etag);
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+        var numero = await Db.ExecuteScalarAsync<string>($"SELECT Numero FROM fact.Factura WHERE FacturaId = {facturaId};");
+        Assert.Equal("F001-1", numero!.TrimEnd());
+    }
+
+    [Fact]
+    public async Task PatchFactura_WithAnUnknownTipoComprobante_Returns422_AndLeavesTheRowUnchanged()
+    {
+        var facturaId = await Db.InsertarFacturaAsync(tipoComprobante: "01");
+        var etag = TokenDeConcurrencia.Codificar(await Db.ObtenerVersionFacturaAsync(facturaId));
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var request = new HttpRequestMessage(HttpMethod.Patch, $"/api/facturas/{facturaId}")
+        {
+            Content = JsonContent.Create(new CorreccionFacturaRequest(
+                null, null, null, null, null, null, null, TipoComprobante: "99", Numero: null)),
+        };
+        request.Headers.TryAddWithoutValidation("If-Match", etag);
+
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.UnprocessableEntity, response.StatusCode);
+        var tipo = await Db.ExecuteScalarAsync<string>($"SELECT TipoComprobante FROM fact.Factura WHERE FacturaId = {facturaId};");
+        Assert.Equal("01", tipo!.TrimEnd());
+    }
+
     // --- abrir ---
 
     [Fact]

@@ -69,15 +69,15 @@ Chain strategy: pending
 
 ## Phase 5: .NET PATCH delta + binding (PR5, dep PR4 — api-facturas)
 
-- [ ] 5.1 RED: core test — `ValidacionDeCorreccion.Validar(CorreccionFactura)` rejects blank `numero`, `tipoComprobante` not 2-char / outside accepted domain enum, `numero` > 20 chars; returns `null` when untouched.
-- [ ] 5.2 GREEN: create `ValidacionDeCorreccion.cs` — pure guard, no DB/HTTP/clock (ADR 0019).
-- [ ] 5.3 RED: core test — `AplicarCorreccion` emits one `AuditoriaCorreccion` row (`Accion=CORRECCION`) per changed field for `TipoComprobante`/`Numero`; resend of same value audits nothing.
-- [ ] 5.4 GREEN: add trailing `string? TipoComprobante = null, string? Numero = null` to `CorreccionFactura.cs` (source-compatible) + 2 `AplicarCorreccion` blocks in `ServicioDeFacturas.cs` with guard call.
-- [ ] 5.5 GREEN: add 2 trailing `= null` params to `CorreccionFacturaRequest` + `ACorreccion()` mapping in `FacturaEndpoints.cs`.
-- [ ] 5.6 RED: API contract test — PATCH with `tipoComprobante`/`numero` returns 200 AND GET reflects new values (currently persists nothing); 7-arg positional `CorreccionFactura` construction still compiles.
-- [ ] 5.7 GREEN: add both columns to `SqlUnidadDeTrabajo.GuardarFacturaAsync` UPDATE `SET` list + 2 SqlParameters (verified omitted today). No versioned SQL, no new grant (008 covers object-level UPDATE).
-- [ ] 5.8 RED: `factura-form.spec.ts` — `tipoComprobante`/`numero` render editable and emit `cambios`; `factura.model.ts` `CorreccionFacturaRequest` gains `tipoComprobante?`/`numero?`.
-- [ ] 5.9 GREEN: wire the two fields into `borradorFactura` → PATCH payload.
+- [x] 5.1 RED: core test — `ValidacionDeCorreccion.Validar(CorreccionFactura)` rejects blank `numero`, `tipoComprobante` not 2-char / outside accepted domain enum, `numero` > 20 chars; returns `null` when untouched. (`ValidacionDeCorreccionTests.cs`, 8 cases)
+- [x] 5.2 GREEN: create `ValidacionDeCorreccion.cs` — pure guard, no DB/HTTP/clock (ADR 0019). Uses new `SmartNet.Contable.Core.CodigoComprobante` (single canonical {01,03,07} set; `SqlUnidadDeTrabajo.MapearTipoComprobante` refactored to share it).
+- [x] 5.3 RED: core test — `AplicarCorreccion` emits one `AuditoriaCorreccion` row (`Accion=CORRECCION`) per changed field for `TipoComprobante`/`Numero`; resend of same value audits nothing. (`ServicioDeFacturasPhase2Tests.cs` +4 tests)
+- [x] 5.4 GREEN: add trailing `string? TipoComprobante = null, string? Numero = null` to `CorreccionFactura.cs` (source-compatible) + 2 `AplicarCorreccion` blocks in `ServicioDeFacturas.cs` with guard call. Guard returns new `ResultadoComando.CorreccionInvalida` (→ 422 via `ProblemasDeNegocio.Map`).
+- [x] 5.5 GREEN: add 2 trailing `= null` params to `CorreccionFacturaRequest` + `ACorreccion()` mapping in `FacturaEndpoints.cs`.
+- [x] 5.6 RED: API contract test — PATCH with `tipoComprobante`/`numero` returns 200 AND GET reflects new values (currently persists nothing); 7-arg positional `CorreccionFactura` construction still compiles. (`FacturaEndpointsTests.cs` +3 tests; linchpin RED observed: 200 + DB unchanged `01|F001-1`)
+- [x] 5.7 GREEN: add both columns to `SqlUnidadDeTrabajo.GuardarFacturaAsync` UPDATE `SET` list + 2 SqlParameters (verified omitted today). No versioned SQL, no new grant (008 covers object-level UPDATE).
+- [x] 5.8 RED: `factura-form.spec.ts` — `tipoComprobante`/`numero` render editable and emit `cambios`; `factura.model.ts` `CorreccionFacturaRequest` gains `tipoComprobante?`/`numero?`.
+- [x] 5.9 GREEN: wire the two fields into `borradorFactura` → PATCH payload (`tipoComprobante` → `<select>` of 3 types, `numero` → text input, both through existing generic `onCampoInput` → `cambios` → `onCambiosFactura` path; no new save contract).
 
 ## Phase 6: read-only base/IGV projection (PR6 conditional, dep PR4 — api-facturas / pantalla)
 

@@ -12,7 +12,9 @@ import { dosDecimales, importeOpcional } from '../../../shared/formato';
  *    `fechaEmision`, `proveedorCodigo`, `rucProveedor`. Emits one partial
  *    {@link CorreccionFacturaRequest} per edit; the container batches them and sends on
  *    "Guardar avance". `buscarProveedor` just asks the container to open its picker.
- *  - Read-only this phase: `tipoComprobante`, `numero` (need the .NET PATCH delta — Phase 5).
+ *  - Editable via the .NET PATCH delta (BACKLOG #18 PR5): `tipoComprobante` (select of the 3
+ *    comprobante types) and `numero`, bound through the same `cambios` → `borradorFactura` → PATCH
+ *    path as every other editable field.
  *  - Read-only display: `base imponible` / `IGV` (placeholder until the Phase 6 projection),
  *    `tipo de cambio (venta)` (design D6 — the rate the engine actually uses), and derived
  *    `mes` / `día` contable from `AsientoContable.FechaContable`.
@@ -39,6 +41,14 @@ export class FacturaForm {
   readonly confirmarAfectacion = output<boolean>();
   /** Asks the container to open its proveedor picker (the container owns the actual lookup). */
   readonly buscarProveedor = output<void>();
+
+  /** BACKLOG #18 PR5 — el conjunto aceptado por el backend (`fact.Factura.TipoComprobante`
+   * CHAR(2), REGLAS.md §5); la validación real vive en `ValidacionDeCorreccion` server-side. */
+  readonly tiposComprobante: readonly { readonly codigo: string; readonly etiqueta: string }[] = [
+    { codigo: '01', etiqueta: 'Factura' },
+    { codigo: '03', etiqueta: 'Boleta' },
+    { codigo: '07', etiqueta: 'Nota de crédito' },
+  ];
 
   readonly montoTexto = computed(() => dosDecimales(this.factura().totalOrig));
 

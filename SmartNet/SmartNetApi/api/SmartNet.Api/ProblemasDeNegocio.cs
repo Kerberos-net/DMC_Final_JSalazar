@@ -25,6 +25,7 @@ internal static class ProblemasDeNegocio
         ResultadoComando.VersionEnConflicto => VersionEnConflicto(),
         ResultadoComando.Conflicto c => Conflicto(c),
         ResultadoComando.InvariantesIncumplidas inv => Invariantes(inv),
+        ResultadoComando.CorreccionInvalida ci => CorreccionInvalida(ci),
         ResultadoComando.Aplicado => throw new InvalidOperationException(
             "ProblemasDeNegocio.Map nunca se llama con Aplicado -- cada endpoint construye su propia respuesta de éxito."),
         _ => throw new ArgumentOutOfRangeException(nameof(resultado)),
@@ -63,6 +64,18 @@ internal static class ProblemasDeNegocio
                 Base + "configuracion-valor-invalido", "El valor no cumple el tipo declarado de la clave",
                 StatusCodes.Status422UnprocessableEntity,
                 "El valor enviado no pasó la validación de su Tipo (TEXTO/ENTERO/DECIMAL/BOOLEANO/FECHA/LISTA); el valor previo se conserva."),
+            statusCode: StatusCodes.Status422UnprocessableEntity,
+            contentType: "application/problem+json");
+
+    /// <summary>BACKLOG #18 PR5 (api-facturas delta) — <c>ValidacionDeCorreccion</c> rechazó un
+    /// campo de la corrección: 422 <c>application/problem+json</c>, misma naturaleza que
+    /// <see cref="ValorDeConfiguracionInvalido"/> (forma correcta, regla de dominio incumplida) —
+    /// nunca 400.</summary>
+    private static IResult CorreccionInvalida(ResultadoComando.CorreccionInvalida invalida) =>
+        TypedResults.Json(
+            new ProblemaGenerico(
+                Base + "correccion-invalida", "La corrección de la factura no cumple una regla de validación",
+                StatusCodes.Status422UnprocessableEntity, invalida.Detalle),
             statusCode: StatusCodes.Status422UnprocessableEntity,
             contentType: "application/problem+json");
 

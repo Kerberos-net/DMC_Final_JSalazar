@@ -8,7 +8,7 @@ describe('FacturaForm', () => {
     estado: 'ABIERTA',
     proveedorCodigo: 'P00123',
     rucProveedor: '20123456789',
-    tipoComprobante: 'Factura',
+    tipoComprobante: '01',
     numero: 'F001-100',
     totalOrig: 118,
     moneda: 'USD',
@@ -62,14 +62,41 @@ describe('FacturaForm', () => {
       expect(fixture.nativeElement.querySelector('[data-testid="abrir-picker-proveedor"]')).toBeTruthy();
     });
 
-    it('renders tipoComprobante and numero as read-only this phase (PATCH delta is Phase 5)', () => {
+    it('renders tipoComprobante as an editable select of the 3 comprobante types (PR5 PATCH delta)', () => {
       const fixture = createComponent(factura);
-      const tipo: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="campo-tipoComprobante"]');
+      const tipo: HTMLSelectElement = fixture.nativeElement.querySelector('[data-testid="campo-tipoComprobante"]');
+      expect(tipo.tagName).toBe('SELECT');
+      expect(tipo.disabled).toBe(false);
+      expect(tipo.value).toBe('01');
+      expect(Array.from(tipo.options).map((o) => o.value)).toEqual(['01', '03', '07']);
+    });
+
+    it('renders numero as an editable text input (PR5 PATCH delta)', () => {
+      const fixture = createComponent(factura);
+      const numero: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="campo-numero"]');
+      expect(numero.disabled).toBe(false);
+      expect(numero.value).toBe('F001-100');
+    });
+
+    it('emits cambios for tipoComprobante and numero through the existing onCambiosFactura path', () => {
+      const fixture = createComponent(factura);
+      const emitidos: unknown[] = [];
+      fixture.componentInstance.cambios.subscribe((c) => emitidos.push(c));
+      const tipo: HTMLSelectElement = fixture.nativeElement.querySelector('[data-testid="campo-tipoComprobante"]');
+      tipo.value = '07';
+      tipo.dispatchEvent(new Event('change'));
+      const numero: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="campo-numero"]');
+      numero.value = 'FC01-9';
+      numero.dispatchEvent(new Event('input'));
+      expect(emitidos).toEqual([{ tipoComprobante: '07' }, { numero: 'FC01-9' }]);
+    });
+
+    it('disables tipoComprobante and numero when editable=false (VALIDADA)', () => {
+      const fixture = createComponent(factura, null, null, false);
+      const tipo: HTMLSelectElement = fixture.nativeElement.querySelector('[data-testid="campo-tipoComprobante"]');
       const numero: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="campo-numero"]');
       expect(tipo.disabled).toBe(true);
       expect(numero.disabled).toBe(true);
-      expect(tipo.value).toBe('Factura');
-      expect(numero.value).toBe('F001-100');
     });
   });
 

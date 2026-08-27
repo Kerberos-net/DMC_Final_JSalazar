@@ -198,10 +198,14 @@ internal sealed record CorreccionFacturaRequest(
     decimal? TotalOrig,
     DateOnly? FechaEmision,
     int? Motivo,
-    string? Afectacion)
+    string? Afectacion,
+    // BACKLOG #18 PR5 (api-facturas delta) -- 2 params TRAILING con default: los ~call sites
+    // posicionales de 7 argumentos existentes (tests incluidos) siguen compilando.
+    string? TipoComprobante = null,
+    string? Numero = null)
 {
     public CorreccionFactura ACorreccion() =>
-        new(ProveedorCodigo, RucProveedor, Moneda, TotalOrig, FechaEmision, Motivo, Afectacion);
+        new(ProveedorCodigo, RucProveedor, Moneda, TotalOrig, FechaEmision, Motivo, Afectacion, TipoComprobante, Numero);
 }
 
 internal sealed record RegistrarAdjuntoRequest(string NombreArchivo, string RutaRelativa, string MimeType, long TamanoBytes);

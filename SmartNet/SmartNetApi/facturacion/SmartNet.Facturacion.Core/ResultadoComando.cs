@@ -29,4 +29,11 @@ public abstract record ResultadoComando
     /// <summary>Una o más <see cref="InvarianteContable"/> (REGLAS.md §7) fallaron — 422. TODAS las
     /// fallas se devuelven, nunca solo la primera (design D3).</summary>
     public sealed record InvariantesIncumplidas(IReadOnlyList<InvarianteIncumplida> Fallos) : ResultadoComando;
+
+    /// <summary>BACKLOG #18 PR5 (api-facturas delta) — un campo de <see cref="CorreccionFactura"/>
+    /// no pasó <c>ValidacionDeCorreccion</c> (numero en blanco o de más de 20 caracteres, tipo de
+    /// comprobante fuera del conjunto aceptado) — 422 <c>application/problem+json</c>, ninguna fila
+    /// se toca. No es una <see cref="InvarianteContable"/>: es validación de forma del comando, no
+    /// una regla contable de REGLAS.md §7.</summary>
+    public sealed record CorreccionInvalida(string Detalle) : ResultadoComando;
 }

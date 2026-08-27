@@ -66,12 +66,26 @@
 
     <div class="campo" [class.campo--resaltado]="campoResaltado()">
       <span class="campo__etiqueta">Tipo de comprobante</span>
-      <input data-testid="campo-tipoComprobante" [value]="factura().tipoComprobante" disabled />
+      <select
+        data-testid="campo-tipoComprobante"
+        [value]="factura().tipoComprobante"
+        [disabled]="!editable()"
+        (change)="onCampoInput('tipoComprobante', $any($event.target).value)"
+      >
+        @for (tipo of tiposComprobante; track tipo.codigo) {
+          <option [value]="tipo.codigo" [selected]="tipo.codigo === factura().tipoComprobante">{{ tipo.etiqueta }}</option>
+        }
+      </select>
     </div>
 
     <div class="campo" [class.campo--resaltado]="campoResaltado()">
       <span class="campo__etiqueta">Número</span>
-      <input data-testid="campo-numero" [value]="factura().numero" disabled />
+      <input
+        data-testid="campo-numero"
+        [value]="factura().numero"
+        [disabled]="!editable()"
+        (input)="onCampoInput('numero', $any($event.target).value)"
+      />
     </div>
 
     <div class="campo campo--lectura">

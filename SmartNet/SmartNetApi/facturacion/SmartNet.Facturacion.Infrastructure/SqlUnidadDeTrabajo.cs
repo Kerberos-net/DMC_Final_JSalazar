@@ -368,7 +368,7 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
             UPDATE fact.Factura
             SET Estado = @estado, ProveedorCodigo = @proveedorCodigo, RucProveedor = @rucProveedor,
                 TotalOrig = @totalOrig, Moneda = @moneda, FechaEmision = @fechaEmision, Motivo = @motivo,
-                Afectacion = @afectacion
+                Afectacion = @afectacion, TipoComprobante = @tipoComprobante, Numero = @numero
             WHERE FacturaId = @id AND Version = @versionEsperada;
             """);
         command.Parameters.AddWithValue("@estado", factura.Estado);
@@ -379,6 +379,11 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
         command.Parameters.AddWithValue("@fechaEmision", factura.FechaEmision.ToDateTime(TimeOnly.MinValue));
         command.Parameters.AddWithValue("@motivo", (object?)factura.Motivo ?? DBNull.Value);
         command.Parameters.AddWithValue("@afectacion", (object?)factura.Afectacion ?? DBNull.Value);
+        // BACKLOG #18 PR5 (api-facturas delta) -- el SET de arriba OMITIA ambas columnas: un PATCH de
+        // tipoComprobante/numero devolvia 200 y NO persistia nada. Numero NULL nunca llega aqui via
+        // PATCH (CorreccionFactura.Numero == null => "no se toca", AplicarCorreccion no lo copia).
+        command.Parameters.AddWithValue("@tipoComprobante", factura.TipoComprobante);
+        command.Parameters.AddWithValue("@numero", (object?)factura.Numero ?? DBNull.Value);
         command.Parameters.AddWithValue("@id", id);
         command.Parameters.AddWithValue("@versionEsperada", versionEsperada);
 
@@ -842,11 +847,7 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
         _ => Afectacion.Gravada,
     };
 
-    private static TipoComprobante MapearTipoComprobante(string codigo) => codigo switch
-    {
-        "01" => TipoComprobante.Factura,
-        "03" => TipoComprobante.Boleta,
-        "07" => TipoComprobante.NotaCredito,
-        _ => throw new InvalidOperationException($"TipoComprobante desconocido: '{codigo}'."),
-    };
+    // BACKLOG #18 PR5 -- el conjunto de codigos {01,03,07} vive una sola vez, en
+    // SmartNet.Contable.Core.CodigoComprobante; la validacion de correcciones lo comparte.
+    private static TipoComprobante MapearTipoComprobante(string codigo) => CodigoComprobante.Convertir(codigo);
 }
