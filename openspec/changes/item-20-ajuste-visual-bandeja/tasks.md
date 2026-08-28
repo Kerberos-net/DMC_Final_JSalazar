@@ -49,17 +49,17 @@ Base order (stacked-to-main): PR1→main, PR2→main after PR1, PR3→main after
 
 ## Phase 3: PR3 — panel-errores card + confirmar-reproceso modal
 
-- [ ] 3.1 RED: `panel-errores.spec.ts` — `.panel-errores__item` per error; clasificación carries `__clasificacion`; renders nothing when `errores` empty (keep existing spec).
-- [ ] 3.2 GREEN: `panel-errores.html` class attrs only (5 testids unchanged); create `panel-errores.css` — `.alerta--informativa` shape: 1px `var(--estado-error-borde)`, no fill, ink on clasificación only; date `.tabular-nums`.
-- [ ] 3.3 RED: `confirmar-reproceso.spec.ts` — backdrop absent closed / present after `open()` / absent after either close; backdrop click emits cancelar (not confirmar); `keydown.escape` emits cancelar; `document.activeElement` is Cancelar after `open()`; 4 existing `.open` specs stay green.
-- [ ] 3.4 GREEN: `confirmar-reproceso.ts` — add `readonly abierto = signal(false)` set alongside every `nativeElement.open` write in `open()`/`onConfirmar()`/`onCancelar()`; store `document.activeElement` in `open()`, restore on both close paths. No `showModal()`.
-- [ ] 3.5 GREEN: `confirmar-reproceso.html` — `@if (abierto())` backdrop `<div class="confirmar-reproceso__fondo" data-testid="confirmar-reproceso-fondo" (click)="onCancelar()">` before `<dialog>`; add `(keydown.escape)="onCancelar()"`; title/actions wrappers; testids unchanged. Create `confirmar-reproceso.css` — centered fixed card, `--radio-modal`, `--sombra-prominente`, `--fondo-scrim`, `:not([open]){display:none}`.
-- [ ] 3.6 REFACTOR: `npm run lint` + `npx ng build --configuration production`.
+- [x] 3.1 RED: `panel-errores.spec.ts` — `.panel-errores__item` per error; clasificación carries `__clasificacion`; renders nothing when `errores` empty (keep existing spec).
+- [x] 3.2 GREEN: `panel-errores.html` class attrs only (5 testids unchanged); create `panel-errores.css` — `.alerta--informativa` shape: 1px `var(--estado-error-borde)`, no fill, ink on clasificación only; date `.tabular-nums`.
+- [x] 3.3 RED: `confirmar-reproceso.spec.ts` — backdrop absent closed / present after `open()` / absent after either close; backdrop click emits cancelar (not confirmar); `keydown.escape` emits cancelar; `document.activeElement` is Cancelar after `open()`; 4 existing `.open` specs stay green.
+- [x] 3.4 GREEN: `confirmar-reproceso.ts` — add `readonly abierto = signal(false)` set alongside every `nativeElement.open` write in `open()`/`onConfirmar()`/`onCancelar()`; store `document.activeElement` in `open()`, restore on both close paths. No `showModal()`.
+- [x] 3.5 GREEN: `confirmar-reproceso.html` — `@if (abierto())` backdrop `<div class="confirmar-reproceso__fondo" data-testid="confirmar-reproceso-fondo" (click)="onCancelar()">` before `<dialog>`; add `(keydown.escape)="onCancelar()"`; title/actions wrappers; testids unchanged. Create `confirmar-reproceso.css` — centered fixed card, `--radio-modal`, `--sombra-prominente`, `--fondo-scrim`, `:not([open]){display:none}`.
+- [x] 3.6 REFACTOR: `npm run lint` + `npx ng build --configuration production`.
 
 ## Phase 4: Verification
 
-- [ ] 4.1 Full `npx ng test --no-watch` green; confirm read-only files untouched (`inbox-screen/spec.md`, `bandeja/spec.md`, `inbox.service.ts`, bandeja query, filter semantics, pagination, `chipsDe()`, reprocesar window).
-- [ ] 4.2 Map each spec requirement (spa-visual-bandeja 1–7, spa-design-tokens ADDED/MODIFIED) to its covering spec/test; record in apply evidence.
+- [x] 4.1 Full `npx ng test --no-watch` green; confirm read-only files untouched (`inbox-screen/spec.md`, `bandeja/spec.md`, `inbox.service.ts`, bandeja query, filter semantics, pagination, `chipsDe()`, reprocesar window).
+- [x] 4.2 Map each spec requirement (spa-visual-bandeja 1–7, spa-design-tokens ADDED/MODIFIED) to its covering spec/test; record in apply evidence.
 
 ## Requirement → Task Map
 

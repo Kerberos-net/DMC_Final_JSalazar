@@ -50,4 +50,24 @@ describe('PanelErrores', () => {
     expect(filas.length).toBe(0);
     expect(fixture.nativeElement.querySelector('[data-testid="panel-errores"]')).toBeNull();
   });
+
+  it('applies the restrained card structure: one __item per error, __clasificacion on the classification', () => {
+    const fixture = createComponent(errores);
+    const items = fixture.nativeElement.querySelectorAll('.panel-errores__item') as NodeListOf<HTMLElement>;
+    expect(items.length).toBe(2);
+
+    const clasificaciones = fixture.nativeElement.querySelectorAll(
+      '.panel-errores__item .panel-errores__clasificacion'
+    ) as NodeListOf<HTMLElement>;
+    expect(clasificaciones.length).toBe(2);
+    expect(clasificaciones[0].textContent).toContain('TRANSITORIO');
+  });
+
+  it('follows the .alerta--informativa shape, never the .alerta--bloqueante fill', () => {
+    const fixture = createComponent(errores);
+    const contenedor = fixture.nativeElement.querySelector('[data-testid="panel-errores"]') as HTMLElement;
+    expect(contenedor.classList.contains('panel-errores')).toBe(true);
+    expect(fixture.nativeElement.querySelector('.alerta--bloqueante')).toBeNull();
+    expect(fixture.nativeElement.querySelector('.banner--error')).toBeNull();
+  });
 });

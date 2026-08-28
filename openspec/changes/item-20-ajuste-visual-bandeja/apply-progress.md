@@ -87,5 +87,97 @@ Branched off `pr1/item-20-bandeja-tokens-shell` @ `ccdd96b`.
 - None material. Design D3 named the interface fields `etiqueta`/`clase` with `clase` as the full `chip chip--x` string — followed exactly; template uses `[class]="fila.chipEstado.clase"` (whole-string binding, no static `class`).
 - Header "small-caps" satisfied with `font-variant: all-small-caps` on `.inbox-list thead th` layered on top of the global `.tabla th` `text-transform: uppercase`.
 
-## PR3 (Phase 3) — NOT STARTED
-## Phase 4 verification — NOT STARTED
+## PR3 — `pr3/item-20-panel-modal` (Phase 3) — COMPLETE (6/6)
+
+Branched off `pr2/item-20-inbox-list-table` @ `f747c08`.
+
+### Completed tasks
+- [x] 3.1 RED panel-errores.spec.ts — 2 new tests: one `.panel-errores__item` per error +
+  `.panel-errores__clasificacion` on the classification span; container carries `.panel-errores`
+  and NO `.alerta--bloqueante` / `.banner--error` fill class. Existing empty-array spec kept.
+- [x] 3.2 GREEN panel-errores.html — class attributes only (`panel-errores__item`,
+  `__clasificacion`, `__mensaje`, `__fecha`); all 5 testids + `| date: 'short'` unchanged. New
+  panel-errores.css (1094 B): `.alerta--informativa` shape — `1px solid var(--estado-error-borde)`,
+  `background: transparent` (NO fill), `--estado-error-texto` on the clasificación only, date
+  `font-variant-numeric: tabular-nums` (component-scoped, not global `.tabular-nums`). `styleUrl` wired.
+- [x] 3.3 RED confirmar-reproceso.spec.ts — 5 new tests: backdrop absent while closed / present
+  after `open()` / removed after both close paths; backdrop click → `cancelar` not `confirmar` +
+  dialog closes; `keydown.escape` on dialog → `cancelar`; `document.activeElement` === Cancelar
+  button after `open()`. 4 existing `.open` specs untouched.
+- [x] 3.4 GREEN confirmar-reproceso.ts — added `readonly abierto = signal(false)` set alongside
+  every `nativeElement.open` write (`open()` true, private `cerrar()` false used by
+  `onConfirmar()`/`onCancelar()`); `open()` stores `document.activeElement` then focuses the
+  `#botonCancelar` viewChild; `cerrar()` restores focus. NO `showModal()`. `styleUrl` wired.
+- [x] 3.5 GREEN confirmar-reproceso.html — `@if (abierto())` backdrop `<div
+  class="confirmar-reproceso__fondo" data-testid="confirmar-reproceso-fondo" (click)="onCancelar()">`
+  before `<dialog>`; `(keydown.escape)="onCancelar()"` on the dialog; `__titulo` + `__acciones`
+  wrappers; `#botonCancelar` ref + `.btn`/`.btn--secundario` primitives; both testids unchanged.
+  New confirmar-reproceso.css (1070 B): fixed centered card `translate(-50%,-50%)`, `--radio-modal`,
+  `--sombra-prominente`, `--borde-sutil`; `__fondo` fixed `inset:0` `z-index:1` `var(--fondo-scrim)`;
+  card `z-index:2`; `.confirmar-reproceso:not([open]){display:none}`.
+- [x] 3.6 REFACTOR — `npm run lint` clean; full suite 342 passed; prod build clean, no
+  `anyComponentStyle` budget warning.
+
+### TDD Cycle Evidence
+| Task | Test File | Layer | Safety Net | RED | GREEN | REFACTOR |
+|------|-----------|-------|------------|-----|-------|----------|
+| 3.1 | panel-errores.spec.ts | Integration (TestBed) | ✅ 2/2 baseline | ✅ 2 failing (`.panel-errores__item` 0≠2; classes absent) | ✅ 4/4 | ➖ |
+| 3.2 | panel-errores.html/.css/.ts | Integration | ✅ | via 3.1 | ✅ 4/4 | ✅ token-only, outside `@layer` |
+| 3.3 | confirmar-reproceso.spec.ts | Integration | ✅ 4/4 baseline | ✅ 3 failing (no backdrop; focus stays `<body>`) | ✅ 9/9 | ➖ |
+| 3.4 | confirmar-reproceso.ts | — | ✅ | via 3.3 | ✅ | ✅ `abierto` is a `signal` (ADR 0009), no service/store |
+| 3.5 | confirmar-reproceso.html/.css | Integration | ✅ | via 3.3 | ✅ 9/9 | ✅ manual scrim element, no `showModal()`/`::backdrop` |
+
+### Work Unit Evidence (PR3)
+| Evidence | Value |
+|---|---|
+| Focused test command + result | `npx ng test --watch=false --include "**/panel-errores.spec.ts" --include "**/confirmar-reproceso.spec.ts"` → **13 passed** (8 baseline + 5 new) |
+| Full suite | `npx ng test --watch=false` → **342 passed / 34 files**, 0 failures (was 335; +2 panel-errores +5 confirmar-reproceso… net +7) |
+| Runtime harness | `npx ng build --configuration production` → bundle complete 4.6s; NO `anyComponentStyle` warning; styles.css 8.22 kB unchanged; inbox-page lazy chunk 17.79 kB |
+| Lint | `npm run lint` (`tsc --noEmit` app + spec) → clean |
+| Component CSS sizes | panel-errores.css **1094 B**, confirmar-reproceso.css **1070 B** — both far under the 4 kB `anyComponentStyle` warn threshold |
+| Authored diff vs `pr2/item-20-inbox-list-table` | tracked 161 ins / 18 del + 2 new `.css` (~87 lines) ≈ **266 changed lines** (within 400) |
+| Rollback boundary | new `panel-errores.css` + `confirmar-reproceso.css` (delete to restore); `panel-errores.{html,ts}` class-attr / `styleUrl` diff; `confirmar-reproceso.{html,ts}` (`abierto` signal + focus store/restore + backdrop element + wrappers) diff; both `.spec.ts` diffs. `onCancelar()`/`onConfirmar()` emit contract, `chipsDe()`, `inbox.service.ts`, #13 semantics untouched. |
+
+### Deviations from design
+- `confirmar-reproceso` buttons gained `.btn` / `.btn--secundario` primitive classes and a
+  `__acciones` flex wrapper (design named only "actions wrapper"). Purely presentational, keeps
+  both testids and the click handlers. No behavior change.
+- Focus restore added in the private `cerrar()` helper shared by both close paths (design said
+  "restore on both close paths" — one helper satisfies both).
+- `panel-errores` field names confirmed against `bandeja-item.model.ts` `ErrorProcesamiento`:
+  `{ clasificacion, mensaje, ocurridoEn }` all present — design assumption held, no rename needed.
+
+## Phase 4 — Verification — COMPLETE (2/2)
+
+- [x] 4.1 Full `npx ng test --watch=false` → **342 passed / 34 files, 0 failures**. Read-only
+  files confirmed untouched: `git diff --name-only pr2/item-20-inbox-list-table` lists only the
+  6 PR3 scope files (+ 2 untracked new `.css`). `styles.css`, `inbox.service.ts`, `inbox-list.*`,
+  `inbox-page.*`, `inbox-filter.*`, `openspec/specs/inbox-screen/spec.md`,
+  `openspec/specs/bandeja/spec.md` — zero changes. `chipsDe()`, bandeja query, filter semantics,
+  pagination, reprocesar 5-min window — not in any touched file.
+- [x] 4.2 Requirement → evidence map below.
+
+### Requirement Coverage (spa-visual-bandeja + spa-design-tokens delta)
+
+| Requirement | Status | Evidence |
+|---|---|---|
+| **spa-visual-bandeja R1** — inbox components consume tokens, layout-only CSS outside `@layer`, no literals, within 4 kB budget | Met (PR1–PR3) | PR3: `panel-errores.css` / `confirmar-reproceso.css` every value a `var(--*)` token, header comment states "outside the @layer stack"; build has no `anyComponentStyle` warning; 1094 B / 1070 B |
+| **R2** — inbox-page header + shell | Met (PR1) | `inbox-page.spec.ts` h1 "Bandeja principal" + subtitle + doc-order tests (PR1, 11/11) |
+| **R3** — inbox-filter horizontal bar, signals frozen | Met (PR1) | `inbox-filter.spec.ts` label-class test + 7 unchanged behavior specs green (PR1, 8/8) |
+| **R4** — inbox-list table + derived Estado chip | Met (PR2) | `inbox-list.spec.ts` `table.tabla` + `chip-estado` per row + 5 precedence cases + `indicador-chip` regression lock (PR2, 22/22) |
+| **R5** — panel-errores restrained card (informativa shape, no fill, renders nothing when empty; rows show clasificación/mensaje/ocurridoEn) | Met (PR3) | `panel-errores.spec.ts:34` fields render; `:47` empty → `panel-errores` container null; `:54` `.panel-errores__item` ×2 + `__clasificacion`; `:71` container has `.panel-errores`, NO `.alerta--bloqueante` / `.banner--error`. `panel-errores.css:12` `border:1px solid var(--estado-error-borde)` + `background:transparent`; `:29` ink on `__clasificacion` only |
+| **R6** — confirmar-reproceso modal card + manual backdrop, `<dialog>` stays non-modal via `.open` (no `showModal()`, no `::backdrop`), 2 buttons keep behavior | Met (PR3) | `confirmar-reproceso.ts:38` `nativeElement.open = true` (no `showModal()`); `.html:2` `@if (abierto())` manual `__fondo` div w/ `var(--fondo-scrim)`; `.css:14` fixed centered card `--radio-modal` + `--sombra-prominente`; `confirmar-reproceso.spec.ts` 9/9 incl. 4 original `.open` specs + backdrop present/absent + click→cancelar + Escape→cancelar + focus→Cancelar |
+| **R7** — new estado pairs pass WCAG AA both themes | Met (PR1) | `contraste.spec.ts` 4 pair cases (`--estado-error-texto`/`--estado-alerta-texto` over own `-fondo`, ≥4.5) + 16 border cases, both themes (PR1) |
+| **spa-design-tokens ADDED** — `.chip--error` / `.chip--alerta` primitives, `.chip--validada` shape, token-driven | Met (PR1) | `styles.css:395-405` `@layer primitives`; `paleta.spec.ts` chip-body regex tests |
+| **spa-design-tokens ADDED** — estado error/alerta trios both themes, `texto` derived from `--error-ink`/`--alerta-ink`, no new hue | Met (PR1) | `styles.css:146-151` (claro) / `:212-217` (oscuro) pure `var()` aliases; `paleta.spec.ts` alias-identity + anti-literal tests |
+| **spa-design-tokens MODIFIED** — WCAG AA per token pair now names the estado error/alerta pairs | Met (PR1) | `contraste.spec.ts` `PARES_TINTA_FONDO` + `TINTAS_NO_TEXTO` rows |
+
+No Partial / Not-met.
+
+### Open Questions carried to verify (design "Open Questions" + apply flags)
+- **Estado precedence 1 vs 2** (DESCARTADO row WITH error history shows "Descartada", not "Error") —
+  implemented in PR2 per design D3 inference; still flagged for user confirmation.
+- **Backdrop click + Escape both emit `cancelar`** — implemented in PR3 per design D4; the prompt
+  states this is user-ratified ("same effect as the Cancelar button, no new logic path").
+- **`inbox-list` empty state** (`data-testid="inbox-vacio"`) — added in PR2; confirm for #20 vs #21.
+- Summary counter cards + rich data columns remain deferred to #21.

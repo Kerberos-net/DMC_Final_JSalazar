@@ -1,0 +1,41 @@
+/* item #20 (spa-visual-bandeja R6): centered modal card + manual backdrop. The `<dialog>` stays
+ * non-modal (toggled via `.open`, design D6 / #13 D6) so `::backdrop` never paints -- the scrim
+ * is a real element driven by the `abierto` signal. Layout/token only, OUTSIDE the @layer stack. */
+.confirmar-reproceso__fondo {
+  position: fixed;
+  inset: 0;
+  z-index: 1;
+  background: var(--fondo-scrim);
+}
+
+.confirmar-reproceso {
+  position: fixed;
+  z-index: 2;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  margin: 0;
+  max-width: min(90vw, 32rem);
+  padding: var(--space-5);
+  background: var(--fondo-superficie);
+  color: var(--texto-principal);
+  border: 1px solid var(--borde-sutil);
+  border-radius: var(--radio-modal);
+  box-shadow: var(--sombra-prominente);
+}
+
+.confirmar-reproceso:not([open]) {
+  display: none;
+}
+
+.confirmar-reproceso__titulo {
+  margin: 0 0 var(--space-4);
+  font-size: var(--fs-16);
+  font-weight: var(--peso-semi);
+}
+
+.confirmar-reproceso__acciones {
+  display: flex;
+  justify-content: flex-end;
+  gap: var(--space-2);
+}

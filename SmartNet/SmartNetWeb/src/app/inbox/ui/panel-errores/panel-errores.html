@@ -1,10 +1,14 @@
 @if (errores().length > 0) {
   <ul data-testid="panel-errores" class="panel-errores">
     @for (error of errores(); track error.procesamientoErrorId) {
-      <li data-testid="error-item">
-        <span data-testid="error-clasificacion">{{ error.clasificacion }}</span>
-        <span data-testid="error-mensaje">{{ error.mensaje }}</span>
-        <span data-testid="error-ocurrido-en">{{ error.ocurridoEn | date: 'short' }}</span>
+      <li data-testid="error-item" class="panel-errores__item">
+        <span data-testid="error-clasificacion" class="panel-errores__clasificacion">{{
+          error.clasificacion
+        }}</span>
+        <span data-testid="error-mensaje" class="panel-errores__mensaje">{{ error.mensaje }}</span>
+        <span data-testid="error-ocurrido-en" class="panel-errores__fecha">{{
+          error.ocurridoEn | date: 'short'
+        }}</span>
       </li>
     }
   </ul>

@@ -14,6 +14,7 @@ import { ErrorProcesamiento } from '../../models/bandeja-item.model';
   imports: [DatePipe],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './panel-errores.html',
+  styleUrl: './panel-errores.css',
 })
 export class PanelErrores {
   readonly errores = input.required<readonly ErrorProcesamiento[]>();

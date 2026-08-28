@@ -1,9 +1,29 @@
-<dialog #dialogo class="confirmar-reproceso">
-  <p>¿Reprocesar este documento?</p>
-  <button type="button" data-testid="confirmar-reproceso-cancelar" (click)="onCancelar()">
-    Cancelar
-  </button>
-  <button type="button" data-testid="confirmar-reproceso-confirmar" (click)="onConfirmar()">
-    Confirmar
-  </button>
+@if (abierto()) {
+  <div
+    class="confirmar-reproceso__fondo"
+    data-testid="confirmar-reproceso-fondo"
+    (click)="onCancelar()"
+  ></div>
+}
+<dialog #dialogo class="confirmar-reproceso" (keydown.escape)="onCancelar()">
+  <p class="confirmar-reproceso__titulo">¿Reprocesar este documento?</p>
+  <div class="confirmar-reproceso__acciones">
+    <button
+      #botonCancelar
+      type="button"
+      class="btn btn--secundario"
+      data-testid="confirmar-reproceso-cancelar"
+      (click)="onCancelar()"
+    >
+      Cancelar
+    </button>
+    <button
+      type="button"
+      class="btn"
+      data-testid="confirmar-reproceso-confirmar"
+      (click)="onConfirmar()"
+    >
+      Confirmar
+    </button>
+  </div>
 </dialog>
