@@ -36,15 +36,15 @@ literals, and stay within `angular.json` `anyComponentStyle` budgets (4kB warn
 
 ### Requirement: inbox-page header and layout shell
 
-The system MUST render a page header with the title "Bandeja" and a subtitle
-that answers "¿qué necesito atender hoy?", plus a layout shell that places the
-filter bar above the list and the list below.
+The system MUST render a page header with the title "Bandeja principal" and a
+subtitle that answers "¿qué necesito atender hoy?", plus a layout shell that
+places the filter bar above the list and the list below.
 
 #### Scenario: Header and shell present
 
 - GIVEN the bandeja route is loaded
 - WHEN `inbox-page` renders
-- THEN a heading "Bandeja" and an orienting subtitle are shown, with
+- THEN a heading "Bandeja principal" and an orienting subtitle are shown, with
   `inbox-filter` above `inbox-list`
 
 ### Requirement: inbox-filter horizontal bar
@@ -63,23 +63,39 @@ blocks. The filter inputs and their bound signals MUST remain unchanged from
 
 ### Requirement: inbox-list table with derived Estado chip column
 
-The system MUST render `inbox-list` as a `.tabla` with `.tabular-nums` on the
-date column and an uppercase small-caps header row. The system MUST add one
-ADDITIVE derived "Estado" chip column computed per row in this precedence:
+The system MUST render `inbox-list` as a `.tabla` with a component-scoped
+tabular-figures treatment on the date cell (NOT the global right-aligning
+`.tabular-nums` primitive, which is wrong for a left-aligned date) and an
+uppercase small-caps header row. The system MUST add one ADDITIVE derived
+"Estado" chip column computed per row, FIRST MATCH WINS, in this precedence:
 
-1. `errores.length > 0` → `.chip--error` "Error"
-2. else `esProveedorGenerico || posibleDuplicado` → `.chip--alerta` "Alerta"
-3. else `estadoConsumo === 'PROMOVIDO'` → `.chip--validada` "Validada"
-4. else `estadoConsumo === 'PENDIENTE'` → `.chip--pendiente` "Pendiente"
-5. else `estadoConsumo === 'DESCARTADO'` → `.chip--descartada` "Descartada"
+1. `estadoConsumo === 'DESCARTADO'` → `.chip--descartada` "Descartada"
+   (unconditional — wins even when the row still carries error history)
+2. else `errores.length > 0` → `.chip--error` "Error"
+3. else `indicadores !== null && (esProveedorGenerico || posibleDuplicado)` →
+   `.chip--alerta` "Alerta" (null-safe: `origen === 'INCIDENCIA'` rows have
+   `indicadores: null`)
+4. else `estadoConsumo === 'PROMOVIDO'` → `.chip--validada` "Validada"
+5. else `estadoConsumo === 'PENDIENTE'` → `.chip--pendiente` "Pendiente"
 
-The derived Estado chip is presentation-only and is NOT a change to #13's
-"indicators → chips" logic. The existing per-indicator `chipsDe()` list column
-MUST remain unchanged.
+`DESCARTADO` ranks FIRST, not last: a discarded row is a terminal lifecycle
+fact and MUST show "Descartada" even with error history (user-ratified,
+design D3). The derived Estado chip is presentation-only and is NOT a change
+to #13's "indicators → chips" logic. The existing per-indicator `chipsDe()`
+list column MUST remain unchanged.
 
-#### Scenario: Row with errors shows Error chip
+#### Scenario: Discarded row with error history shows Descartada
 
-- GIVEN a `BandejaItem` with `errores.length > 0`
+- GIVEN a `BandejaItem` with `estadoConsumo === 'DESCARTADO'` and
+  `errores.length > 0`
+- WHEN the row renders
+- THEN the Estado column shows a `.chip--descartada` labeled "Descartada"
+  (the DESCARTADO branch wins over the error branch)
+
+#### Scenario: Non-discarded row with errors shows Error chip
+
+- GIVEN a `BandejaItem` with `estadoConsumo !== 'DESCARTADO'` and
+  `errores.length > 0`
 - WHEN the row renders
 - THEN the Estado column shows a `.chip--error` labeled "Error" and the
   `chipsDe()` indicator column is unchanged
@@ -91,11 +107,13 @@ MUST remain unchanged.
 - WHEN the row renders
 - THEN the Estado column shows a `.chip--validada` labeled "Validada"
 
-#### Scenario: Date column is tabular
+#### Scenario: Date cell uses component-scoped tabular figures
 
 - GIVEN any inbox-list row
 - WHEN the date cell renders
-- THEN it carries `.tabular-nums`
+- THEN it carries a component-scoped tabular-figures class
+  (`.inbox-list__fecha`, `font-variant-numeric: tabular-nums`, left-aligned),
+  not the global `.tabular-nums` primitive
 
 ### Requirement: panel-errores restrained card treatment
 
@@ -103,15 +121,16 @@ The system MUST style `panel-errores` to transmit urgency without a full red
 fill: error rows use `--estado-error-texto` and a hairline border, following
 the #18 `.alerta--informativa` pattern (1px border, no fill), NOT
 `.alerta--bloqueante`. The panel MUST render nothing when `errores` is empty.
-Each row MUST show clasificación, mensaje, and `ocurridoEn` (date with
-`.tabular-nums`).
+Each row MUST show clasificación, mensaje, and `ocurridoEn` (date rendered with
+a component-scoped tabular-figures treatment, not the global `.tabular-nums`
+primitive).
 
 #### Scenario: Errors present
 
 - GIVEN a `BandejaItem` with one or more `errores`
 - WHEN `panel-errores` renders
-- THEN each row shows clasificación, mensaje and a tabular `ocurridoEn`, using
-  `--estado-error-texto` text and a hairline border with no solid red fill
+- THEN each row shows clasificación, mensaje and a tabular-figures `ocurridoEn`,
+  using `--estado-error-texto` text and a hairline border with no solid red fill
 
 #### Scenario: No errors
 

@@ -11,9 +11,9 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | **15 de 21 cerrados** (BACKLOG.md tiene 21 ítems: #18–#21 nacieron al implementar el #12 — #18 "Ajuste visual del diseño SPA" cerrado 2026-08-27; #19 "Campos contables editables y resaltado OCR por campo", #20 "Ajuste visual de bandeja y panel de errores" y #21 "Bandeja: datos enriquecidos y contadores de resumen" abiertos) |
-| Ciclo SDD activo | Ítem #20 (Ajuste visual de bandeja y panel de errores) — arrancado 2026-08-27 |
-| Última fase cerrada | Ítem #18 (Ajuste visual del diseño SPA), 8 fases, 69/69 tareas cerradas, verify PASS WITH WARNINGS (0 CRITICAL, 2 WARNING no bloqueantes, 3 SUGGESTIONS de deuda aceptada), 8 delta specs, cadena de 7 *commits* apilados sobre `main`, 5 PRs con `size:exception` aceptados por el dueño — ítem #18 cerrado 2026-08-27 |
+| Ítems del backlog | **16 de 21 cerrados** (BACKLOG.md tiene 21 ítems: #18–#21 nacieron al implementar el #12 — #18 "Ajuste visual del diseño SPA" y #20 "Ajuste visual de bandeja y panel de errores" cerrados 2026-08-27; #19 "Campos contables editables y resaltado OCR por campo" y #21 "Bandeja: datos enriquecidos y contadores de resumen" abiertos) |
+| Ciclo SDD activo | Ninguno — último cerrado: ítem #20 (Ajuste visual de bandeja y panel de errores), 2026-08-27 |
+| Última fase cerrada | Ítem #20 (Ajuste visual de bandeja y panel de errores), 4 fases, 23/23 tareas cerradas, verify PASS WITH WARNINGS (0 CRITICAL, 6 WARNING no bloqueantes, 3 SUGGESTIONS), 1 spec nueva (`spa-visual-bandeja`) + 1 delta (`spa-design-tokens`), cadena de 3 *commits* apilados sobre `main` — ítem #20 cerrado 2026-08-27 |
 
 ---
 
@@ -1617,9 +1617,118 @@ Consistente con todos los archivos previos (#12–#17).
 
 ---
 
-## ⬜ Ítems 10, 15, 16, 19 y 21 — sin ciclo SDD abierto
+## ✅ 20. Ajuste visual de bandeja y panel de errores
 
-(El #20 tiene ciclo SDD abierto desde 2026-08-27 — ver sección propia cuando avance.)
+Conformar al *handoff* (`DESIGN_BRIEF.md` §2 dashboard, §5 panel de errores) las cinco pantallas de
+bandeja que el #18 excluyó —`inbox-page`, `inbox-filter`, `inbox-list`, `panel-errores`,
+`confirmar-reproceso`—, que hasta ahora no tenían CSS de componente y solo heredaban los *tokens*
+globales. **Solo visual y de estructura de plantilla: sin datos nuevos** — usa lo que ya trae
+`BandejaItem`. El comportamiento funcional del #13 (consulta de bandeja, semántica de filtros,
+paginación, `chipsDe()` por indicador, ventana de 5 min de reprocesar, `inbox.service.ts`) quedó
+congelado y verificado sin tocar. Mismo *playbook* que el #18. Depende de #13 y #18 (completos).
+
+**Alcance entregado:** capa de *tokens* extendida en `styles.css` (dos tríos `--estado-error-*` /
+`--estado-alerta-*` + `--fondo-scrim`, todos alias `var()` de *inks* ya verificados AA, sin literal
+de matiz nuevo) + dos primitivos `.chip--error` / `.chip--alerta`; guarda WCAG (`paleta.spec.ts` /
+`contraste.spec.ts`) extendida para que esos roles puedan ponerse rojos; CSS de composición +
+reestructuración de plantilla a nivel de clase en los 5 componentes; una columna "Estado" derivada
+ADITIVA en `inbox-list` (`chipEstadoDe()`, función pura a nivel de módulo junto a `chipsDe()`);
+`confirmar-reproceso` con *backdrop* manual (elemento real, no `::backdrop`) y tarjeta modal
+centrada. Contadores de resumen y columnas enriquecidas **diferidos al #21** (requieren ampliar
+`GET /api/bandeja` — trabajo funcional).
+
+**Precedencia del chip de Estado (ratificada por el dueño, primer match gana):** `DESCARTADO`
+primero e incondicional → "Descartada" (gana incluso con historial de errores); luego
+`errores.length > 0` → "Error"; luego `indicadores !== null && (esProveedorGenerico ||
+posibleDuplicado)` → "Alerta" (*null-safe* para `INCIDENCIA` con `indicadores: null`); luego
+`PROMOVIDO` → "Validada"; luego `PENDIENTE` → "Pendiente".
+
+**Entrega:** cadena de 3 *commits* apilados linealmente sobre `main` (`ask-on-risk`,
+`stacked-to-main`), cada PR bajo el presupuesto de 400 líneas individualmente. `main` no se movió
+desde que se cortó la cadena; el orquestador hace *fast-forward*.
+
+**Ciclo SDD:** `openspec/changes/archive/2026-08-27-item-20-ajuste-visual-bandeja/` · **23 de 23 tareas cerradas** — ✅ **CERRADO 2026-08-27**
+
+| Fase | Alcance | Tareas | Estado |
+|---|---|---|---|
+| 1 (PR1) | *Tokens* `--estado-*` + primitivos `.chip--error/--alerta` + guarda WCAG (`paleta`/`contraste`) + *shell* de `inbox-page` + barra horizontal de `inbox-filter` | 10/10 | ✅ |
+| 2 (PR2) | `inbox-list` como `.tabla` + columna "Estado" derivada (`chipEstadoDe()`) + `inbox-list.css` + estado vacío | 5/5 | ✅ |
+| 3 (PR3) | `panel-errores` tarjeta contenida (forma `.alerta--informativa`) + `confirmar-reproceso` tarjeta modal centrada + *backdrop* manual (*backdrop-click* y Escape → `onCancelar()`) + guardar/restaurar foco | 6/6 | ✅ |
+| 4 | Verificación — suite completa, superficies congeladas del #13 confirmadas sin tocar, mapa requisito→prueba | 2/2 | ✅ |
+
+Pronóstico de revisión: alto riesgo de 400 líneas (~660 líneas autoradas en 3 *slices*); PRs
+encadenados recomendados, `ask-on-risk`, `stacked-to-main`. Cada PR quedó bajo 400 individualmente.
+
+### Cadena de *commits* (3, lineal sobre `main`)
+
+| # | Hash | *Slice* | Una línea |
+|---|---|---|---|
+| 1 | `ccdd96b` | PR1 | *Tokens* `--estado-error/alerta-*` + `--fondo-scrim` + `.chip--error/--alerta` + guarda WCAG + *shell* `inbox-page` + barra `inbox-filter` |
+| 2 | `f747c08` | PR2 | `inbox-list` `.tabla` + `chipEstadoDe()` (columna "Estado" derivada, aditiva, `chipsDe()` intacto) + estado vacío `data-testid="inbox-vacio"` |
+| 3 | `a5eee03` | PR3 | `panel-errores` tarjeta `.alerta--informativa` + `confirmar-reproceso` modal centrado + *backdrop* manual + `abierto` *signal* + foco guardar/restaurar |
+
+Rama `pr3/item-20-panel-modal`; `main` se lleva por *fast-forward* a ese *tip*.
+
+### Pruebas
+
+Verificación independiente de `sdd-verify` sobre `pr3/item-20-panel-modal @ a5eee03`
+(`gentle-ai sdd-verify-validate --requirements 10 --scenarios 20` → `{"valid":true,"verdict":"pass"}`):
+
+| Suite | Resultado | Nota |
+|---|---|---|
+| SPA `npx ng test --watch=false` | 342/342 (34 archivos) | Era 296 al cerrar #18; +46. Guarda de paleta/contraste, `inbox-page`, `inbox-filter`, `inbox-list` (5 casos de precedencia + *lock* de regresión de `chipsDe()`), `panel-errores`, `confirmar-reproceso` |
+| SPA `npx ng build --configuration production` | limpio | Sin *warning* de *budget* `anyComponentStyle` (CSS de componente 592–1154 B, muy bajo el aviso de 4 kB) |
+| SPA `npm run lint` | exit 0 | `tsc --noEmit` (app + spec) |
+| `.NET` | no ejecutado | #20 no toca .NET, SQL ni API — correcto |
+
+### Lo verificado al cerrar
+
+D1–D5 seguidos. Los tríos `--estado-*` son `var()` puros de *inks* ya afinados AA; el único valor
+crudo nuevo es `--fondo-scrim` (rgba de *scrim*, no un matiz de estado). La guarda D2 (`paleta.spec.ts`)
+lee `styles.css` de verdad y puede ponerse roja ante un primitivo sin *token*. La precedencia D3
+(DESCARTADO primero) está en el código con 5 pruebas de precedencia en verde. D4: sin `showModal()`,
+sin `::backdrop`, *backdrop* manual. D5: clase de fecha con `font-variant-numeric: tabular-nums` de
+ámbito de componente (`.inbox-list__fecha`), no el primitivo global `.tabular-nums` (que alinea a la
+derecha, incorrecto para una fecha).
+
+**Superficies congeladas del #13 — confirmadas sin tocar:** `chipsDe()` byte-idéntico (*lock* de
+regresión en verde), `inbox.service.ts` ausente del *diff*, consulta de bandeja / filtros /
+paginación / ventana de 5 min de reprocesar sin cambios, `openspec/specs/inbox-screen/spec.md` y
+`openspec/specs/bandeja/spec.md` sin modificar, `bandeja-item.model.ts` sin modificar,
+`styles.css` de PR1 no re-tocado por PR2/PR3.
+
+**Elementos conocidos, no ocultos** — `sdd-verify`: 0 CRITICAL, 6 WARNING no bloqueantes, 3
+SUGGESTIONS. Las 6 WARNING son de reconciliación documental/ratificación para el archivo:
+
+- **WARNING 1–3 (reconciliadas en el paso de archivo)** — el texto del *delta* `spa-visual-bandeja`
+  contradecía el comportamiento ratificado + implementado en tres puntos: (1) la precedencia del
+  chip de Estado estaba escrita "errores primero, DESCARTADO al final"; el orden ratificado es
+  DESCARTADO primero e incondicional. (2) el escenario de fecha decía literal `.tabular-nums`; la
+  implementación usa `.inbox-list__fecha` de ámbito de componente (D5). (3) el encabezado de
+  `inbox-page` decía "Bandeja"; la implementación renderiza "Bandeja principal" (*handoff* §2 +
+  diseño). Los tres textos se corrigieron en el *delta* **antes** de fusionar a `openspec/specs/`.
+- **WARNING 4 (registrada en el reporte de archivo)** — DESCARTADO-primero/incondicional y
+  *backdrop-click* + Escape → `onCancelar()` estaban como Open Questions del diseño; el dueño las
+  ratificó a mitad de ciclo. Las casillas del `design.md` quedan como registro histórico; el
+  `archive-report.md` es el registro de ratificación.
+- **WARNING 5–6 (anotadas en el *change log* del archivo)** — `inbox-page.ts` ganó
+  `.catch(() => undefined)` en el *effect* de carga (arreglo de rechazo no manejado latente,
+  ligeramente fuera del marco "solo CSS/plantilla", neutro en comportamiento, no una superficie
+  funcional del #13); `inbox-list` ganó un estado vacío `data-testid="inbox-vacio"` (DOM
+  presentacional nuevo, probado, no en la propuesta original — adición dentro de alcance, NO el
+  trabajo de contadores/columnas del #21).
+
+Las 3 SUGGESTIONS se arrastran como *follow-ups*: contadores de resumen + columnas enriquecidas
+diferidos al #21; cobertura directa de la celda de fecha; ramas `pr1/pr2/pr3` locales, sin *push*
+ni PRs.
+
+**RDD de gentle-ai desactivado a nivel de repo** (exFAT sin ACL — ver "Condiciones del entorno"),
+así que `reviewGate.delivery: disabled/unmanaged` y no se exige ni se fabrica recibo de revisión.
+Consistente con todos los archivos previos (#12–#18).
+
+---
+
+## ⬜ Ítems 10, 15, 16, 19 y 21 — sin ciclo SDD abierto
 
 Las fases de cada ítem **se definen cuando arranca su ciclo SDD**, no antes. Ponerlas aquí ahora
 sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ítem, y ninguno existe.
