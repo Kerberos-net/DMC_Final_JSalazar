@@ -28,16 +28,16 @@ Base order (stacked-to-main): PR1→main, PR2→main after PR1, PR3→main after
 
 ## Phase 1: PR1 — Tokens, primitives, guard, page shell, filter bar
 
-- [ ] 1.1 RED: add `paleta.spec.ts` tests — 6 `--estado-*` tokens resolve `#rrggbb` both themes; each `texto`===its ink; anti-literal `not.toMatch(/#d70015|#c93400|#ff453a|#ff9f0a/i)`; `toMatch(/\.chip--error\s*\{[^}]*var\(--estado-error-texto\)/)` + `--alerta` analogue.
-- [ ] 1.2 RED: extend `contraste.spec.ts` — `PARES_TINTA_FONDO` += 2 estado texto/fondo rows; `TINTAS_NO_TEXTO` += `--estado-error-borde`,`--estado-alerta-borde`.
-- [ ] 1.3 GREEN: `styles.css` `@layer tokens` — add `--estado-error-{texto,fondo,borde}`, `--estado-alerta-{texto,fondo,borde}`, `--fondo-scrim` to BOTH light+dark blocks as `var()` aliases of `--error-*`/`--alerta-*` inks; `borde`=ink. No hue literal.
-- [ ] 1.4 GREEN: `styles.css` `@layer primitives` after `.chip--descartada` — `.chip--error`/`.chip--alerta` (color/background/border-color from role tokens, `.chip--validada` shape).
-- [ ] 1.5 REFACTOR: run `npm run lint`; confirm 1.1–1.2 green.
-- [ ] 1.6 RED: `inbox-page.spec.ts` — h1 text "Bandeja principal"; subtitle present; document order header→filter→list→dialog (`compareDocumentPosition`); error path renders `.banner .banner--error` keeping `role=alert` + `data-testid="inbox-error"`.
-- [ ] 1.7 GREEN: `inbox-page.html` — add `<header>`/h1/subtitle, error `<p>`→`.banner .banner--error`; create `inbox-page.css` (`:host` column shell, `__cabecera`,`__titulo`,`__subtitulo`).
-- [ ] 1.8 RED: `inbox-filter.spec.ts` — each `<label>` carries `campo inbox-filter__campo`; 5 controls still emit; 7 existing specs stay green.
-- [ ] 1.9 GREEN: `inbox-filter.html` class attrs only; create `inbox-filter.css` (horizontal wrap bar on card surface, per-field flex). Signals/inputs unchanged.
-- [ ] 1.10 REFACTOR: `npm run lint` + `npx ng build --configuration production`; flag any component `.css` nearing 4kB.
+- [x] 1.1 RED: add `paleta.spec.ts` tests — 6 `--estado-*` tokens resolve `#rrggbb` both themes; each `texto`===its ink; anti-literal `not.toMatch(/#d70015|#c93400|#ff453a|#ff9f0a/i)`; `toMatch(/\.chip--error\s*\{[^}]*var\(--estado-error-texto\)/)` + `--alerta` analogue.
+- [x] 1.2 RED: extend `contraste.spec.ts` — `PARES_TINTA_FONDO` += 2 estado texto/fondo rows; `TINTAS_NO_TEXTO` += `--estado-error-borde`,`--estado-alerta-borde`.
+- [x] 1.3 GREEN: `styles.css` `@layer tokens` — add `--estado-error-{texto,fondo,borde}`, `--estado-alerta-{texto,fondo,borde}`, `--fondo-scrim` to BOTH light+dark blocks as `var()` aliases of `--error-*`/`--alerta-*` inks; `borde`=ink. No hue literal.
+- [x] 1.4 GREEN: `styles.css` `@layer primitives` after `.chip--descartada` — `.chip--error`/`.chip--alerta` (color/background/border-color from role tokens, `.chip--validada` shape).
+- [x] 1.5 REFACTOR: run `npm run lint`; confirm 1.1–1.2 green.
+- [x] 1.6 RED: `inbox-page.spec.ts` — h1 text "Bandeja principal"; subtitle present; document order header→filter→list→dialog (`compareDocumentPosition`); error path renders `.banner .banner--error` keeping `role=alert` + `data-testid="inbox-error"`.
+- [x] 1.7 GREEN: `inbox-page.html` — add `<header>`/h1/subtitle, error `<p>`→`.banner .banner--error`; create `inbox-page.css` (`:host` column shell, `__cabecera`,`__titulo`,`__subtitulo`).
+- [x] 1.8 RED: `inbox-filter.spec.ts` — each `<label>` carries `campo inbox-filter__campo`; 5 controls still emit; 7 existing specs stay green.
+- [x] 1.9 GREEN: `inbox-filter.html` class attrs only; create `inbox-filter.css` (horizontal wrap bar on card surface, per-field flex). Signals/inputs unchanged.
+- [x] 1.10 REFACTOR: `npm run lint` + `npx ng build --configuration production`; flag any component `.css` nearing 4kB.
 
 ## Phase 2: PR2 — inbox-list table + derived Estado chip
 

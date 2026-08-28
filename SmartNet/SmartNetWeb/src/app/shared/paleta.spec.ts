@@ -43,6 +43,44 @@ describe('paleta -- ramp privado --azul-*', () => {
   });
 });
 
+describe('paleta -- roles de estado error/alerta (item #20 D1/D2)', () => {
+  const claro = tokensPorTema(CSS, 'claro');
+  const oscuro = tokensPorTema(CSS, 'oscuro');
+  const ROLES = [
+    '--estado-error-texto',
+    '--estado-error-fondo',
+    '--estado-error-borde',
+    '--estado-alerta-texto',
+    '--estado-alerta-fondo',
+    '--estado-alerta-borde',
+  ] as const;
+
+  it('los seis tokens de estado error/alerta existen resueltos en ambos temas', () => {
+    for (const nombre of ROLES) {
+      expect(claro.get(nombre), `${nombre} claro`).toMatch(/^#[0-9a-f]{6}$/i);
+      expect(oscuro.get(nombre), `${nombre} oscuro`).toMatch(/^#[0-9a-f]{6}$/i);
+    }
+  });
+
+  it('el chip Error/Alerta reutiliza la tinta AA existente (sin hue nuevo)', () => {
+    expect(claro.get('--estado-error-texto')).toBe(claro.get('--error-ink'));
+    expect(oscuro.get('--estado-error-texto')).toBe(oscuro.get('--error-ink'));
+    expect(claro.get('--estado-error-borde')).toBe(claro.get('--error-ink'));
+    expect(claro.get('--estado-alerta-texto')).toBe(claro.get('--alerta-ink'));
+    expect(oscuro.get('--estado-alerta-texto')).toBe(oscuro.get('--alerta-ink'));
+    expect(oscuro.get('--estado-alerta-borde')).toBe(oscuro.get('--alerta-ink'));
+  });
+
+  it('los hexes de estado del handoff nunca entran a la hoja', () => {
+    expect(CSS).not.toMatch(/#d70015|#c93400|#ff453a|#ff9f0a/i);
+  });
+
+  it('.chip--error/.chip--alerta consumen el token de rol, no un literal', () => {
+    expect(CSS).toMatch(/\.chip--error\s*\{[^}]*var\(--estado-error-texto\)/);
+    expect(CSS).toMatch(/\.chip--alerta\s*\{[^}]*var\(--estado-alerta-texto\)/);
+  });
+});
+
 describe('paleta -- superficies, radios y tipografia', () => {
   const oscuro = tokensPorTema(CSS, 'oscuro');
   const raiz = leerTokens(CSS);

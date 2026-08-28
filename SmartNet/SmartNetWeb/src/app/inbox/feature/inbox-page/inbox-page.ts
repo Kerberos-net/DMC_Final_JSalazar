@@ -19,6 +19,7 @@ import { EstadoConsumo, OrdenFecha } from '../../models/bandeja-item.model';
   imports: [InboxFilter, InboxList, ConfirmarReproceso],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './inbox-page.html',
+  styleUrl: './inbox-page.css',
 })
 export class InboxPage {
   private readonly inboxService = inject(InboxService);
@@ -48,14 +49,18 @@ export class InboxPage {
       const hasta = this.hasta();
       const proveedor = this.proveedor();
       const pagina = this.pagina();
-      void this.inboxService.cargar({
-        estado,
-        orden,
-        desde,
-        hasta,
-        proveedor,
-        pagina: pagina ?? undefined,
-      });
+      // `InboxService.cargar` re-throws on failure for its own spec; the container only needs the
+      // error signal it sets, so the rejection is swallowed here (no unhandled promise rejection).
+      void this.inboxService
+        .cargar({
+          estado,
+          orden,
+          desde,
+          hasta,
+          proveedor,
+          pagina: pagina ?? undefined,
+        })
+        .catch(() => undefined);
     });
   }
 

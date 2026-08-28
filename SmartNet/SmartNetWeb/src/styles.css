@@ -139,6 +139,18 @@
     --estado-descartada-fondo: transparent;
     --estado-descartada-borde: #9aa1ac;
 
+    /* item #20 -- estado roles for the derived Estado chip (inbox-list) and the panel de errores.
+     * Aliases only: no new hue enters the palette (design #18 D1, #20 D1). `borde` = the ink,
+     * matching `.banner--error` / `.asiento-lineas__cuadre--desbalance`. Decoupling any `texto`
+     * from its ink REQUIRES promoting it into contraste.spec.ts TINTAS_TEXTO. */
+    --estado-error-texto: var(--error-ink);
+    --estado-error-fondo: var(--error-fondo);
+    --estado-error-borde: var(--error-ink);
+    --estado-alerta-texto: var(--alerta-ink);
+    --estado-alerta-fondo: var(--alerta-fondo);
+    --estado-alerta-borde: var(--alerta-ink);
+    --fondo-scrim: rgba(15, 23, 42, 0.45);
+
     --accion-fondo: #1f2937;
     --accion-texto: #ffffff;
 
@@ -195,6 +207,15 @@
     --estado-descartada-texto: #a2abba;
     --estado-descartada-fondo: transparent;
     --estado-descartada-borde: #4a5160;
+
+    /* item #20 -- estado roles, dark theme. Aliases only (design #20 D1). */
+    --estado-error-texto: var(--error-ink);
+    --estado-error-fondo: var(--error-fondo);
+    --estado-error-borde: var(--error-ink);
+    --estado-alerta-texto: var(--alerta-ink);
+    --estado-alerta-fondo: var(--alerta-fondo);
+    --estado-alerta-borde: var(--alerta-ink);
+    --fondo-scrim: rgba(0, 0, 0, 0.62);
 
     --accion-fondo: #e8ebf0;
     --accion-texto: #1c1c1e;
@@ -368,6 +389,19 @@
     color: var(--estado-descartada-texto);
     background: var(--estado-descartada-fondo);
     border: 1px dashed var(--estado-descartada-borde);
+  }
+
+  /* item #20 -- derived Estado chip roles. Same shape as .chip--validada; role tokens only. */
+  .chip--error {
+    color: var(--estado-error-texto);
+    background: var(--estado-error-fondo);
+    border-color: var(--estado-error-borde);
+  }
+
+  .chip--alerta {
+    color: var(--estado-alerta-texto);
+    background: var(--estado-alerta-fondo);
+    border-color: var(--estado-alerta-borde);
   }
 
   /* .tabla -- tabular alignment for amounts/dates (design D5, spec.md tabular-nums requirement). */

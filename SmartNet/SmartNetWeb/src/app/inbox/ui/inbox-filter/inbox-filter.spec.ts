@@ -28,6 +28,18 @@ describe('InboxFilter', () => {
     expect(values).toEqual(['', 'PROMOVIDO', 'DESCARTADO', 'PENDIENTE']);
   });
 
+  it('lays out every field label with the shared campo + component class', () => {
+    const fixture = createComponent();
+    const labels = Array.from(
+      fixture.nativeElement.querySelectorAll('.inbox-filter label')
+    ) as HTMLLabelElement[];
+    expect(labels).toHaveLength(5);
+    for (const label of labels) {
+      expect(label.classList.contains('campo')).toBe(true);
+      expect(label.classList.contains('inbox-filter__campo')).toBe(true);
+    }
+  });
+
   it('emits estadoChange with the selected estado', () => {
     const fixture = createComponent();
     const emitted: (string | null)[] = [];

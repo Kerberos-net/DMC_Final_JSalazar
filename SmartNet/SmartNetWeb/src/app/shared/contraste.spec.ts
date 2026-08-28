@@ -35,7 +35,12 @@ const TINTAS_TEXTO = [
 ] as const;
 
 /** Tokens that only ever act as non-text UI (borders, decorative) -> 3:1 floor (design.md D3). */
-const TINTAS_NO_TEXTO = ['--borde-control', '--texto-terciario'] as const;
+const TINTAS_NO_TEXTO = [
+  '--borde-control',
+  '--texto-terciario',
+  '--estado-error-borde',
+  '--estado-alerta-borde',
+] as const;
 
 /** Ink over its own tinted background. */
 const PARES_TINTA_FONDO: readonly [string, string, number][] = [
@@ -44,6 +49,8 @@ const PARES_TINTA_FONDO: readonly [string, string, number][] = [
   ['--alerta-ink', '--alerta-fondo', TEXTO],
   ['--conflicto-ink', '--conflicto-fondo', TEXTO],
   ['--error-ink', '--error-fondo', TEXTO],
+  ['--estado-error-texto', '--estado-error-fondo', TEXTO],
+  ['--estado-alerta-texto', '--estado-alerta-fondo', TEXTO],
 ];
 
 describe('contraste -- sanidad de la formula', () => {

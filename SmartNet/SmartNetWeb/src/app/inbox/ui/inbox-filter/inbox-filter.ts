@@ -13,6 +13,7 @@ import { EstadoConsumo, OrdenFecha } from '../../models/bandeja-item.model';
   standalone: true,
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './inbox-filter.html',
+  styleUrl: './inbox-filter.css',
 })
 export class InboxFilter {
   readonly estado = input<EstadoConsumo | null>(null);

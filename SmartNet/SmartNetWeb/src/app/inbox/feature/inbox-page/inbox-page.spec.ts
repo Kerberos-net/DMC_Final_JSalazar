@@ -191,6 +191,60 @@ describe('InboxPage', () => {
     httpMock.expectNone('/api/incidencias/104/reprocesar');
   });
 
+  it('renders a page header: h1 "Bandeja principal" plus a subtitle', () => {
+    const fixture = TestBed.createComponent(InboxPage);
+    fixture.detectChanges();
+    httpMock
+      .expectOne(() => true)
+      .flush({ items: [], pagina: 1, tamanioPagina: 20, totalRegistros: 0, totalPaginas: 0 });
+    fixture.detectChanges();
+
+    const h1: HTMLHeadingElement = fixture.nativeElement.querySelector('header h1');
+    expect(h1.textContent?.trim()).toBe('Bandeja principal');
+
+    const subtitulo: HTMLElement = fixture.nativeElement.querySelector(
+      '[data-testid="inbox-subtitulo"]'
+    );
+    expect(subtitulo.textContent?.trim().length).toBeGreaterThan(0);
+  });
+
+  it('lays out header -> filter -> list -> dialog in document order', () => {
+    const fixture = TestBed.createComponent(InboxPage);
+    fixture.detectChanges();
+    httpMock
+      .expectOne(() => true)
+      .flush({ items: [], pagina: 1, tamanioPagina: 20, totalRegistros: 0, totalPaginas: 0 });
+    fixture.detectChanges();
+
+    const root: HTMLElement = fixture.nativeElement;
+    const header = root.querySelector('header')!;
+    const filter = root.querySelector('app-inbox-filter')!;
+    const list = root.querySelector('app-inbox-list')!;
+    const dialog = root.querySelector('app-confirmar-reproceso')!;
+    const sigue = (a: Element, b: Element) =>
+      Boolean(a.compareDocumentPosition(b) & Node.DOCUMENT_POSITION_FOLLOWING);
+
+    expect(sigue(header, filter)).toBe(true);
+    expect(sigue(filter, list)).toBe(true);
+    expect(sigue(list, dialog)).toBe(true);
+  });
+
+  it('renders the load error as a .banner .banner--error keeping role=alert and the testid', async () => {
+    const fixture = TestBed.createComponent(InboxPage);
+    fixture.detectChanges();
+    httpMock
+      .expectOne(() => true)
+      .flush('boom', { status: 500, statusText: 'Server Error' });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+
+    const banner: HTMLElement = fixture.nativeElement.querySelector('[data-testid="inbox-error"]');
+    expect(banner).not.toBeNull();
+    expect(banner.getAttribute('role')).toBe('alert');
+    expect(banner.classList.contains('banner')).toBe(true);
+    expect(banner.classList.contains('banner--error')).toBe(true);
+  });
+
   it('reprocesandoId disables the action immediately after confirm, independent of the server flag', async () => {
     const fixture = TestBed.createComponent(InboxPage);
     fixture.detectChanges();
