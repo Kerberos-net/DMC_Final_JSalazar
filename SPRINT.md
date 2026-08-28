@@ -11,7 +11,7 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | **15 de 18 cerrados** (BACKLOG.md tiene 18 ítems: el #18 "Ajuste visual del diseño SPA" nació al cerrar el sub-cambio visual del #12, 2026-08-24) |
+| Ítems del backlog | **15 de 19 cerrados** (BACKLOG.md tiene 19 ítems: #18 y #19 nacieron al implementar el #12 — #18 "Ajuste visual del diseño SPA" cerrado 2026-08-27; #19 "Campos contables editables y resaltado OCR por campo" recoge lo que el #18 dejó en solo lectura por cruzar al núcleo contable) |
 | Ciclo SDD activo | Ninguno — último cerrado: ítem #18 (Ajuste visual del diseño SPA) |
 | Última fase cerrada | Ítem #18 (Ajuste visual del diseño SPA), 8 fases, 69/69 tareas cerradas, verify PASS WITH WARNINGS (0 CRITICAL, 2 WARNING no bloqueantes, 3 SUGGESTIONS de deuda aceptada), 8 delta specs, cadena de 7 *commits* apilados sobre `main`, 5 PRs con `size:exception` aceptados por el dueño — ítem #18 cerrado 2026-08-27 |
 
@@ -1617,7 +1617,7 @@ Consistente con todos los archivos previos (#12–#17).
 
 ---
 
-## ⬜ Ítems 10, 15 y 16 — sin ciclo SDD abierto
+## ⬜ Ítems 10, 15, 16 y 19 — sin ciclo SDD abierto
 
 Las fases de cada ítem **se definen cuando arranca su ciclo SDD**, no antes. Ponerlas aquí ahora
 sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ítem, y ninguno existe.
@@ -1627,6 +1627,7 @@ sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ít
 | 10 | Notas de crédito | #8 | ⚠ `REGLAS.md` §5, §7 | ⬜ |
 | 15 | Publicación a Drive | #14 | — | ⬜ |
 | 16 | Publicación a Sheets | #14 | — | ⬜ |
+| 19 | Campos contables editables y resaltado OCR por campo | #12, #18 | ⚠ `REGLAS.md` §5–§10 | ⬜ |
 
 ---
 
