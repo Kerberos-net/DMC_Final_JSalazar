@@ -11,9 +11,9 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | **14 de 18 cerrados** (BACKLOG.md tiene 18 ítems: el #18 "Ajuste visual del diseño SPA" nació al cerrar el sub-cambio visual del #12, 2026-08-24) |
-| Ciclo SDD activo | Ninguno — último cerrado: ítem #17 (Errores, notificaciones y operación) |
-| Última fase cerrada | Ítem #17 (Errores, notificaciones y operación), 7 fases, 35/35 tareas cerradas, verify PASS (0 CRITICAL tras re-verificación, 1 WARNING no bloqueante, 3 SUGGESTIONS de deuda aceptada), 2 gaps reales de proceso encontrados y corregidos (texto de spec desactualizado, manifest de *checksums* sin regenerar) — ítem #17 cerrado 2026-08-25 |
+| Ítems del backlog | **15 de 18 cerrados** (BACKLOG.md tiene 18 ítems: el #18 "Ajuste visual del diseño SPA" nació al cerrar el sub-cambio visual del #12, 2026-08-24) |
+| Ciclo SDD activo | Ninguno — último cerrado: ítem #18 (Ajuste visual del diseño SPA) |
+| Última fase cerrada | Ítem #18 (Ajuste visual del diseño SPA), 8 fases, 69/69 tareas cerradas, verify PASS WITH WARNINGS (0 CRITICAL, 2 WARNING no bloqueantes, 3 SUGGESTIONS de deuda aceptada), 8 delta specs, cadena de 7 *commits* apilados sobre `main`, 5 PRs con `size:exception` aceptados por el dueño — ítem #18 cerrado 2026-08-27 |
 
 ---
 
@@ -1484,7 +1484,140 @@ de Drive/Sheets todavía.
 
 ---
 
-## ⬜ Ítems 10, 15, 16 y 18 — sin ciclo SDD abierto
+## ✅ 18. Ajuste visual del diseño SPA
+
+Correcciones sobre la capa visual de la SPA (tokens/tema, `login-page`, `detalle-page` y sus
+componentes) para conformar el resultado al *handoff* de diseño ratificado y cerrar el riesgo de
+"sin *mockup* formal" que dejó abierto el sub-cambio visual del #12. Nació al cerrar ese sub-cambio
+(2026-08-24): el tema aplicaba y las pantallas funcionaban, pero el resultado no conformaba del
+todo al *handoff*; se separó a propósito en vez de reabrir ese cambio, para no bloquear con
+retrabajo visual el avance de lógica de negocio. Depende del ítem #12 (completo).
+
+**El alcance creció tres veces sobre "puro visual", con aprobación explícita del dueño en cada
+punto:** (a) `factura-form` pasó a tener campos editables con *binding* bidireccional (`monto`,
+`moneda`, `fechaEmision`, `proveedorCodigo`) — todos ya en la proyección GET y el contrato PATCH,
+trabajo solo de SPA; (b) `tipoComprobante` / `numero` pasaron a ser editables por PATCH — *delta*
+.NET aditivo sobre `CorreccionFacturaRequest` / `CorreccionFactura` / `ServicioDeFacturas.PatchAsync`
+con guarda de dominio pura, sin SQL versionado (columnas y `GRANT UPDATE ON fact.Factura` ya
+existen); (c) *picker* de proveedor funcional + nuevo `GET /api/catalogos/proveedores` de solo
+lectura sobre `dbo.Proveedor` — `factura-form` ya emitía un *output* `buscarProveedor` sin manejar.
+
+Diferido por decisión ratificada, no descartado en silencio: `base imponible` / `IGV` / `TC compra`
+quedan de solo lectura (su editabilidad exige revisión contra `REGLAS.md`); `glosa` ausente (sin
+columna, exige SQL versionado); el `TC` se rotula "(venta)" porque ADR 0018 pt.1 hace de la venta
+la tasa operativa.
+
+**Entrega:** cadena de 7 *commits* apilados linealmente sobre `main` (`ask-on-risk`, cada PR sobre
+su predecesor). El dueño decidió que la cadena entera aterriza en `main` por *fast-forward*, no como
+PRs separados. **5 PRs con `size:exception` aceptados por el dueño** (PR1, PR3, PR4, PR5, PR8): cada
+*slice* de pantalla más sus *specs* de TDD corre ~430–580 líneas y solo es revisable de forma
+coherente entero — la guarda de paleta es lo que prueba la capa de *tokens*; una reestructuración de
+pantalla y sus *specs* de DOM son una unidad; el *slice* del *picker* (endpoint + servicio + diálogo
++ *wiring*) es un solo contrato. PR2 y PR6 quedaron bajo el presupuesto de 400 líneas.
+
+**Ciclo SDD:** `openspec/changes/archive/2026-08-27-item-18-ajuste-visual-spa/` · **69 de 69 tareas cerradas** — ✅ **CERRADO 2026-08-27**
+
+| Fase | Alcance | Tareas | Estado |
+|---|---|---|---|
+| 1 | Capa de *tokens* de dos niveles en `styles.css` + guarda WCAG de paleta que lee `styles.css` vía `node:fs` (`paleta.ts` / `paleta.spec.ts` / `contraste.spec.ts`) | 7/7 | ✅ |
+| 2 | *Shell* de la app (control de tema `<select>`) + recomposición de `login-page` a la tarjeta del *handoff* | 5/5 | ✅ |
+| 3 | Reestructuración de `detalle-page`: cabecera + volver + acciones arriba-derecha, *banners* indicadores izados sobre el *split* en `indicadores-factura`, *split* estático 42/58, `asiento-lineas` tabular + *pill* de cuadre | 9/9 | ✅ |
+| 4 | Rejilla de campos de `factura-form`, campos editables sin *backend*, `.campo--resaltado` por campo, mes/día derivados, filas de solo lectura base/IGV/TC | 7/7 | ✅ |
+| 5 | *Delta* .NET de PATCH (4 capas) `tipoComprobante`/`numero` + guarda pura `ValidacionDeCorreccion` + `ResultadoComando.CorreccionInvalida` → 422 + nuevo `SmartNet.Contable.Core/CodigoComprobante` + *binding* SPA | 9/9 | ✅ |
+| 6 | `AsientoRespuesta.BasePEN`/`IgvPEN` aditivo de solo lectura + *binding* de las filas base/IGV en SPA | 4/4 | ✅ |
+| 7 | Verificación (suites completas, exención de acento *greppable*, sin SQL versionado, `SPRINT.md` #18) | 5/5 | ✅ |
+| 8 | *Picker* de proveedor funcional: `GET /api/catalogos/proveedores` de solo lectura sobre `dbo.Proveedor` (P00000 excluido, sin SQL versionado/`GRANT`, sin escritura `dbo.*`, sin `fact.*`), `catalogos/data-access` `ProveedorService`, componente `<dialog>` `picker-proveedor`, *wiring* en `detalle-page` por `borradorFactura` | 15/15 | ✅ |
+
+Pronóstico de revisión: alto riesgo de presupuesto de 400 líneas (~1740 líneas en 6 *slices* + ~575
+del *slice* 8); PRs encadenados recomendados, `ask-on-risk`. Detalle completo en `tasks.md`.
+
+### Cadena de *commits* (7, lineal sobre `main`)
+
+| # | Hash | *Slice* | Una línea |
+|---|---|---|---|
+| 1 | `2ac0ac7` | PR1 | Capa de *tokens* de dos niveles + guarda WCAG que lee `styles.css` (`size:exception` ~480) |
+| 2 | `505fdb8` | PR2 | *Shell* header (tema `<select>`) + recomposición de `login-page` |
+| 3 | `93ec9a7` | PR3 | Reestructuración de `detalle-page` + `indicadores-factura` + `asiento-lineas` tabular + *pill* de cuadre |
+| 4 | `8720f63` | PR4 | Rejilla de campos de `factura-form`, editables sin *backend*, `.campo--resaltado` por campo, mes/día derivados |
+| 5 | `aa91cda` | PR5 | *Delta* .NET PATCH `tipoComprobante`/`numero` + `ValidacionDeCorreccion` + `CodigoComprobante` + *binding* SPA (`size:exception` ~431) |
+| 6 | `37a4ece` | PR6 | `AsientoRespuesta.BasePEN`/`IgvPEN` aditivo de solo lectura + *binding* SPA |
+| 7 | `312d2b6` | PR8 | *Picker* de proveedor funcional + `GET /api/catalogos/proveedores` (`size:exception` ~1392 ins / 3 del, un solo *commit*) |
+
+`main` no se ha movido desde que se cortó la cadena; el orquestador hace *fast-forward* de `main`.
+
+### Pruebas
+
+Verificación independiente de `sdd-verify`, cada suite ejecutada por separado
+(`gentle-ai sdd-verify-validate --requirements 38 --scenarios 69` → `{"valid":true,"verdict":"pass"}`):
+
+| Suite | Resultado | Nota |
+|---|---|---|
+| SPA `npx ng test --no-watch` | 296/296 (34 archivos) | Era 282 en PR6; +14. Guarda de paleta, login, `detalle-page`, `indicadores-factura`, `asiento-lineas`, `factura-form`, `ProveedorService`, `picker-proveedor` |
+| SPA `npx ng build --configuration production` | limpio | Sin *warning* de *budget* `anyComponentStyle` (`picker-proveedor.css` ~1.4 kB) |
+| SPA `npm run lint` | exit 0 | Es `tsc --noEmit`, no ESLint (SUGGESTION 2) |
+| `dotnet build SmartNet.sln` | 0 warn / 0 err | |
+| `.NET` por proyecto (autoritativo) | todo verde | Facturacion.Core 147, Api.Tests 163 (`CatalogoEndpointsTests` + PR5 `FacturaEndpointsTests` + PR6 `AsientoEndpointsTests`), Catalogos.Infrastructure 66 (`SqlProveedorRepository.BuscarAsync` ×9), Catalogos.Core 32, Facturacion.Infrastructure 53, más Contable/Sugerencia/TiposCambio/Inbox/Auth cores |
+| `dotnet test SmartNet.sln` (paralelo) | 32 fallos en 8 ensamblados de integración | **No** regresión de #18 — contención de SQL Server bajo aprovisionamiento paralelo de `fact_test_*` (cada ensamblado pasa aislado). Mismo patrón preexistente de #3/#4/#12/#13/#17 (WARNING 1) |
+
+### Lo verificado al cerrar
+
+D1–D6 seguidos. La guarda D2 lee `styles.css` de verdad vía `node:fs` (se pone roja ante un
+*token* malo). El `--accento-texto` oscuro quedó en `#409cff` ratificado sobre el `#0a84ff` del
+diseño (falla AA 3.82:1 sobre `#2c2c2e`), documentado en `styles.css:168-172`. La desviación 6-vs-4
+puntos de contacto .NET en PR5 (nuevo `ResultadoComando.CorreccionInvalida` → 422; nuevo
+`SmartNet.Contable.Core/CodigoComprobante`) es sólida y está documentada en `aa91cda` +
+`apply-progress.md`. Sin escritura `dbo.*` en código .NET de producción (solo *fixtures* de prueba
+llegan a `dbo.Proveedor` por INSERT crudo); sin acceso `fact.*` desde el *slice* `catalogos`; sin
+SQL versionado ni `GRANT` nuevo (`git diff` no toca ningún `*.sql`; `usr_api` ya tiene
+`SELECT ON dbo.Proveedor`). Exención de reúso de acento *greppable* y documentada en el *ramp* de
+`styles.css`. P00000 excluido del *picker* (`SqlProveedorRepository.cs:47`, `codpro <> 'P00000'`) —
+OPEN QUESTION 1 resuelta.
+
+**Elementos conocidos, no ocultos** — `sdd-verify`: 0 CRITICAL, 2 WARNING no bloqueantes, 3
+SUGGESTIONS:
+
+- **WARNING 1** — `dotnet test SmartNet.sln` en paralelo no determinístico bajo contención local de
+  SQL Server. Deuda preexistente, no introducida por #18. Recomendación: correr los ensamblados de
+  integración en serie en CI, o documentar la invocación por proyecto como la canónica.
+- **WARNING 2** — la tarea 7.5 (`SPRINT.md`/`BACKLOG.md` #18) no estaba hecha al verificar.
+  Resuelta en el paso de archivo: entrada de cierre de #18 añadida a `SPRINT.md`; `BACKLOG.md` sin
+  tocar, siguiendo la convención del ítem #17 (que tampoco lleva marca de estado por fila).
+- **SUGGESTION 1** — los comodines `LIKE` en el `q` del *picker* no se escapan. Sin impacto de
+  seguridad (consulta parametrizada), pero es el único punto abierto sin comentario en el repo.
+  Anotado en la *spec* archivada y en `openspec/specs/api-catalogos-proveedores/spec.md`; queda como
+  *follow-up*.
+- **SUGGESTION 2** — `npm run lint` es solo *typecheck* (`tsc --noEmit`), no ESLint.
+- **SUGGESTION 3** — el literal `--accento-suave` vive fuera del *ramp* `--azul-*` (por diseño D3,
+  aceptable).
+
+**Preguntas abiertas preexistentes que se arrastran (deliberadamente fuera de alcance de #18):**
+
+- **`PosibleDuplicado` queda desactualizado tras editar la terna de identidad.** Editar
+  `tipoComprobante` / `numero` cambia la identidad de duplicado (`RucProveedor` + `TipoComprobante`
+  + `Numero`), pero `PosibleDuplicado` es columna almacenada escrita en ingesta y no se recalcula en
+  PATCH — el *banner* queda *stale* hasta reingesta. Recalcular en PATCH es cambio de regla de
+  dominio, fuera de #18 salvo ratificación (design Open Question 2).
+- **Resaltado OCR a nivel de factura, no de campo.** El servidor solo expone
+  `TieneCamposNoExtraidos: boolean`, así que `.campo--resaltado` se aplica a la granularidad
+  correcta más gruesa (todos los campos derivados de OCR se resaltan juntos cuando la bandera es
+  true). 2 requisitos llevan nota PARTIAL por esta limitación deliberada documentada; los escenarios
+  pasan a la granularidad expuesta.
+- **Sin índice no *clustered* en `dbo.Proveedor(proveedor)`** — objeto de catálogo externo `dbo.*`
+  por ADR 0003, FUERA DE ALCANCE como decisión marcada. `LIKE` sobre ~6600 filas es aceptable.
+
+**Reconciliación de casillas de la Fase 7 en el archivo.** `sdd-apply` marcó todas las fases de
+implementación (1–6, 8) pero nunca volvió al artefacto de tareas para marcar las casillas de
+verificación de la Fase 7 tras correr `sdd-verify`. Ningún trabajo de implementación quedó sin
+marcar. Las tareas 7.1–7.4 están probadas completas por `verify-report.md`; la 7.5 se ejecutó en el
+paso de archivo. Reconciliadas a `[x]` con la fuente de evidencia citada en línea en `tasks.md`.
+
+**RDD de gentle-ai desactivado a nivel de repo** (exFAT sin ACL — ver "Condiciones del entorno"),
+así que `reviewGate.delivery: disabled/unmanaged` y no se exige ni se fabrica recibo de revisión.
+Consistente con todos los archivos previos (#12–#17).
+
+---
+
+## ⬜ Ítems 10, 15 y 16 — sin ciclo SDD abierto
 
 Las fases de cada ítem **se definen cuando arranca su ciclo SDD**, no antes. Ponerlas aquí ahora
 sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ítem, y ninguno existe.
@@ -1494,11 +1627,6 @@ sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ít
 | 10 | Notas de crédito | #8 | ⚠ `REGLAS.md` §5, §7 | ⬜ |
 | 15 | Publicación a Drive | #14 | — | ⬜ |
 | 16 | Publicación a Sheets | #14 | — | ⬜ |
-| 18 | Ajuste visual del diseño SPA | #12 | ⚠ *Handoff* de diseño | ⬜ |
-
-Ítem #18 nace del cierre del sub-cambio visual del #12 (2026-08-24): el tema aplica y las pantallas
-funcionan, pero el resultado no conforma del todo al *handoff* de diseño. Se separó a propósito en
-vez de reabrir ese cambio, para no bloquear con retrabajo visual el avance de lógica de negocio.
 
 ---
 

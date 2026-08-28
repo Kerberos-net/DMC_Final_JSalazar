@@ -88,11 +88,11 @@ Chain strategy: pending
 
 ## Phase 7: Verification
 
-- [ ] 7.1 Run full `ng test` — palette guard, login, detalle-page, indicadores, asiento-lineas, factura-form all green both themes.
-- [ ] 7.2 Run full `dotnet test` — correccion core, validation guard, API contract green.
-- [ ] 7.3 Confirm ratified accent-reuse exception intact; `rg -- '--azul-'` shows literals only in ramp.
-- [ ] 7.4 Confirm no versioned SQL added, data partition (ADR 0003) untouched, money helper never 3-decimal.
-- [ ] 7.5 Update `BACKLOG.md` #18 status.
+- [x] 7.1 Run full `ng test` — palette guard, login, detalle-page, indicadores, asiento-lineas, factura-form all green both themes. (sdd-verify: SPA 34 files / 296 passed.)
+- [x] 7.2 Run full `dotnet test` — correccion core, validation guard, API contract green. (sdd-verify: per-project all green; Api.Tests 163, Catalogos.Infrastructure 66, Catalogos.Core 32, Facturacion.Core 147.)
+- [x] 7.3 Confirm ratified accent-reuse exception intact; `rg -- '--azul-'` shows literals only in ramp. (sdd-verify task 7.4(a): documented at styles.css ramp, greppable.)
+- [x] 7.4 Confirm no versioned SQL added, data partition (ADR 0003) untouched, money helper never 3-decimal. (sdd-verify: git diff touches no `*.sql`, no `fact.*` from catalogos slice, money via `formato.ts` toFixed(2).)
+- [x] 7.5 Update `BACKLOG.md` #18 status. (Closed via `SPRINT.md` per the item #17 convention — commit `e6054ea`; `BACKLOG.md` carries no per-row status mark for #17 either.)
 
 ## Phase 8: Functional proveedor picker (PR-picker, dep PR4 — api-catalogos-proveedores, spa-picker-proveedor)
 
