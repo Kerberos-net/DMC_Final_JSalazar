@@ -33,9 +33,41 @@ function chipsDe(indicadores: IndicadoresFactura | null): IndicadorChip[] {
   return chips;
 }
 
+type ClaseChipEstado = `chip chip--${'error' | 'alerta' | 'validada' | 'pendiente' | 'descartada'}`;
+
+interface ChipEstado {
+  readonly etiqueta: string;
+  readonly clase: ClaseChipEstado;
+}
+
+/**
+ * Derived Estado chip (item #20 PR2, design D3). Module-level pure function beside `chipsDe()`;
+ * FIRST MATCH WINS. This is a presentation-only projection of already-existing #13 state
+ * (`estadoConsumo`, `errores`, two indicator flags) -- NOT a change to `chipsDe()` or the #13
+ * indicator surface. DESCARTADO ranks first: it is a terminal lifecycle fact and keeps
+ * `.chip--descartada` unconditionally, even for a row that still carries error history.
+ */
+function chipEstadoDe(item: BandejaItem): ChipEstado {
+  if (item.estadoConsumo === 'DESCARTADO') {
+    return { etiqueta: 'Descartada', clase: 'chip chip--descartada' };
+  }
+  if (item.errores.length > 0) {
+    return { etiqueta: 'Error', clase: 'chip chip--error' };
+  }
+  const indicadores = item.indicadores;
+  if (indicadores !== null && (indicadores.esProveedorGenerico || indicadores.posibleDuplicado)) {
+    return { etiqueta: 'Alerta', clase: 'chip chip--alerta' };
+  }
+  if (item.estadoConsumo === 'PROMOVIDO') {
+    return { etiqueta: 'Validada', clase: 'chip chip--validada' };
+  }
+  return { etiqueta: 'Pendiente', clase: 'chip chip--pendiente' };
+}
+
 interface FilaInbox {
   readonly item: BandejaItem;
   readonly chips: IndicadorChip[];
+  readonly chipEstado: ChipEstado;
   readonly reprocesarDisponible: boolean;
 }
 
@@ -52,6 +84,7 @@ interface FilaInbox {
   imports: [DatePipe, RouterLink, PanelErrores],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './inbox-list.html',
+  styleUrl: './inbox-list.css',
 })
 export class InboxList {
   readonly items = input.required<BandejaItem[]>();
@@ -64,6 +97,7 @@ export class InboxList {
     this.items().map((item) => ({
       item,
       chips: chipsDe(item.indicadores),
+      chipEstado: chipEstadoDe(item),
       reprocesarDisponible:
         item.reprocesarDisponibleEn === null || new Date(item.reprocesarDisponibleEn) <= new Date(),
     }))

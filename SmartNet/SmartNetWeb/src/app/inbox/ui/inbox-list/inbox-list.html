@@ -1,4 +1,4 @@
-<table class="inbox-list">
+<table class="tabla inbox-list">
   <thead>
     <tr>
       <th>Fecha</th>
@@ -11,8 +11,10 @@
   <tbody>
     @for (fila of filas(); track fila.item.inboxEventId) {
       <tr [attr.data-testid]="'inbox-row-' + fila.item.inboxEventId">
-        <td>{{ fila.item.creadoEn | date: 'short' }}</td>
-        <td>{{ fila.item.estadoConsumo }}</td>
+        <td class="inbox-list__fecha">{{ fila.item.creadoEn | date: 'short' }}</td>
+        <td>
+          <span [class]="fila.chipEstado.clase" data-testid="chip-estado">{{ fila.chipEstado.etiqueta }}</span>
+        </td>
         <td>
           @if (fila.item.origen === 'FACTURA') {
             <span data-testid="factura-id">Factura #{{ fila.item.facturaId }}</span>
@@ -30,12 +32,12 @@
             </details>
           }
         </td>
-        <td>
+        <td class="inbox-list__indicadores">
           @for (chip of fila.chips; track chip.clave) {
             <span data-testid="indicador-chip" class="chip">{{ chip.etiqueta }}</span>
           }
         </td>
-        <td>
+        <td class="inbox-list__acciones">
           @if (fila.item.errores.length > 0) {
             <button
               type="button"
@@ -47,6 +49,10 @@
             </button>
           }
         </td>
+      </tr>
+    } @empty {
+      <tr>
+        <td class="inbox-list__vacio" colspan="5" data-testid="inbox-vacio">Sin resultados</td>
       </tr>
     }
   </tbody>

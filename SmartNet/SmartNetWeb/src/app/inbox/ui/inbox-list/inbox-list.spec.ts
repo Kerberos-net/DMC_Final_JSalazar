@@ -107,6 +107,50 @@ describe('InboxList', () => {
     reprocesarDisponibleEn: '2099-01-01T00:00:00Z',
   };
 
+  const descartadoConErrores: BandejaItem = {
+    inboxEventId: 6,
+    procesamientoId: 106,
+    origen: 'INCIDENCIA',
+    estadoConsumo: 'DESCARTADO',
+    creadoEn: '2026-08-05T08:00:00Z',
+    facturaId: null,
+    proveedorCodigo: null,
+    rucProveedor: null,
+    indicadores: null,
+    motivoDescarte: 'Descartada tras fallos repetidos',
+    errores: [
+      {
+        procesamientoErrorId: 3,
+        integracion: 'SUNAT',
+        mensaje: 'Error permanente',
+        clasificacion: 'PERMANENTE',
+        ocurridoEn: '2026-08-05T09:00:00Z',
+      },
+    ],
+    reprocesarDisponibleEn: null,
+  };
+
+  const promovidoLimpio: BandejaItem = {
+    inboxEventId: 7,
+    procesamientoId: 107,
+    origen: 'FACTURA',
+    estadoConsumo: 'PROMOVIDO',
+    creadoEn: '2026-08-04T08:00:00Z',
+    facturaId: 44,
+    proveedorCodigo: 'P00003',
+    rucProveedor: '20111111111',
+    indicadores: {
+      esProveedorGenerico: false,
+      posibleDuplicado: false,
+      tieneCamposNoExtraidos: false,
+      fechaEnDomingo: false,
+      afectacionMixta: false,
+    },
+    motivoDescarte: null,
+    errores: [],
+    reprocesarDisponibleEn: null,
+  };
+
   const createComponent = (items: BandejaItem[]) => {
     const fixture = TestBed.createComponent(InboxList);
     fixture.componentRef.setInput('items', items);
@@ -219,5 +263,91 @@ describe('InboxList', () => {
     boton.click();
 
     expect(emitted).toEqual([104]);
+  });
+
+  describe('tabular table + derived Estado chip column (BACKLOG #20 PR2)', () => {
+    const chipEstado = (fixture: ReturnType<typeof createComponent>, rowId: number): HTMLElement =>
+      fixture.nativeElement.querySelector(
+        `[data-testid="inbox-row-${rowId}"] [data-testid="chip-estado"]`
+      );
+
+    it('renders the rows in a <table> that uses the global .tabla primitive', () => {
+      const fixture = createComponent([promovido]);
+      expect(fixture.nativeElement.querySelector('table.tabla')).not.toBeNull();
+    });
+
+    it('keeps every existing column header in order', () => {
+      const fixture = createComponent([promovido]);
+      const headers = Array.from(
+        fixture.nativeElement.querySelectorAll('thead th')
+      ).map((h) => (h as HTMLElement).textContent?.trim());
+      expect(headers).toEqual(['Fecha', 'Estado', 'Detalle', 'Indicadores', 'Acciones']);
+    });
+
+    it('renders exactly one chip-estado per row', () => {
+      const fixture = createComponent([promovido, pendiente, descartado]);
+      expect(
+        fixture.nativeElement.querySelectorAll('[data-testid="chip-estado"]').length
+      ).toBe(3);
+      expect(
+        fixture.nativeElement
+          .querySelector('[data-testid="inbox-row-1"]')
+          .querySelectorAll('[data-testid="chip-estado"]').length
+      ).toBe(1);
+    });
+
+    it('precedence 1: DESCARTADO wins unconditionally, even with error history', () => {
+      const fixture = createComponent([descartadoConErrores]);
+      const chip = chipEstado(fixture, 6);
+      expect(chip.textContent?.trim()).toBe('Descartada');
+      expect(chip.classList.contains('chip--descartada')).toBe(true);
+    });
+
+    it('precedence 2: a row with error history shows the Error chip', () => {
+      const fixture = createComponent([facturaConErroresBloqueada]);
+      const chip = chipEstado(fixture, 5);
+      expect(chip.textContent?.trim()).toBe('Error');
+      expect(chip.classList.contains('chip--error')).toBe(true);
+    });
+
+    it('precedence 3: a quality flag shows the Alerta chip (over Validada)', () => {
+      const fixture = createComponent([promovido]);
+      const chip = chipEstado(fixture, 1);
+      expect(chip.textContent?.trim()).toBe('Alerta');
+      expect(chip.classList.contains('chip--alerta')).toBe(true);
+    });
+
+    it('precedence 4: a clean PROMOVIDO row shows the Validada chip', () => {
+      const fixture = createComponent([promovidoLimpio]);
+      const chip = chipEstado(fixture, 7);
+      expect(chip.textContent?.trim()).toBe('Validada');
+      expect(chip.classList.contains('chip--validada')).toBe(true);
+    });
+
+    it('precedence 5: a PENDIENTE row shows the Pendiente chip', () => {
+      const fixture = createComponent([pendiente]);
+      const chip = chipEstado(fixture, 3);
+      expect(chip.textContent?.trim()).toBe('Pendiente');
+      expect(chip.classList.contains('chip--pendiente')).toBe(true);
+    });
+
+    it('does not throw for an INCIDENCIA row with indicadores null', () => {
+      expect(() => createComponent([pendiente, incidenciaConErrores])).not.toThrow();
+    });
+
+    it('regression lock: chipsDe() indicator chips are byte-identical for a representative item', () => {
+      const fixture = createComponent([promovido]);
+      const chips = Array.from(
+        fixture.nativeElement
+          .querySelector('[data-testid="inbox-row-1"]')
+          .querySelectorAll('[data-testid="indicador-chip"]')
+      ).map((c) => (c as HTMLElement).textContent?.trim());
+      expect(chips).toEqual(['Proveedor genérico', 'Campos no extraídos']);
+    });
+
+    it('renders an empty-state marker when there are no rows', () => {
+      const fixture = createComponent([]);
+      expect(fixture.nativeElement.querySelector('[data-testid="inbox-vacio"]')).not.toBeNull();
+    });
   });
 });

@@ -1,0 +1,41 @@
+/* item #20 (spa-visual-bandeja R4): inbox list on a card surface with a tabular table layout.
+ * Layout only -- every value comes from a token, no color/typography/hue literal. Sits outside
+ * the @layer stack. #13 behaviour (rows, reprocesar, chipsDe indicators) is frozen. */
+:host {
+  display: block;
+  overflow-x: auto;
+  background: var(--fondo-superficie);
+  border: 1px solid var(--borde-sutil);
+  border-radius: var(--radio-card);
+  box-shadow: var(--sombra-panel);
+}
+
+/* Uppercase small-caps header row on top of the global .tabla uppercase treatment. */
+.inbox-list thead th {
+  font-variant: all-small-caps;
+}
+
+/* Dates read as a column: tabular figures WITHOUT the global .tabular-nums right-align
+ * (design D5 -- right-align is for money columns, wrong for a date). */
+.inbox-list__fecha {
+  font-variant-numeric: tabular-nums;
+  text-align: left;
+  white-space: nowrap;
+}
+
+.inbox-list__indicadores .chip {
+  margin: 0 var(--space-1) var(--space-1) 0;
+}
+
+.inbox-list__acciones {
+  white-space: nowrap;
+}
+
+.inbox-list__vacio {
+  color: var(--texto-secundario);
+  text-align: center;
+}
+
+.inbox-list details {
+  margin-top: var(--space-2);
+}

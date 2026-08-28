@@ -54,6 +54,38 @@ non-TTY, and `--include` is the file selector).
 - Backdrop click + Escape both emit `cancelar` — PR3.
 - `inbox-list` empty state — PR2.
 
-## PR2 (Phase 2) — NOT STARTED
+## PR2 — `pr2/item-20-inbox-list-table` (Phase 2) — COMPLETE (5/5)
+
+Branched off `pr1/item-20-bandeja-tokens-shell` @ `ccdd96b`.
+
+### Completed tasks
+- [x] 2.1 RED inbox-list.spec.ts — `table.tabla`; column headers preserved in order; one `[data-testid="chip-estado"]` per row; 5 precedence cases (DESCARTADO-with-errors → "Descartada"; error history → "Error"; quality flag → "Alerta" over Validada; clean PROMOVIDO → "Validada"; PENDIENTE → "Pendiente"); INCIDENCIA `indicadores:null` does not throw.
+- [x] 2.2 RED regression lock — `[data-testid="indicador-chip"]` count+labels byte-identical (`['Proveedor genérico','Campos no extraídos']`) for the representative promoted item; new `[data-testid="inbox-vacio"]` empty state.
+- [x] 2.3 GREEN inbox-list.ts — added `ClaseChipEstado` type, `ChipEstado` interface, module-level pure `chipEstadoDe(item)` beside `chipsDe()`; `FilaInbox` gained `chipEstado`; `filas` computed gained one line `chipEstado: chipEstadoDe(item)`. `chipsDe()` untouched. `styleUrl` wired.
+- [x] 2.4 GREEN inbox-list.html — `class="tabla inbox-list"`; Estado cell renders `<span [class]="fila.chipEstado.clase" data-testid="chip-estado">`; `__fecha`/`__indicadores`/`__acciones` cell classes; `@empty` row with `data-testid="inbox-vacio"`. Created inbox-list.css (`:host` card + `overflow-x:auto`, `all-small-caps` header, `.inbox-list__fecha` component-scoped tabular-nums NOT global `.tabular-nums`, indicator chip spacing, empty-state).
+- [x] 2.5 REFACTOR — lint clean; full suite green; prod build clean, no `anyComponentStyle` warning.
+
+### TDD Cycle Evidence
+| Task | Test File | Layer | Safety Net | RED | GREEN | REFACTOR |
+|------|-----------|-------|------------|-----|-------|----------|
+| 2.1 | inbox-list.spec.ts | Integration (TestBed) | ✅ 14/14 baseline | ✅ 8 failing (no table.tabla, no chip-estado, precedence unresolved) | ✅ 22/22 | ➖ |
+| 2.2 | inbox-list.spec.ts | Integration | ✅ | ✅ regression + empty-state failing | ✅ 22/22 | ➖ |
+| 2.3 | inbox-list.ts | — | ✅ | via 2.1/2.2 | ✅ | ✅ pure fn, no signal/service/store (ADR 0009) |
+| 2.4 | inbox-list.html/.css | Integration | ✅ | via 2.1/2.2 | ✅ | ✅ |
+
+### Work Unit Evidence (PR2)
+| Evidence | Value |
+|---|---|
+| Focused test command + result | `npx ng test --watch=false --include "**/inbox-list.spec.ts"` → **22 passed** (14 baseline + 8 new) |
+| Full suite | `npx ng test --watch=false` → **335 passed / 34 files**, 0 failures |
+| Runtime harness | `npx ng build --configuration production` → bundle complete 4.4s, no `anyComponentStyle` budget warning; styles.css 8.22 kB unchanged; inbox-list.css ~1 kB folded into lazy inbox chunk |
+| Lint | `npm run lint` (`tsc --noEmit` app + spec) → clean |
+| Rollback boundary | `inbox-list.ts` (added `ClaseChipEstado`/`ChipEstado`/`chipEstadoDe` + one field + one `filas` line + `styleUrl`), `inbox-list.html` class attrs + Estado cell + `@empty`, new `inbox-list.css` (delete to restore), `inbox-list.spec.ts` diff. `chipsDe()`, reprocesar, `<details>`/panel-errores wiring untouched. |
+| Authored diff | 216 insertions / 5 deletions = **221 changed lines** (within 400 budget; ~130 of the additions are the new spec) |
+
+### Deviations from design
+- None material. Design D3 named the interface fields `etiqueta`/`clase` with `clase` as the full `chip chip--x` string — followed exactly; template uses `[class]="fila.chipEstado.clase"` (whole-string binding, no static `class`).
+- Header "small-caps" satisfied with `font-variant: all-small-caps` on `.inbox-list thead th` layered on top of the global `.tabla th` `text-transform: uppercase`.
+
 ## PR3 (Phase 3) — NOT STARTED
 ## Phase 4 verification — NOT STARTED

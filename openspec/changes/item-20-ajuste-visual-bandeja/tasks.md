@@ -41,11 +41,11 @@ Base order (stacked-to-main): PR1→main, PR2→main after PR1, PR3→main after
 
 ## Phase 2: PR2 — inbox-list table + derived Estado chip
 
-- [ ] 2.1 RED: `inbox-list.spec.ts` — `table.tabla`; `[data-testid="chip-estado"]` once per row; 5 precedence cases (DESCARTADO first/unconditional even with error history → "Descartada"; then errores.length>0 → Error; then `esProveedorGenerico||posibleDuplicado` → Alerta; then PROMOVIDO → Validada; then PENDIENTE → Pendiente); INCIDENCIA row `indicadores:null` does not throw.
-- [ ] 2.2 RED: `inbox-list.spec.ts` regression lock — `[data-testid="indicador-chip"]` count+labels UNCHANGED (`chipsDe()` frozen); new empty state `data-testid="inbox-vacio"`.
-- [ ] 2.3 GREEN: `inbox-list.ts` — add `ClaseChipEstado` type, `ChipEstado` interface, module-level pure `chipEstadoDe(item)` beside `chipsDe()`; add one `FilaInbox` field `chipEstado`; add one line to `filas` computed. Do not touch `chipsDe()`.
-- [ ] 2.4 GREEN: `inbox-list.html` — `class="tabla inbox-list"`, Estado cell → chip binding, `__fecha`/`__indicadores`/`__acciones` wrappers, empty state; create `inbox-list.css` (`:host` card + `overflow-x:auto`, `.inbox-list__fecha{font-variant-numeric:tabular-nums;text-align:left}`, indicator hairline, detalle stack, empty state).
-- [ ] 2.5 REFACTOR: `npm run lint` + `npx ng build --configuration production`.
+- [x] 2.1 RED: `inbox-list.spec.ts` — `table.tabla`; `[data-testid="chip-estado"]` once per row; 5 precedence cases (DESCARTADO first/unconditional even with error history → "Descartada"; then errores.length>0 → Error; then `esProveedorGenerico||posibleDuplicado` → Alerta; then PROMOVIDO → Validada; then PENDIENTE → Pendiente); INCIDENCIA row `indicadores:null` does not throw.
+- [x] 2.2 RED: `inbox-list.spec.ts` regression lock — `[data-testid="indicador-chip"]` count+labels UNCHANGED (`chipsDe()` frozen); new empty state `data-testid="inbox-vacio"`.
+- [x] 2.3 GREEN: `inbox-list.ts` — add `ClaseChipEstado` type, `ChipEstado` interface, module-level pure `chipEstadoDe(item)` beside `chipsDe()`; add one `FilaInbox` field `chipEstado`; add one line to `filas` computed. Do not touch `chipsDe()`.
+- [x] 2.4 GREEN: `inbox-list.html` — `class="tabla inbox-list"`, Estado cell → chip binding, `__fecha`/`__indicadores`/`__acciones` wrappers, empty state; create `inbox-list.css` (`:host` card + `overflow-x:auto`, `.inbox-list__fecha{font-variant-numeric:tabular-nums;text-align:left}`, indicator hairline, detalle stack, empty state).
+- [x] 2.5 REFACTOR: `npm run lint` + `npx ng build --configuration production`.
 
 ## Phase 3: PR3 — panel-errores card + confirmar-reproceso modal
 
