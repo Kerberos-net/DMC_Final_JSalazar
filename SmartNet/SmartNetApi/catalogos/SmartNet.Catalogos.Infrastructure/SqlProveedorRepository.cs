@@ -48,7 +48,14 @@ public sealed class SqlProveedorRepository : IProveedorRepository
             ORDER BY proveedor
             OFFSET @salto ROWS FETCH NEXT @tamano ROWS ONLY;
             """;
-        command.Parameters.AddWithValue("@patron", "%" + termino + "%");
+        // Escape LIKE metacharacters so a user who types `%`, `_` or `[` searches for them
+        // literally instead of as wildcards. Bracket-escaping needs no ESCAPE clause. The query
+        // is already parameterised, so this is a correctness fix, not an injection one.
+        var patron = "%" + termino
+            .Replace("[", "[[]")
+            .Replace("%", "[%]")
+            .Replace("_", "[_]") + "%";
+        command.Parameters.AddWithValue("@patron", patron);
         command.Parameters.AddWithValue("@salto", salto);
         command.Parameters.AddWithValue("@tamano", TamanoPagina + 1);
 

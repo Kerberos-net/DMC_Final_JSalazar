@@ -173,6 +173,20 @@ public sealed class SqlProveedorRepositoryTests : IAsyncLifetime
         Assert.False(busqueda.HayMas);
     }
 
+    // `%` and `_` in the typed term must be literal, not LIKE wildcards -- searching "A_B" must
+    // not also match "AXB" (SqlProveedorRepository escapes them; the query stays parameterised).
+    [Fact]
+    public async Task BuscarAsync_TreatsLikeWildcardsInTheTermAsLiterals()
+    {
+        await _db.SeedProveedorAsync("P00019", "A_B LOGISTICA", coddocide: "06", rucpro: null);
+        await _db.SeedProveedorAsync("P00020", "AXB LOGISTICA", coddocide: "06", rucpro: null);
+        var sut = new SqlProveedorRepository(_db.ConnectionString);
+
+        var busqueda = await sut.BuscarAsync("A_B", 1, CancellationToken.None);
+
+        Assert.Equal(new[] { "P00019" }, busqueda.Resultados.Select(p => p.Codigo));
+    }
+
     [Fact]
     public async Task BuscarAsync_NoMatches_ReturnsEmpty()
     {
