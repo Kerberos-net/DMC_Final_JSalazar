@@ -5,9 +5,10 @@ implementables. Cada ítem es un ciclo de desarrollo completo: lo bastante grand
 algo coherente, lo bastante acotado para especificarse y construirse sin convertirse en un
 proyecto propio.
 
-Los ítems #18 y #19 nacieron después del despiece inicial, al implementar el #12: el #18 aisló el
-retrabajo visual y el #19 recoge los campos del detalle que quedaron en solo lectura porque
-hacerlos editables cruza al núcleo contable.
+Los ítems #18, #19 y #20 nacieron después del despiece inicial, al implementar el #12: el #18 aisló
+el retrabajo visual del detalle, el #19 recoge los campos que quedaron en solo lectura porque
+hacerlos editables cruza al núcleo contable, y el #20 lleva la misma pasada visual a la bandeja y
+el panel de errores, que el #18 dejó fuera de alcance.
 
 El diseño está cerrado: los 30 hallazgos de la segunda revisión adversarial están resueltos, las
 cinco premisas externas verificadas y ningún ADR queda condicionado.
@@ -35,6 +36,7 @@ cinco premisas externas verificadas y ningún ADR queda condicionado.
 | 17 | **Errores, notificaciones y operación** | Tres clases de error, notificación por clase, Telegram con respaldo por correo, `EstadoIntegracion`, latido, pantalla de configuración | #14 | — |
 | 18 | **Ajuste visual del diseño SPA** | Correcciones sobre la capa visual (tokens/tema, `login-page`, `detalle-page` y sus componentes) para conformar el resultado al *handoff* de diseño; separado del #12 para no bloquear la lógica de negocio con retrabajo visual | #12 | ⚠ *Handoff* de diseño |
 | 19 | **Campos contables editables y resaltado OCR por campo** | Lo que el #18 dejó fuera por requerir trabajo de servidor coordinado: hacer editables en el detalle `base imponible`, `IGV` y `tipo de cambio` (proyección y contrato de escritura nuevos, impacto sobre el asiento revisado contra `REGLAS.md`); columna `glosa` y su edición (SQL versionado); resaltado OCR **por campo** vía una lista `camposNoExtraidos` en la extracción —hoy solo existe un booleano por factura—; recálculo de `PosibleDuplicado` al cambiar el triple de identidad (`tipoComprobante`/`numero`) | #12, #18 | ⚠ **`REGLAS.md` §5–§10** |
+| 20 | **Ajuste visual de bandeja y panel de errores** | Conformar al *handoff* las pantallas que el #18 excluyó: bandeja/dashboard (`inbox-page`, `inbox-list`, `inbox-filter`), panel de errores y `confirmar-reproceso` —hoy sin CSS de componente, solo heredan los tokens globales—. Tabla con alineación tabular, chip de estado por color (Pendiente/Validada/Error/Alerta), filtros, contador rápido; mismo patrón que el #18 | #13, #18 | ⚠ *Handoff* de diseño (`DESIGN_BRIEF.md` §2 y §5) |
 
 ## Cómo usar este backlog
 
