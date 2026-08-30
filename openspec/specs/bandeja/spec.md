@@ -164,3 +164,9 @@ The aggregate rides the existing `PaginaBandeja<T>` envelope as a `resumen` sibl
 - GIVEN a row with `errores.length > 0` AND `esProveedorGenerico === true`
 - WHEN the aggregate is computed
 - THEN it increments `conError` and does not increment `alertas`
+
+#### Scenario: A row whose only error history is OBSOLETO still counts as conError (D2b)
+- GIVEN a non-DESCARTADO row whose sole `fact.ProcesamientoError` entry has `Clasificacion = 'OBSOLETO'`
+- WHEN the aggregate is computed
+- THEN it increments `conError` — matching the row's derived Estado chip, which counts any
+  `errores.length > 0` — even though `FiltroWhere` would exclude that error from the default list view

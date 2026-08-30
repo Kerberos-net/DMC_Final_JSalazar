@@ -432,6 +432,22 @@ public sealed class SqlBandejaRepositoryTests : IAsyncLifetime
         Assert.Equal(1, r.Descartadas);
     }
 
+    [Fact]
+    public async Task Resumen_ObsoletoOnlyErrorHistory_StillCountsAsConError_MatchingTheChip()
+    {
+        var procId = await _db.InsertarProcesamientoAsync(gmailMessageId: "msg-21-obsoleto");
+        await _db.InsertarInboxEventAsync(procId, "{}");
+        await _db.InsertarProcesamientoErrorAsync(procId, clasificacion: "OBSOLETO", mensaje: "reintento superado");
+
+        var sut = new SqlBandejaRepository(_db.ConnectionString);
+        var r = (await sut.ListarAsync(Filtros(orden: "asc"), CancellationToken.None)).Resumen;
+
+        // D2b: the aggregate's ERROR bucket uses an unfiltered EXISTS, matching chipEstadoDe
+        // (any errores.length > 0), not FiltroWhere (which drops OBSOLETO from the default view).
+        Assert.Equal(1, r.ConError);
+        Assert.Equal(0, r.Pendientes);
+    }
+
     // --- BACKLOG #21 task 2.3: the aggregate ignores filters and pagination -----------------
 
     [Fact]
