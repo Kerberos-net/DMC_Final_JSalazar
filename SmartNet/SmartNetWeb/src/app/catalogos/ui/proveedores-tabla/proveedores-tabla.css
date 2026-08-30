@@ -1,0 +1,7 @@
+/* BACKLOG #22 PR6 -- the frame, header and hairlines live in the shared `.tabla-catalogo*`
+ * primitives (src/styles.css, design D8). Only the wrapping scroll affordance is local. */
+
+:host {
+  display: block;
+  overflow-x: auto;
+}

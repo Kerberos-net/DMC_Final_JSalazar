@@ -45,7 +45,12 @@ export class Sidebar {
   protected readonly primarios: readonly DestinoNav[] = [
     { testid: 'nav-bandeja', etiqueta: 'Bandeja principal', glifo: 'bandeja', ruta: '/bandeja' },
     { testid: 'nav-registro', etiqueta: 'Registro de compra', glifo: 'registro' },
-    { testid: 'nav-proveedores', etiqueta: 'Proveedores', glifo: 'proveedores' },
+    {
+      testid: 'nav-proveedores',
+      etiqueta: 'Proveedores',
+      glifo: 'proveedores',
+      ruta: '/catalogos/proveedores',
+    },
     {
       testid: 'nav-plan-contable',
       etiqueta: 'Plan contable',

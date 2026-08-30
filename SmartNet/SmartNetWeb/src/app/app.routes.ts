@@ -32,6 +32,14 @@ export const routes: Routes = [
           ),
       },
       {
+        path: 'catalogos/proveedores',
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./catalogos/feature/proveedores-page/proveedores-page').then(
+            (m) => m.ProveedoresPage
+          ),
+      },
+      {
         path: 'catalogos/plan-contable',
         canActivate: [authGuard],
         loadComponent: () =>

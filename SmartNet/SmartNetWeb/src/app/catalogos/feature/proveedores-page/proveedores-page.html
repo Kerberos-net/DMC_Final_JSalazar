@@ -1,0 +1,41 @@
+<section class="proveedores-page">
+  <header class="proveedores-page__cabecera">
+    <h1>Proveedores</h1>
+    <p class="proveedores-page__subtitulo" data-testid="proveedores-subtitulo">
+      Consulta de solo lectura del maestro de proveedores.
+    </p>
+  </header>
+
+  <div class="proveedores-page__controles">
+    <label class="campo proveedores-page__buscador">
+      Buscar por código, razón social o RUC
+      <input
+        type="search"
+        data-testid="proveedores-filtro"
+        [value]="filtro()"
+        (input)="onFiltro($any($event.target).value)"
+        placeholder="Ej. ACME o 20123456789"
+      />
+    </label>
+
+    <app-boton-exportar [descargando]="descargando()" (exportar)="exportar()" />
+  </div>
+
+  @if (cargando()) {
+    <p data-testid="proveedores-cargando">Cargando…</p>
+  }
+
+  @if (error()) {
+    <p class="banner banner--error" data-testid="proveedores-error" role="alert">{{ error() }}</p>
+  }
+
+  <app-proveedores-tabla [filas]="items()" [orden]="orden()" (ordenar)="onOrdenar($event)" />
+
+  <app-tabla-paginador
+    [pagina]="pagina()"
+    [totalPaginas]="totalPaginas() || 1"
+    [tamanio]="tamanioPagina()"
+    (paginaChange)="onPagina($event)"
+    (tamanioChange)="onTamanio($event)"
+  />
+</section>

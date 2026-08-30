@@ -75,7 +75,7 @@ describe('CatalogoProveedorService', () => {
 
     servicio.irAPagina(3);
     await tick();
-    http.expectOne((r) => r.request.params.get('pagina') === '3').flush({ ...pagina1, pagina: 3 });
+    http.expectOne((r) => r.params.get('pagina') === '3').flush({ ...pagina1, pagina: 3 });
     await tick();
 
     servicio.buscar('  acme ');
