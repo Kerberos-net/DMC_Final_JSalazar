@@ -1,21 +1,14 @@
-import { Component, inject } from '@angular/core';
+import { Component } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { PreferenciaTema, TemaService } from './shared/tema.service';
 
 /**
- * design.md D1/Open Question 2: the theme control lives in this shell header, reachable from
- * every screen including login (spa-theme-toggle spec: "reachable from every in-scope screen").
+ * Root component: a bare routing host. All chrome for the authenticated screens lives in
+ * `ShellLayout` (app.routes.ts nests those routes under it); `/login` renders on its own with no
+ * header and no theme control.
  */
 @Component({
   imports: [RouterOutlet],
   selector: 'app-root',
-  styleUrl: './app.css',
-  templateUrl: './app.html',
+  template: '<router-outlet></router-outlet>',
 })
-export class App {
-  protected readonly tema = inject(TemaService);
-
-  onCambiarTema(preferencia: PreferenciaTema): void {
-    this.tema.establecer(preferencia);
-  }
-}
+export class App {}

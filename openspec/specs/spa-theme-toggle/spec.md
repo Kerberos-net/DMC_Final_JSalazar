@@ -8,17 +8,25 @@ in practice, not only declared.
 
 ## Requirements
 
-### Requirement: Theme toggle control is accessible from the SPA
+### Requirement: Theme toggle control is accessible from the authenticated screens
 
-The system MUST expose a control, reachable from every in-scope screen
-(login, detalle-validación), that lets the user switch between light and
-dark theme.
+The system MUST expose a control, reachable from every authenticated
+in-scope screen (bandeja, detalle-validación, configuración), that lets the
+user switch between light and dark theme. The `/login` screen is out of
+scope for this control (see `spa-visual-login`: login renders without the
+app shell chrome).
 
 #### Scenario: Toggle reachable from detalle-validación
 
 - GIVEN the user is on the detalle-validación screen
 - WHEN they look for the theme control
 - THEN it is visible or reachable without leaving the screen
+
+#### Scenario: Login screen does not show the theme control
+
+- GIVEN the user is on the `/login` screen
+- WHEN the DOM is inspected
+- THEN there is no theme `<select>` and no app shell header
 
 ### Requirement: Default theme resolution without explicit choice
 

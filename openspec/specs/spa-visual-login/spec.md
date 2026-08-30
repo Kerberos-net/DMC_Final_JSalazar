@@ -9,6 +9,27 @@ ratified design handoff.
 
 ## Requirements
 
+### Requirement: Login renders without the app shell chrome
+
+The system MUST render `/login` outside the app shell layout: no shell
+header, no product marca bar, and no theme control on the login screen. The
+theme control belongs to the authenticated screens only (`spa-theme-toggle`).
+The route MUST NOT be nested under the shell layout parent.
+
+#### Scenario: Login has no header or theme control
+
+- GIVEN the `/login` screen loads
+- WHEN its DOM is inspected
+- THEN it contains no `.app-shell__header`, no shell marca bar, and no theme
+  `<select>` — only the centered login card
+
+#### Scenario: Authenticated screens keep the shell chrome
+
+- GIVEN the user is authenticated and on `/bandeja`
+- WHEN the layout is inspected
+- THEN the shell header with the product marca and the theme `<select>` is
+  present above the routed screen
+
 ### Requirement: Login page consumes design tokens
 
 The system MUST style `login-page` exclusively through the global tokens defined in `spa-design-tokens` (color, typography, spacing, radius, elevation) — the component MUST NOT define its own color or font literals.
