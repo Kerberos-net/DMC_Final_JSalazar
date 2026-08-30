@@ -1,0 +1,39 @@
+<div class="tabla-paginador">
+  <button
+    type="button"
+    class="btn btn--secundario"
+    data-testid="pag-anterior"
+    [disabled]="enPrimera()"
+    (click)="anterior()"
+  >
+    Anterior
+  </button>
+
+  <span class="tabla-paginador__estado" data-testid="pag-estado">
+    Página {{ pagina() }} de {{ totalPaginas() }}
+  </span>
+
+  <button
+    type="button"
+    class="btn btn--secundario"
+    data-testid="pag-siguiente"
+    [disabled]="enUltima()"
+    (click)="siguiente()"
+  >
+    Siguiente
+  </button>
+
+  <label class="tabla-paginador__tamanio">
+    Filas por página
+    <select
+      class="campo"
+      data-testid="pag-tamanio"
+      [value]="tamanio()"
+      (change)="onTamanio($any($event.target).value)"
+    >
+      @for (t of tamaniosDisponibles(); track t) {
+        <option [value]="t">{{ t }}</option>
+      }
+    </select>
+  </label>
+</div>

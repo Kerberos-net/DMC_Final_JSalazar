@@ -509,4 +509,49 @@
     color: var(--error-ink);
     border: 1px solid var(--error-ink);
   }
+
+  /* .tabla-catalogo -- BACKLOG #22, design D8: shared chrome for the read-only catalog screens.
+   * The bodies differ per screen (3 / 2 / 4 columns) so only the frame + the sortable-header
+   * affordance live here. Semantic tokens only -- no literal (contraste.spec.ts / paleta.spec.ts
+   * parse this file). */
+  .tabla-catalogo {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: var(--fs-14);
+  }
+
+  .tabla-catalogo th,
+  .tabla-catalogo td {
+    text-align: left;
+    padding: var(--space-2) var(--space-3);
+    border-bottom: 1px solid var(--borde-sutil);
+  }
+
+  .tabla-catalogo th {
+    font-size: var(--fs-12);
+    font-weight: var(--peso-semi);
+    color: var(--texto-secundario);
+    text-transform: uppercase;
+    letter-spacing: 0.02em;
+  }
+
+  .tabla-catalogo td.tabular-nums,
+  .tabla-catalogo th.tabular-nums {
+    font-variant-numeric: tabular-nums;
+    text-align: right;
+  }
+
+  .tabla-catalogo__th--ordenable {
+    cursor: pointer;
+    user-select: none;
+  }
+
+  .tabla-catalogo__th--ordenable:hover {
+    color: var(--texto-principal);
+  }
+
+  .tabla-catalogo__flecha {
+    margin-left: var(--space-1);
+    color: var(--accento-texto);
+  }
 }

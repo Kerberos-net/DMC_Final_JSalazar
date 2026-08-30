@@ -1,0 +1,26 @@
+/* BACKLOG #22, design D8 -- pagination chrome. Layout/composition only; every colour via a global
+ * token; sits outside the @layer stack. */
+
+.tabla-paginador {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
+  font-size: var(--fs-13);
+  color: var(--texto-secundario);
+}
+
+.tabla-paginador__estado {
+  font-variant-numeric: tabular-nums;
+}
+
+.tabla-paginador__tamanio {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  margin: 0 0 0 auto;
+}
+
+.tabla-paginador__tamanio select {
+  width: auto;
+}

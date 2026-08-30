@@ -1,0 +1,22 @@
+/* BACKLOG #22, design D8 -- "Exportar a Excel" button. Layout only; colours via global tokens; the
+ * green sheet glyph resolves to the existing "validada" estado tokens (design D8: semantic tokens
+ * only, no new literal -- contraste.spec.ts / paleta.spec.ts parse styles.css). */
+
+.boton-exportar__glifo {
+  flex: none;
+  width: 13px;
+  height: 16px;
+  border-radius: 2px;
+  background: var(--estado-validada-fondo);
+  border: 1.5px solid var(--estado-validada-borde);
+  position: relative;
+}
+
+.boton-exportar__glifo::after {
+  content: '';
+  position: absolute;
+  inset: auto 3px 3px 3px;
+  height: 2px;
+  background: var(--estado-validada-borde);
+  box-shadow: 0 -4px 0 var(--estado-validada-borde);
+}

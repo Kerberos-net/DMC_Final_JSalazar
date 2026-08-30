@@ -1,0 +1,10 @@
+<button
+  type="button"
+  class="btn btn--secundario boton-exportar"
+  data-testid="boton-exportar"
+  [disabled]="descargando()"
+  (click)="exportar.emit()"
+>
+  <span class="boton-exportar__glifo" data-testid="boton-exportar-glifo" aria-hidden="true"></span>
+  {{ descargando() ? 'Generando…' : 'Exportar a Excel' }}
+</button>
