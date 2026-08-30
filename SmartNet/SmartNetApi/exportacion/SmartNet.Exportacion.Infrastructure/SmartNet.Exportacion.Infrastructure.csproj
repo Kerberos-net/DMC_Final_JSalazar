@@ -1,0 +1,19 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <!-- ADR 0021 decision 1: DocumentFormat.OpenXml 3.x is the ONLY file-generation dependency of
+       the backend, and it lives here and nowhere else. Exact pin, following the repo convention
+       (no Directory.Packages.props / Directory.Build.props; each project declares its own pin,
+       e.g. Microsoft.Data.SqlClient 7.0.2 in SmartNet.Catalogos.Infrastructure).
+       ADR 0021 decision 2: no *.Core project may reference this package, direct or transitive —
+       SmartNet.Exportacion.Infrastructure.Tests/NoCoreReferencesOpenXmlGuardTests proves it. -->
+  <ItemGroup>
+    <PackageReference Include="DocumentFormat.OpenXml" Version="3.3.0" />
+  </ItemGroup>
+
+</Project>

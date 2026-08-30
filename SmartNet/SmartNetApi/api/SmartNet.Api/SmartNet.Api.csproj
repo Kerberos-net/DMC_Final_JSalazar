@@ -27,6 +27,11 @@
          same Core/Infrastructure pair shape as above, never SmartNet.Db.Runner. -->
     <ProjectReference Include="..\..\catalogos\SmartNet.Catalogos.Core\SmartNet.Catalogos.Core.csproj" />
     <ProjectReference Include="..\..\catalogos\SmartNet.Catalogos.Infrastructure\SmartNet.Catalogos.Infrastructure.csproj" />
+    <!-- BACKLOG #22 PR1 / ADR 0021 decision 2: the .xlsx writer and its single PackageReference
+         (DocumentFormat.OpenXml) live in this isolated project; the host reaches it by
+         ProjectReference and no *.Core ever sees it (structural guard in
+         SmartNet.Exportacion.Infrastructure.Tests). Never SmartNet.Db.Runner. -->
+    <ProjectReference Include="..\..\exportacion\SmartNet.Exportacion.Infrastructure\SmartNet.Exportacion.Infrastructure.csproj" />
   </ItemGroup>
 
   <!-- Makes the top-level-statements Program class visible to WebApplicationFactory<Program> in
