@@ -1,20 +1,239 @@
 ```yaml
 schema: gentle-ai.verify-result/v1
-evidence_revision: sha256:3a29eea9d63256976134a08a5d742753f72379305d9323653311a37d20b7d99d
+evidence_revision: sha256:b9450518add73faa1a49d1bc7e3e5bfa24609089a99b4450f1951b3e88e20271
 verdict: pass_with_warnings
 blockers: 0
 critical_findings: 0
-requirements: 3/3
-scenarios: 9/9
+requirements: 9/9
+scenarios: 23/23
 test_command: "cd SmartNet/SmartNetWeb && npm test"
 test_exit_code: 0
-test_output_hash: sha256:a244e284589fc98492562243ed25b6340dc625dda4779d8c6fe4e9cb30e23fc9
-build_command: "cd SmartNet/SmartNetWeb && npm run build"
+test_output_hash: sha256:6ad3650e82e540af7c75acdbe85da36fba6429f7b0d0c17e70f2998b6f58d34c
+build_command: "cd SmartNet/SmartNetWeb && npm run lint && npm run build"
 build_exit_code: 0
-build_output_hash: sha256:dd04bae2fe83e254b1816d2f5afc7f465db75e2da1b6e843fccc0c90879cf9ad
+build_output_hash: sha256:ddc5649590c004f0a67eff514a38baa83476a6c35ef765de67efc9a893a4f72a
 ```
 
 # Verification Report - consultas-catalogos-spa
+
+Envelope reflects the final slice group verified (PR7 + PR8 + PR9). PR1-PR6 sections retained below.
+
+# PR7 + PR8 + PR9 (slices 7-9) - PASS WITH WARNINGS
+
+Verified at HEAD 1e06dd1, branch feat/consultas-catalogos-spa-22-pr9. Completes verification of the
+whole 9-slice change. Slices 1-6 verified separately (all PASS WITH WARNINGS, 0 CRITICAL).
+Validator sdd-verify-validate --requirements 9 --scenarios 23 returned valid true.
+
+## Scope
+
+- Slice 7 (catalog-queries-api): Tipo de cambio history endpoint with mandatory bounded range
+  (5 scenarios); Excel export endpoint per catalog TC portion (3 scenarios); Read-only
+  partition-respecting access TC method portion (1 scenario); Contract-test coverage TC portion
+  (1 scenario) = 4 req / 10 scen.
+- Slice 8 (catalog-queries-spa + spa-shell-nav): Three guarded lazy catalog routes tipo-cambio
+  portion (3 scenarios); Tipo de cambio screen date-range filter with month-to-date defaults
+  (4 scenarios); Screens are query-only and follow the inbox pattern tipo-cambio portion
+  (1 scenario); Sidebar mirrors the handoff navigation (4 scenarios); Shell CSS stays layout-only
+  and within budget (1 scenario) = 5 req / 13 scen.
+- Slice 9 (harness): folded into catalog-queries-api Contract-test coverage - no separate requirement.
+Total in-scope: 9 requirements / 23 scenarios.
+
+## Completeness - tasks 7.1-7.6, 8.1-8.6, 9.1-9.3 all checked, match commits
+
+- PR7: RED 7d45f40 test-only (TipoCambioEndpointsTests.cs +157, SqlTipoCambioRepositoryTests.cs +58,
+  zero production) then GREEN 8a86f67 (TipoCambioEndpoints.cs +98, ITipoCambioRepository.cs +11,
+  SqlTipoCambioRepository.cs +26) then checkoff 141617a.
+- PR8: RED 93005db test-only (7 files, production only the type-only tipo-cambio.model.ts; +397/-11)
+  then GREEN 031899b (+343/-34 across 12 files; inbox-page.ts is a pure fechaIso import move) then
+  checkoff 5ebddc0.
+- PR9: 6b44a1d docs-only (HARNESS.md + integration-spa-api/SKILL.md, +327; about 55 authored lines,
+  remainder is pre-existing untracked doc content committed for the first time) + checkoff 1e06dd1.
+- Working tree clean of source changes (only skills-lock.json + untracked codegraph/engram dirs).
+
+## Build / test evidence (independent re-run this session)
+
+- dotnet test SmartNet/SmartNetApi/api/SmartNet.Api.Tests -> Con error 0, Superado 203, Omitido 0,
+  Total 203 (3 m 1 s), exit 0. +12 PR7 TC cases; nothing else regressed.
+- cd SmartNet/SmartNetWeb && npm test -> 52 files / 464 tests passed, exit 0 (PR6 baseline 443; +21 PR8).
+- dotnet test tipos-de-cambio/SmartNet.TiposCambio.Core.Tests -> 20/20 exit 0 (PurityScanTests green;
+  the assembly holds ITipoCambioRepository + TipoCambio; ListarHistoricoAsync signature is two
+  DateOnly + CancellationToken to a Task of IReadOnlyList of TipoCambio - no clock, no infra type).
+- dotnet test tipos-de-cambio/SmartNet.TiposCambio.Infrastructure.Tests -> 15/15 exit 0 (+3 new:
+  both-origins ordered, empty range, excludes unknown BCP origen).
+- dotnet test exportacion/SmartNet.Exportacion.Infrastructure.Tests -> 4/4 exit 0 (Core-purity guard).
+- cd SmartNet/SmartNetWeb && npm run lint (tsc --noEmit app + spec) -> clean, exit 0.
+- cd SmartNet/SmartNetWeb && npm run build (production) -> exit 0. tipo-cambio-page lazy chunk
+  6.02 kB raw / 2.20 kB transfer; styles 8.92 kB. NO anyComponentStyle budget warning or error
+  (6 kB warn / 8 kB hard cap).
+- dotnet build SmartNet/SmartNetApi/api/SmartNet.Api -> Compilacion correcta, 0 Advertencias, 0 Errores.
+- No coverage tool configured - coverage analysis skipped (not a failure).
+
+## Spec compliance - 9 requirements / 23 scenarios, all runtime-proven
+
+### catalog-queries-api: Tipo de cambio history endpoint with mandatory bounded range - 5/5
+- Valid range, both origins per date: GetHistorico_Returns200_BothOrigins... asserts MANUAL-then-SBS
+  for 2026-08-14 then SBS 2026-08-15, camelCase fecha/origen/compra/venta/fechaConsulta, origen as
+  string, fecha yyyy-MM-dd. Endpoint maps enum to SBS / MANUAL; SQL ORDER BY Fecha, Origen.
+- Missing / unparseable / inverted: GetHistorico_Returns400_OnBadRange Theory covers missing desde,
+  missing hasta, desde=noesfecha, inverted -> 400. TryResolverRango runs before any query.
+- Span over maximum: same Theory, 2025-01-01 to 2026-01-02 (over 366d) -> 400. Cap 366 lives ONLY
+  in TipoCambioEndpoints, never in Core (ADR 0019).
+- Unauthenticated: GetHistorico_WithoutACookie_Returns401 (RequireAuthorization on the route).
+- Bonus: GetHistorico_ExcludesRowsOutsideTheInclusiveRange proves inclusive bounds.
+
+### catalog-queries-api: Excel export endpoint per catalog - TC portion 3/3
+- Range coverage: GetHistoricoExportacion_Returns200_XlsxHeaders_WorkbookRows -> 200, xlsx
+  Content-Type, attachment + .xlsx Content-Disposition, 1 header + 2 rows.
+- Range validation matches JSON endpoint: GetHistoricoExportacion_Returns400_OnBadRange (missing hasta).
+- Unauthenticated export: GetHistoricoExportacion_WithoutACookie_Returns401_AndNoFile.
+- ADR 0021 dec.4: HostileExtraParam test - CRLF payload never reaches Content-Disposition; filename
+  is constant plus server date from the injected TimeProvider.
+
+### catalog-queries-api: Read-only, partition-respecting access - TC method portion 1/1
+- ListarHistoricoAsync issues one SELECT over fact.TipoCambio only, WHERE Fecha between bounds AND
+  Origen IN (SBS, MANUAL) ORDER BY Fecha, Origen; added to ITipoCambioRepository as a clock-pure
+  read-only port method guarded by PurityScanTests (20/20). No new SQL script, no GRANT in the diff.
+  The Origen IN filter is load-bearing (private Map returns cast minus-one for unknowns) and is
+  proven by ListarHistoricoAsync_ExcludesRowsWithAnUnknownOrigen, which seeds a BCP row after
+  NOCHECK CONSTRAINT CK_TipoCambio_Origen - scoped to the disposable fact_test guid DB via
+  TestDatabaseFixture/MigratedDatabase, never the shared base.
+- #8 Venta-freeze path (ObtenerVigenteAsync, SqlUnidadDeTrabajo, SqlFacturacionStore) untouched;
+  the SqlTipoCambioRepository.cs diff is purely the added method; full API suite 203/203.
+
+### catalog-queries-api: Contract-test coverage - TC portion 1/1
+- TipoCambioEndpointsTests +12 (real DB via SmartNetApiFactory + real Host-session cookie),
+  SqlTipoCambioRepositoryTests +3, all green. integration-spa-api harness report updated manually (slice 9).
+
+### catalog-queries-spa: Three guarded lazy catalog routes - tipo-cambio portion 3/3
+- app.routes.ts adds catalogos/tipo-cambio as an additive sibling ShellLayout child, lazy
+  loadComponent to TipoCambioPage, canActivate authGuard. app.routes.spec.ts asserts defined +
+  canActivate length over 0 + loadComponent is a function; existing arrayContaining and per-child
+  guard assertions still green (464/464). Unauthenticated visitor blocked by the guard.
+
+### catalog-queries-spa: Tipo de cambio screen date-range filter with month-to-date defaults - 4/4
+- Default month-to-date view: tipo-cambio-page.spec asserts the GET desde = local first-of-month,
+  hasta = local today, via rangoMesActual/fechaIso in shared/formato.ts using
+  getFullYear/getMonth/getDate (never toISOString). formato.spec adds value tests for both helpers.
+- User changes the range: re-queries when onDesde is called with a new date.
+- Client-side sort: orden-compra click reorders 3.74/3.75/3.76 asc then reversed desc,
+  http.expectNone. filas is a computed over servicio.items via ordenarPor; table emits ordenar only.
+- Invalid range: on API 400 the banner shows role alert and 0 tbody rows; TipoCambioService clears
+  itemsSignal and sets the invalid-range message (companion non-empty assertion present); distinct
+  generic message for a 500 proves triangulation.
+- Columns fecha/origen/compra/venta with 2-decimal amounts, both origins, no origin selector:
+  tipo-cambio-tabla.spec asserts the cell matrix and that no select element exists.
+
+### catalog-queries-spa: Screens are query-only and follow the inbox pattern - tipo-cambio portion 1/1
+- Zero crear/editar/eliminar/guardar testids in page + table specs; only GET (list) and GET (export
+  blob). TipoCambioService is a dedicated providedIn root signal service (private writable signal +
+  asReadonly); container owns desde/hasta/orden signals; ui table is input/output only; models typed
+  to the PR7 contract.
+
+### spa-shell-nav: Sidebar mirrors the handoff navigation - 4/4
+- Order: sidebar.spec asserts the exact 8-entry list (Bandeja principal, Registro de compra,
+  Proveedores, Plan contable, Tipo de cambio, Errores y notificaciones, Sincronizacion, Configuracion).
+- Links: bandeja/configuracion/plan-contable/proveedores/tipo-cambio are anchor tags with correct
+  routerLink/href; nav-registro/nav-errores/nav-sincronizacion are non-link aria-disabled true.
+- Active destination: RouterLinkActive drives the active enlace modifier (color + background via
+  tokens, no literal). CSS + directive wired; no dedicated runtime assertion in sidebar.spec.
+- Exact list assertion: builds glyphs from div/span only asserts 8 glyphs, 0 svg, 0 img, DIV/SPAN
+  each. Docblock guard against restoring the 7-entry list is present (memory shell-nav-canvas-replica).
+  Closes PR6 verify WARNING 1.
+
+### spa-shell-nav: Shell CSS stays layout-only and within budget - 1/1
+- sidebar.css: every color is a token var (contraste.spec.ts / paleta.spec.ts green); the 8th glyph
+  reuses the div/span + pseudo-element token pattern (shares the flex-column rule group with the
+  registro/plan glyphs). Production build reports NO anyComponentStyle warning/error - the optimized
+  sidebar style is genuinely under 6 kB (the apply raw 6496 B figure is pre-minification: comments
+  + whitespace).
+
+## Design / ADR compliance
+
+- ADR 0019: range validation and the 366-day cap live in the endpoint only; the Core port method is
+  a pure signature; PurityScanTests 20/20. The one SPA clock read is rangoMesActual in the container
+  constructor (spa spec req 4 requires the browser local clock) - never in any Core.
+- ADR 0021: DocumentFormat.OpenXml via ExportadorXlsx; constant filename with server date; no user
+  input in Content-Disposition (hostile-param test).
+- ADR 0018 / D8: bounded range fetched unpaged, sorted client-side via ordenarPor - consistent with
+  the plan contable screen; no server pagination for this resource.
+- D5 sidebar delta: 8th entry is the ratified owner decision; docblock guard present in sidebar.ts,
+  sidebar.spec.ts and sidebar.css.
+- Deviations: (1) PR9 committed HARNESS.md + integration-spa-api/SKILL.md to git for the first time
+  (previously untracked) - reasonable: slice 9 IS the harness work; only about 55 of 327 lines are
+  PR9-authored. (2) tipo-cambio glyph uses two opposed rotated pseudo-element chevrons rather than a
+  literal third bar - cosmetic, meets the div/span + pseudo-only, no-svg/img constraint. Neither
+  breaks a spec.
+
+## TDD compliance (Strict TDD active) - PASS
+
+| Check | Result | Details |
+|-------|--------|---------|
+| TDD evidence reported | yes | apply-progress + tasks artifact carry per-slice RED/GREEN SHAs |
+| All tasks have tests | yes | 7.x, 8.x covered; 9.x is a doc-only slice (no RED/GREEN, no production/test source touched) |
+| RED confirmed test-only | yes | 7d45f40 stat = 2 test files, 0 production (genuine CS1061 + 404). 93005db = 7 files, production only the type-only model (genuine unresolved-module + sidebar count 7 not 8 + missing route) |
+| GREEN confirmed | yes | independent re-run: API 203/203, SPA 464/464, TiposCambio.Infra 15/15 |
+| Triangulation adequate | yes | endpoint 400 Theory x5 distinct inputs; service 400 vs 500 distinct messages; sort asc vs desc distinct orders; formato local-date distinct months |
+| Safety net for modified files | yes | pre-existing TipoCambio suites green before/after; inbox-page refactor covered by untouched specs; sidebar.spec pre-existing then updated in RED |
+
+Assertion quality - all real. Scanned the 7 changed test files plus the app.routes delta: no
+tautologies, no production-call-free assertions, no ghost loops, no smoke-only tests. Empty-collection
+checks all have a companion non-empty assertion. The one toBeDefined is paired with value assertions.
+Mock use minimal (one spy on DescargaXlsx.descargar). Glyph-count and order assertions are the spec
+explicit contract.
+
+## Test layer distribution
+
+| Layer | Tests | Files | Tools |
+|-------|-------|-------|-------|
+| Unit / component (jsdom + HttpTestingController) | 21 new SPA | 6 | Vitest |
+| API contract (WebApplicationFactory + real DB + cookie) | +12 PR7 | 1 | xUnit |
+| Infra (real fact_test DB) | +3 PR7 | 1 | xUnit |
+| Core purity (Mono.Cecil / NetArchTest) | 20 guard | 1 | xUnit |
+| Integration (browser) / E2E | 0 | - | not installed |
+
+## Issues
+
+CRITICAL: none.
+
+WARNING (non-blocking):
+1. size:exception - PR7 + PR8 authored delta (about 700 LOC) exceeds the 400-line PR budget,
+   consistent with the owner-accepted feature-level stacked-PR exception carried since PR3.
+2. Pre-existing prettier 3.9.6 trailing-comma drift flags new and untouched files alike; the
+   effective style gate is tsc --noEmit and it passes. Not a PR7-9 regression.
+3. spa-shell-nav active-destination scenario is satisfied structurally (RouterLinkActive + token
+   rule) but has no dedicated runtime assertion in sidebar.spec.ts. Low risk.
+
+SUGGESTION:
+1. PR9 diff is dominated by first-time-tracking two pre-existing untracked doc files; a follow-up
+   could split tracking from the flow append.
+2. The both-origins render test feeds rows already in display order; server ordering is covered by
+   the API contract test. No gap.
+3. The export path recomputes the server date for the filename; a shared helper across the three
+   export routes would DRY it.
+
+## Verdict
+
+PASS WITH WARNINGS. Slices 7-9 complete and correct against their 15 tasks; 9 in-scope requirements
+/ 23 scenarios runtime-proven (API 203/203, SPA 464/464, TiposCambio.Core 20/20, TiposCambio.Infra
+15/15, Exportacion.Infra 4/4, lint clean, production build clean, no anyComponentStyle budget
+warning). Core purity guards the new port method; the load-bearing Origen filter is proven; the #8
+Venta-freeze path is untouched; the sidebar 7 to 8 delta and shell CSS budget are fully satisfied
+(closing the PR6 deferred WARNING). Nothing blocks archiving.
+
+## OVERALL CHANGE VERDICT (all 9 slices) - PASS WITH WARNINGS
+
+All 9 stacked slices verified (PR1-PR6 prior sessions, PR7-PR9 here), every slice PASS WITH WARNINGS,
+0 CRITICAL across the whole change. catalog-queries-api (8 requirements), catalog-queries-spa
+(5 requirements) and the spa-shell-nav delta (2 requirements) are implemented and test-proven end to
+end: proveedores dual picker/catalogo mode with the frozen #18 contract intact, plan contable
+full-list screen, tipo de cambio history screen, per-catalog Excel export, the 8-entry sidebar, and
+the integration-spa-api harness recording all three GET route families. Standing warnings are the
+owner-accepted size:exception and the pre-existing prettier drift. No new versioned SQL, no new
+GRANT, no external-schema write, no accounting rule in any Core. Ready for sdd-archive.
+
+Next: sdd-archive the whole change.
+
+---
 
 Envelope reflects the most recent slice verified (PR6). PR1-PR5 sections retained below.
 
