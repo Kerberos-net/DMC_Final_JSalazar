@@ -81,12 +81,12 @@ TDD is strict: every slice is RED (failing test) -> GREEN (implement) -> REFACTO
 
 ## PR7 — API tipo de cambio history (base: PR6) ~330 | satisfies api req 5,6,7,8
 
-- [ ] 7.1 RED: infra tests — `ListarHistoricoAsync(DateOnly,DateOnly,ct)` inclusive bounds, BOTH origins per date, unknown `Origen` filtered (`AND Origen IN ('SBS','MANUAL')`), empty -> `[]`; PK `(Fecha,Origen)` seek.
-- [ ] 7.2 RED: API tests — `GET /api/tipos-cambio?desde=&hasta=` both REQUIRED, 200 rows `{fecha,origen,compra,venta,fechaConsulta}` camelCase, `origen` serialized as string "SBS"/"MANUAL", order `fecha` then `origen`; 400 x5 (missing / unparseable / inverted / span > 366d); 401.
-- [ ] 7.3 RED: `GET /api/tipos-cambio/exportacion` — `desde`/`hasta` required, headers, workbook rows, shares range validation (400s), 401, hostile-`q` filename.
-- [ ] 7.4 GREEN: `ListarHistoricoAsync` read-only clock-pure port method on `ITipoCambioRepository`; private map returns `(OrigenTipoCambio)(-1)` for unknowns; PurityScanTests green.
-- [ ] 7.5 GREEN: SQL adapter; endpoint in `TipoCambioEndpoints` with range validation in the ENDPOINT not Core; explicit string mapper for `origen`; no #8 Venta-freeze; export route via `ExportadorXlsx`.
-- [ ] 7.6 Acceptance: `dotnet test` green (Infra + Api); `PurityScanTests` green; no `dbo.*` write, no new SQL, no new GRANT.
+- [x] 7.1 RED: infra tests — `ListarHistoricoAsync(DateOnly,DateOnly,ct)` inclusive bounds, BOTH origins per date, unknown `Origen` filtered (`AND Origen IN ('SBS','MANUAL')`), empty -> `[]`; PK `(Fecha,Origen)` seek.
+- [x] 7.2 RED: API tests — `GET /api/tipos-cambio?desde=&hasta=` both REQUIRED, 200 rows `{fecha,origen,compra,venta,fechaConsulta}` camelCase, `origen` serialized as string "SBS"/"MANUAL", order `fecha` then `origen`; 400 x5 (missing / unparseable / inverted / span > 366d); 401.
+- [x] 7.3 RED: `GET /api/tipos-cambio/exportacion` — `desde`/`hasta` required, headers, workbook rows, shares range validation (400s), 401, hostile-`q` filename.
+- [x] 7.4 GREEN: `ListarHistoricoAsync` read-only clock-pure port method on `ITipoCambioRepository`; private map returns `(OrigenTipoCambio)(-1)` for unknowns; PurityScanTests green.
+- [x] 7.5 GREEN: SQL adapter; endpoint in `TipoCambioEndpoints` with range validation in the ENDPOINT not Core; explicit string mapper for `origen`; no #8 Venta-freeze; export route via `ExportadorXlsx`.
+- [x] 7.6 Acceptance: `dotnet test` green (Infra + Api); `PurityScanTests` green; no `dbo.*` write, no new SQL, no new GRANT.
 
 ## PR8 — SPA tipo de cambio screen + sidebar 7->8 delta (base: PR7) ~360 | satisfies spa req 1,4,5; shell-nav delta
 
