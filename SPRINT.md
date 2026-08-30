@@ -11,9 +11,9 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | **17 de 22 cerrados** (BACKLOG.md tiene 22 ítems: #18–#22 nacieron al implementar el #12 — #18 "Ajuste visual del diseño SPA" y #20 "Ajuste visual de bandeja y panel de errores" cerrados 2026-08-27, #21 "Bandeja: datos enriquecidos y contadores de resumen" cerrado 2026-08-30; abiertos: #19 "Campos contables editables y resaltado OCR por campo" y #22 "Consultas de catálogos en la SPA (solo lectura)") |
-| Ciclo SDD activo | Ninguno — último cerrado: ítem #21 (Bandeja: datos enriquecidos y contadores de resumen + shell de navegación macOS), 2026-08-30 |
-| Última fase cerrada | Ítem #21 (Bandeja: datos enriquecidos + shell de navegación), 3 fases, 32/32 tareas cerradas, verify PASS WITH WARNINGS (0 CRITICAL, 3 WARNING reconciliados, 2 SUGGESTION — 1 atendida), 1 spec nueva (`spa-shell-nav`) + 2 delta (`bandeja`, `spa-visual-bandeja`), 4 *commits* apilados sobre `main` (`a93f4c7`/`a83c5ee`/`84c05e4`/`bb1fb59`, `size:exception`) — ítem #21 cerrado 2026-08-30 |
+| Ítems del backlog | **18 de 22 cerrados** (BACKLOG.md tiene 22 ítems: #18–#22 nacieron al implementar el #12 — #18 "Ajuste visual del diseño SPA" y #20 "Ajuste visual de bandeja y panel de errores" cerrados 2026-08-27, #21 y #22 cerrados 2026-08-30; abierto: #19 "Campos contables editables y resaltado OCR por campo") |
+| Ciclo SDD activo | Ninguno — último cerrado: ítem #22 (Consultas de catálogos en la SPA, solo lectura), 2026-08-30 |
+| Última fase cerrada | Ítem #22 (Consultas de catálogos en la SPA, solo lectura), 9 fases/PRs, 54/54 tareas cerradas, verify PASS WITH WARNINGS (0 CRITICAL, 3 WARNING, 3 SUGGESTION), 2 specs nuevas (`catalog-queries-api`, `catalog-queries-spa`) + 1 delta (`spa-shell-nav` 7→8) + ADR 0021, 9 *commits* apilados sobre `main` (`size:exception`) — ítem #22 cerrado 2026-08-30 |
 
 ---
 
@@ -1796,7 +1796,99 @@ apilados sobre `main` local sin *push* — patrón de todos los ítems previos.
 
 ---
 
-## ⬜ Ítems 10, 15, 16, 19 y 22 — sin ciclo SDD abierto
+## ✅ 22. Consultas de catálogos en la SPA (solo lectura)
+
+Tres pantallas de consulta —Proveedores, Plan contable, Tipo de cambio— y sus endpoints `GET /api/*`
+sobre repositorios que ya existían, más export a `.xlsx` de cada una. Sin alta/edición/borrado, sin
+tocar el núcleo contable, sin SQL versionado ni `GRANT` nuevo. El sidebar del #21 dejó `Proveedores` y
+`Plan contable` como entradas inertes; este ítem les cabló ruta y pantalla y **agregó** `Tipo de
+cambio` (7 → 8 entradas).
+
+**Ciclo SDD:** `openspec/changes/archive/2026-08-30-consultas-catalogos-spa/` · **54 de 54 tareas
+cerradas** — ✅ **CERRADO 2026-08-30**
+
+| Fase | Unidad | Alcance | Tareas | Estado |
+|---|---|---|---|---|
+| 1 | PR1 | Infra de export: proyecto `SmartNet.Exportacion.Infrastructure` + `ExportadorXlsx` (`OpenXmlWriter` SAX, `MemoryStream`) + guard estructural de pureza contra `*.Core` | 5/5 | ✅ |
+| 2 | PR2 | API plan contable: `GET /api/catalogos/plan-contable` + `/exportacion`, DTO `CuentaContableResultado`, `EsHojaImputable` proyectado | 5/5 | ✅ |
+| 3 | PR3 | Chrome compartido SPA: `tabla-paginador`, `boton-exportar`, `orden.ts` (funciones puras), `descarga-xlsx` (blob + `<a>`, no `window.open`), primitivas `.tabla-catalogo*` | 7/7 | ✅ |
+| 4 | PR4 | Pantalla Plan contable: servicio signal, tabla presentacional, filtro + orden client-side, ruta `catalogos/plan-contable`, link `nav-plan-contable` | 6/6 | ✅ |
+| 5 | PR5 | API proveedores `modo=catalogo`: `OrdenProveedor` (vocabulario cerrado), `ListarCatalogoAsync` con `COUNT(*) OVER()` + desempate `codpro`, `/exportacion`; picker #18 byte-frozen | 10/10 | ✅ |
+| 6 | PR6 | Pantalla Proveedores: `CatalogoProveedorService` (orden/paginado server-side), tabla, ruta `catalogos/proveedores`, link `nav-proveedores` | 6/6 | ✅ |
+| 7 | PR7 | API tipo de cambio: `ListarHistoricoAsync` (read-only, clock-pure), adaptador SQL con `AND Origen IN ('SBS','MANUAL')`, `GET /api/tipos-cambio` + `/exportacion`, validación de rango en el endpoint (máx 366 d) | 6/6 | ✅ |
+| 8 | PR8 | Pantalla Tipo de cambio (rango default 1° de mes → hoy, local) + **delta sidebar 7 → 8** (`nav-tipo-cambio`, 8º glifo bajo el tope de 6 kB) | 6/6 | ✅ |
+| 9 | PR9 | Re-corrida del harness `integration-spa-api` + append manual de las 3 familias de ruta a `SKILL.md` / `HARNESS.md` | 3/3 | ✅ |
+
+### Pruebas
+
+| Suite | Antes | Después | Nuevas |
+|---|---|---|---|
+| SPA (Vitest) | 409 | **464** | +55 (4 servicios, 3 modelos, 3 páginas, 3 tablas, `tabla-paginador`, `boton-exportar`, `orden`, `descarga-xlsx`, delta sidebar) |
+| `SmartNet.Api.Tests` | 172 | **203** | +31 (contratos de las 3 rutas + `/exportacion`, 401, camelCase, 400s de rango, regresión picker #18) |
+| `SmartNet.Catalogos.Core.Tests` | 32 | **41** | +9 (`OrdenProveedor`, firmas puras — `PurityScanTests` verde) |
+| `SmartNet.Catalogos.Infrastructure.Tests` | 67 | **81** | +14 (`ListarCatalogo`: total en página 1 y 3, página fuera de rango, 3 claves × 2 direcciones, desempate `codpro` entre páginas, `rucpro` NULL primero, `ListarCatalogoCompletoAsync`) |
+| `SmartNet.TiposCambio.Core.Tests` | 20 | **20** | +0 (`PurityScanTests` cubre la firma nueva de `ListarHistoricoAsync` por reflexión, sin caso nuevo) |
+| `SmartNet.TiposCambio.Infrastructure.Tests` | 12 | **15** | +3 (ambos orígenes ordenados, rango vacío, origen desconocido `BCP` filtrado) |
+| `SmartNet.Exportacion.Infrastructure.Tests` | — (proyecto nuevo) | **4** | round-trip de workbook, conteo de filas, celdas fecha/decimal, set vacío |
+
+Ejecutadas por el orquestador contra SQL Server local real: Api 203/203, SPA 464/464,
+Catalogos.Core 41/41, Catalogos.Infrastructure 81/81, TiposCambio.Core 20/20,
+TiposCambio.Infrastructure 15/15, Exportacion 4/4. `npm run lint` (tsc) y `npm run build` limpios,
+presupuesto `anyComponentStyle` de 6 kB no excedido (medido sobre el build optimizado).
+
+### Decisiones de diseño
+
+- **`COUNT(*) OVER()` en la misma pasada** (D6): el `totalRegistros` sale del `SELECT` paginado, cero
+  scans extra. Anuló el "segundo scan aceptado" de la propuesta. Solo el borde de página fuera de rango
+  usa un `COUNT(*)` de respaldo.
+- **`modo` explícito que selecciona la forma de la respuesta** (D1/D6): una ruta sirve al picker #18
+  (`{resultados, hayMas}`, byte-frozen) y al catálogo (`{items, …}` = envelope `PaginaBandeja<T>`
+  verbatim). Se rechazó una forma unificada / union type.
+- **Vocabulario de orden cerrado + columnas literales** (D7): `OrdenProveedor.Valores` valida en el
+  endpoint; el adaptador hace `switch` a nombre de columna constante — el string del usuario nunca se
+  concatena al SQL. Todo `ORDER BY` agrega `, codpro ASC` (sin desempate único, `OFFSET/FETCH`
+  pierde/duplica filas).
+- **Validación de rango en el endpoint, no en Core** (D2): cuánta historia trae una llamada HTTP es
+  transporte; un tope en Core inventaría una regla que `REGLAS.md` no tiene.
+- **`.xlsx` se bufferea, no se streamea** (D9 / ADR 0021): un `.xlsx` es un ZIP y necesita stream
+  seekable; `OpenXmlWriter` fila por fila en `MemoryStream`, validación antes del primer byte.
+- **Dependencia aislada + guard estructural** (D9 / ADR 0019): `DocumentFormat.OpenXml` vive solo en
+  `SmartNet.Exportacion.Infrastructure`; un test asegura que ningún `*.Core` la referencia. EPPlus
+  descartado por licencia Polyform Noncommercial.
+- **Ruteo agrupado sin ruta padre** (D4): `/catalogos/*` como 3 hijos hermanos de `ShellLayout` con
+  path literal, no `children` anidados (evita `<router-outlet>` vacío + redirect del path desnudo).
+- **Orden client-side vs server-side según tamaño** (D7/D8): proveedores en servidor (catálogo sin
+  cota); plan contable y TC en cliente (sets acotados en una respuesta).
+
+### Elementos conocidos, no ocultos
+
+`sdd-verify`: 0 CRITICAL, 3 WARNING, 3 SUGGESTION (veredicto global del cambio + slices 7-9).
+
+- **WARNING 1 (aceptada)** — `size:exception`: ~2.570 líneas totales sobre el presupuesto de 800; 9
+  PRs apilados, ninguno supera 400. Aceptada por el dueño en la expansión de alcance.
+- **WARNING 2 (arrastrada)** — drift de `prettier@3.9.6` (comas finales) preexistente; afecta también
+  archivos no tocados. El gate efectivo es `tsc --noEmit` y pasa.
+- **WARNING 3 (aceptada)** — el escenario "destino activo" de `spa-shell-nav` queda satisfecho
+  estructuralmente (`RouterLinkActive` + token) sin aserción runtime dedicada en `sidebar.spec.ts`.
+- **SUGGESTION (arrastrada)** — la SPA sigue sin herramienta de cobertura; `dotnet test` tampoco tiene
+  cobertura por archivo cambiado.
+- **Desvíos anotados (no defectos)** — PR9 commiteó por primera vez `HARNESS.md` +
+  `integration-spa-api/SKILL.md` (hogar de la lista de flujos); el glifo de `Tipo de cambio` usa dos
+  chevrons CSS opuestos en vez de una 3ª barra literal (cumple div/span + pseudo, sin svg/img).
+
+*Follow-ups:* el export de plan contable emite 4 columnas (`Cuenta, Descripcion, Nivel, Es hoja
+imputable`) mientras la pantalla muestra 2 — confirmar si el archivo más ancho es lo deseado;
+**ADR 0021 sigue en estado "Propuesto"** — el dueño debe pasarlo a "Aceptado" al ratificar el cambio.
+
+**RDD de gentle-ai desactivado a nivel de repo**, `reviewGate.delivery: disabled/unmanaged`. Entrega
+`size:exception` (≈2.570 líneas > presupuesto de 800), 9 *commits* apilados (RED/GREEN separados por
+slice) sobre `main` local sin *push* — más 4 *commits* previos de trabajo sin commitear que se
+consolidaron al abrir el ciclo (sidebar réplica-canvas del #21, enriquecimiento de bandeja, entrada
+#22 en `BACKLOG.md`, chore).
+
+---
+
+## ⬜ Ítems 10, 15, 16 y 19 — sin ciclo SDD abierto
 
 Las fases de cada ítem **se definen cuando arranca su ciclo SDD**, no antes. Ponerlas aquí ahora
 sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ítem, y ninguno existe.
@@ -1807,23 +1899,6 @@ sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ít
 | 15 | Publicación a Drive | #14 | — | ⬜ |
 | 16 | Publicación a Sheets | #14 | — | ⬜ |
 | 19 | Campos contables editables y resaltado OCR por campo | #12, #18 | ⚠ `REGLAS.md` §5–§10 | ⬜ |
-| 22 | Consultas de catálogos en la SPA (solo lectura) | #3, #4, #21 | ⚠ *Handoff* de diseño (pantallas de catálogo) | ⬜ |
-
-### #22 — alcance recordado (solo lectura)
-
-Tres pantallas de **consulta** y sus endpoints `GET /api/*`, sobre repositorios que ya existen y
-bajo el `SELECT` que `usr_api` ya tiene:
-
-| Pantalla | Fuente | Repositorio existente | Endpoint hoy |
-|---|---|---|---|
-| Proveedores | `dbo.Proveedor` | `IProveedorRepository` (#3) | solo `GET /api/catalogos/proveedores` como *picker* paginado del #18 — falta la vista de catálogo |
-| Plan contable | `dbo.CuentaContable` | `ICuentaContableRepository` (#3) | ninguno |
-| Tipo de cambio | `fact.TipoCambio` | `ITipoCambioRepository` (#4) — hoy solo `ObtenerVigenteAsync`, falta un método de histórico | ninguno |
-
-**Sin escritura en ninguna de las tres** — la carga manual de tipo de cambio es del #4 (CLI de
-administración). El sidebar del #21 dejó `Proveedores` y `Plan contable` como entradas inertes;
-`Tipo de cambio` es entrada nueva del sidebar. El #22 solo les cablea ruta y pantalla. No hay SQL
-versionado nuevo ni `GRANT` nuevo.
 
 ---
 
