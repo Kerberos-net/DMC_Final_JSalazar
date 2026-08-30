@@ -58,18 +58,35 @@ backend API surface for theme preference.
 - THEN it falls back to `prefers-color-scheme`, or light theme if that is
   also unavailable, without error
 
-### Requirement: Theme control remains a native `<select>` in this change
+### Requirement: Theme control is a sol/luna toggle button in the sidebar
 
-The system MUST keep the theme control as a native `<select>` element in the app shell header. The handoff's sun/moon icon toggle and any sidebar navigation redesign are explicitly out of scope for item #18 (user decision 5).
+> Supersedes the earlier "native `<select>` in the app shell header" rule (item
+> #18, user decision 5). Reopened on user instruction to match the design canvas
+> (`handoff/Gestor de Facturas.dc.html`): no shell header, and an icon toggle.
+
+The theme control MUST be a `<button>` (`data-testid="toggle-tema"`) inside the
+sidebar "Apariencia" card at the foot of `ShellLayout`'s sidebar. Activating it
+MUST flip the effective theme between light and dark and persist that as an
+explicit `claro` / `oscuro` choice (`localStorage` key `fact.tema`, no backend).
+The button MUST show a sun glyph while the effective theme is light and a moon
+glyph while it is dark, and carry an `aria-label` naming the target theme
+("Cambiar a tema oscuro" / "Cambiar a tema claro"). No theme `<select>` remains
+anywhere in the app.
+
+The pre-bootstrap default is unchanged: a viewer with no stored `fact.tema`
+value still follows the OS `prefers-color-scheme` ("sistema" resolution in
+`TemaService`); the toggle simply records the first explicit choice.
 
 #### Scenario: Theme control element type
 
-- GIVEN the app shell header renders the theme control
+- GIVEN the sidebar "Apariencia" card renders
 - WHEN its DOM is inspected
-- THEN the control is a `<select>` element with options for light, dark, and system
+- THEN the control is a `<button data-testid="toggle-tema">` and there is no
+  theme `<select>` in the document
 
-#### Scenario: No sidebar theme toggle introduced
+#### Scenario: Toggle flips and persists
 
-- GIVEN the SPA after this change
-- WHEN the layout is inspected
-- THEN no sidebar sun/moon "Apariencia" toggle is added
+- GIVEN the effective theme is light
+- WHEN the viewer activates the toggle
+- THEN `data-tema` on `<html>` becomes `oscuro` and `localStorage.fact.tema` is
+  `oscuro`; activating it again returns both to `claro`

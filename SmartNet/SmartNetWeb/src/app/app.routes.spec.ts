@@ -4,9 +4,9 @@ import { ShellLayout } from './shared/shell-layout/shell-layout';
 
 /**
  * Structural guard for the "login has no app shell" decision: `/login` must be a top-level route,
- * never nested under the `ShellLayout` parent, so it never inherits the header or the theme
- * control. The authenticated screens (bandeja, detalle, configuracion) must be children of that
- * parent.
+ * never nested under the `ShellLayout` parent, so it never inherits the sidebar (marca, nav,
+ * theme control, profile). The authenticated screens (bandeja, detalle, configuracion) must be
+ * children of that parent.
  */
 describe('app.routes', () => {
   const shellParent = routes.find((r) => r.component === ShellLayout);

@@ -4,13 +4,16 @@ import { describe, expect, it } from 'vitest';
 import { Sidebar } from './sidebar';
 
 /**
- * tasks.md 1.3 (RED first) — spec `spa-shell-nav`: the sidebar lists exactly the two destinations
- * that have a real route today (`Bandeja`, `Configuración`), grouped by one hairline divider, with
- * `<div>`-only glyphs (no `<svg>`, no icon font), and every entry keeps its accessible name when
- * collapsed.
+ * spec `spa-shell-nav` (canvas replica, `Gestor de Facturas.dc.html`): the sidebar mirrors the
+ * handoff navigation — a primary group (Bandeja principal, Registro de compra, Proveedores, Plan
+ * contable), one hairline divider, then a utility group (Errores y notificaciones, Sincronización,
+ * Configuración). Only `Bandeja` and `Configuración` resolve to a route today; the rest render as
+ * inert entries (`aria-disabled`, not links) marked "disponible próximamente". Glyphs are
+ * `<div>`/`<span>` only (no `<svg>`, no icon font). Below the nav: an "Apariencia" theme card and
+ * a profile row.
  */
 describe('Sidebar', () => {
-  async function crear(colapsado = false) {
+  async function crear(colapsado = false, usuario: string | null = null, temaEfectivo = 'claro') {
     await TestBed.configureTestingModule({
       imports: [Sidebar],
       providers: [provideRouter([])],
@@ -18,36 +21,49 @@ describe('Sidebar', () => {
 
     const fixture = TestBed.createComponent(Sidebar);
     fixture.componentRef.setInput('colapsado', colapsado);
+    fixture.componentRef.setInput('temaEfectivo', temaEfectivo);
+    fixture.componentRef.setInput('usuario', usuario);
     fixture.detectChanges();
     return fixture;
   }
 
-  it('renders exactly the two routed destinations, Bandeja then Configuración', async () => {
+  it('renders the handoff navigation destinations in order', async () => {
     const fixture = await crear();
-    const enlaces = Array.from(
-      fixture.nativeElement.querySelectorAll('a[data-testid^="nav-"]')
-    ) as HTMLAnchorElement[];
+    const entradas = Array.from(
+      fixture.nativeElement.querySelectorAll('[data-testid^="nav-"]:not([data-testid="nav-toggle"]):not([data-testid="nav-divisor"]):not([data-testid="nav-glifo"])')
+    ) as HTMLElement[];
 
-    expect(enlaces.map((a) => a.textContent?.trim())).toEqual(['Bandeja', 'Configuración']);
+    expect(entradas.map((e) => e.textContent?.trim())).toEqual([
+      'Bandeja principal',
+      'Registro de compra',
+      'Proveedores',
+      'Plan contable',
+      'Errores y notificaciones',
+      'Sincronización',
+      'Configuración',
+    ]);
   });
 
-  it('links to the existing routes and adds no disabled or placeholder entries', async () => {
+  it('links only the destinations with a real route; the rest are inert', async () => {
     const fixture = await crear();
     const root: HTMLElement = fixture.nativeElement;
 
+    const bandeja = root.querySelector('[data-testid="nav-bandeja"]')!;
+    const configuracion = root.querySelector('[data-testid="nav-configuracion"]')!;
+    expect(bandeja.tagName).toBe('A');
+    expect(configuracion.tagName).toBe('A');
     expect(
-      root.querySelector('[data-testid="nav-bandeja"]')?.getAttribute('ng-reflect-router-link') ??
-        root.querySelector('[data-testid="nav-bandeja"]')?.getAttribute('href')
+      bandeja.getAttribute('ng-reflect-router-link') ?? bandeja.getAttribute('href')
     ).toContain('bandeja');
     expect(
-      root
-        .querySelector('[data-testid="nav-configuracion"]')
-        ?.getAttribute('ng-reflect-router-link') ??
-        root.querySelector('[data-testid="nav-configuracion"]')?.getAttribute('href')
+      configuracion.getAttribute('ng-reflect-router-link') ?? configuracion.getAttribute('href')
     ).toContain('configuracion');
 
-    expect(root.querySelector('[disabled]')).toBeNull();
-    expect(root.textContent).not.toMatch(/pr[oó]ximamente|coming soon|en construcci[oó]n/i);
+    for (const testid of ['nav-registro', 'nav-proveedores', 'nav-plan-contable', 'nav-errores', 'nav-sincronizacion']) {
+      const inerte = root.querySelector(`[data-testid="${testid}"]`)!;
+      expect(inerte.tagName).not.toBe('A');
+      expect(inerte.getAttribute('aria-disabled')).toBe('true');
+    }
   });
 
   it('separates the primary and utility groups with exactly one hairline divider', async () => {
@@ -66,15 +82,15 @@ describe('Sidebar', () => {
     ).toBeTruthy();
   });
 
-  it('builds glyphs from <div> only — no svg, img, or icon font', async () => {
+  it('builds glyphs from div/span only — no svg, img, or icon font', async () => {
     const fixture = await crear();
     const root: HTMLElement = fixture.nativeElement;
 
     expect(root.querySelectorAll('svg').length).toBe(0);
     expect(root.querySelectorAll('img').length).toBe(0);
     const glifos = root.querySelectorAll('[data-testid="nav-glifo"]');
-    expect(glifos.length).toBeGreaterThanOrEqual(2);
-    glifos.forEach((g) => expect(g.tagName).toBe('DIV'));
+    expect(glifos.length).toBe(7);
+    glifos.forEach((g) => expect(['DIV', 'SPAN']).toContain(g.tagName));
   });
 
   it('keeps each destination accessible-named when collapsed', async () => {
@@ -82,7 +98,7 @@ describe('Sidebar', () => {
     const root: HTMLElement = fixture.nativeElement;
 
     expect(root.querySelector('[data-testid="nav-bandeja"]')?.getAttribute('aria-label')).toBe(
-      'Bandeja'
+      'Bandeja principal'
     );
     expect(
       root.querySelector('[data-testid="nav-configuracion"]')?.getAttribute('aria-label')
@@ -97,5 +113,47 @@ describe('Sidebar', () => {
     (fixture.nativeElement.querySelector('[data-testid="nav-toggle"]') as HTMLButtonElement).click();
 
     expect(emitido).toBe(1);
+  });
+
+  it('renders a sol/luna toggle button and emits alternarTema on click', async () => {
+    const fixture = await crear();
+    let veces = 0;
+    fixture.componentInstance.alternarTema.subscribe(() => (veces += 1));
+
+    const boton = fixture.nativeElement.querySelector(
+      '[data-testid="toggle-tema"]'
+    ) as HTMLButtonElement;
+    expect(boton.tagName).toBe('BUTTON');
+    boton.click();
+
+    expect(veces).toBe(1);
+  });
+
+  it('labels the toggle "Cambiar a tema oscuro" while the effective theme is light', async () => {
+    const fixture = await crear(false, null, 'claro');
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="toggle-tema"]').getAttribute('aria-label')
+    ).toBe('Cambiar a tema oscuro');
+  });
+
+  it('labels the toggle "Cambiar a tema claro" while the effective theme is dark', async () => {
+    const fixture = await crear(false, null, 'oscuro');
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="toggle-tema"]').getAttribute('aria-label')
+    ).toBe('Cambiar a tema claro');
+  });
+
+  it('shows the session user in the profile row', async () => {
+    const fixture = await crear(false, 'María Contadora');
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="perfil"]')?.textContent
+    ).toContain('María Contadora');
+  });
+
+  it('falls back to the role label when there is no session name', async () => {
+    const fixture = await crear(false, null);
+    expect(
+      fixture.nativeElement.querySelector('[data-testid="perfil"]')?.textContent
+    ).toContain('Asistente contable');
   });
 });

@@ -2,48 +2,88 @@
 
 ## Purpose
 
-Restore the macOS sidebar navigation shell in `ShellLayout` as ratified by
-`DESIGN.md`. The running SPA renders only a header with a bare `<router-outlet>`.
-This capability adds a persistent left sidebar with grouped navigation, a
-hairline divider, a collapse toggle, and per-viewer persistence — scoped ONLY to
-destinations that have a real route today. It is layout/CSS plus a small
+Provide the macOS sidebar navigation shell in `ShellLayout` as a faithful replica
+of the design handoff (`handoff/Gestor de Facturas.dc.html`). Per the canvas the
+authenticated shell has NO top header bar: product identity, the theme control
+("Apariencia" card) and a profile row all live in the sidebar, and the routed
+screen owns its own page title. This capability is layout/CSS plus a small
 client-side state service; it introduces no backend contact and no new routes.
+
+> Supersedes the earlier ratified scope ("exactly two routed destinations, no
+> placeholder entries, theme `<select>` in a top header"). Reopened on user
+> instruction to match the canvas; destinations without a route render as inert
+> entries rather than being omitted.
 
 ## Requirements
 
-### Requirement: Sidebar lists only destinations with existing routes
+### Requirement: Sidebar mirrors the handoff navigation
 
-The sidebar MUST render exactly two navigation destinations, each linking to a
-route that already resolves in `app.routes`: `Bandeja` and `Configuración`. The
-sidebar MUST NOT render dead, disabled, "coming soon", or placeholder entries for
-screens that do not yet exist (Registro de compra, Proveedores, Plan contable,
-Sincronización).
+The sidebar MUST render the handoff destinations in two groups. Primary group:
+`Bandeja principal`, `Registro de compra`, `Proveedores`, `Plan contable`.
+Utility group: `Errores y notificaciones`, `Sincronización`, `Configuración`.
+Only `Bandeja principal` (`/bandeja`) and `Configuración` (`/configuracion`)
+resolve to a route today and MUST render as `<a>` links. Every other destination
+MUST render as an inert entry — not a link, `aria-disabled="true"`, `title`
+"Disponible próximamente" — so the navigation matches the canvas without offering
+a dead click.
 
-#### Scenario: Only routed destinations appear
+#### Scenario: Handoff destinations appear in order
 
 - GIVEN the SPA is loaded with a valid session
 - WHEN `ShellLayout` renders the sidebar
-- THEN exactly two nav links are shown, "Bandeja" and "Configuración"
-- AND each navigates to its existing route with no disabled or placeholder items
+- THEN the seven destinations appear in the order above, with a divider between
+  the primary and utility groups
+
+#### Scenario: Only routed destinations are links
+
+- GIVEN the sidebar renders
+- WHEN its entries are inspected
+- THEN `Bandeja principal` and `Configuración` are `<a>` links to their routes,
+  and the other five are `aria-disabled` non-link entries
 
 #### Scenario: Active destination is indicated
 
 - GIVEN the current URL matches the bandeja route
 - WHEN the sidebar renders
-- THEN the "Bandeja" entry carries an active/selected visual state and the other does not
+- THEN the "Bandeja principal" entry carries an active/selected visual state
+  (solid accent fill) and the others do not
 
 ### Requirement: Navigation is grouped with a single hairline divider
 
-The sidebar MUST present `Bandeja` in a primary group and `Configuración` in a
-utility group placed after exactly one hairline divider that uses the existing
-translucent hairline border token.
+The sidebar MUST present the primary group and the utility group separated by
+exactly one hairline divider that uses the existing translucent hairline border
+token.
 
 #### Scenario: Primary and utility groups separated by one divider
 
 - GIVEN the sidebar renders in expanded state
 - WHEN its structure is inspected
-- THEN "Bandeja" sits in the primary group, one hairline divider follows, then
-  "Configuración" sits in the utility group
+- THEN the primary group sits above one hairline divider and the utility group
+  (ending in "Configuración") sits below it
+
+### Requirement: Theme control and profile live in the sidebar
+
+The shell MUST NOT render a top header bar. At the foot of the sidebar an
+"Apariencia" card MUST hold the sol/luna theme toggle button (see
+`spa-theme-toggle`), above a profile row that shows the current session user
+(falling back to "Asistente contable" when the session name is not yet known).
+Product identity (logo badge + "Facturas de Compra") sits at the top of the
+sidebar next to the collapse toggle. The sidebar MUST fill the viewport height so
+the "Apariencia" card and profile row sit flush with the bottom of the screen.
+
+#### Scenario: Theme toggle in the Apariencia card
+
+- GIVEN the authenticated shell renders
+- WHEN the sidebar foot is inspected
+- THEN an "Apariencia" card contains a `<button data-testid="toggle-tema">`, and
+  there is no `.app-shell__header` element and no theme `<select>`
+
+#### Scenario: Profile row reflects the session
+
+- GIVEN a session reporting the user "María Contadora"
+- WHEN the sidebar renders
+- THEN the profile row shows "María Contadora"; with no session name it shows
+  "Asistente contable"
 
 ### Requirement: Sidebar is expanded by default and collapsible
 
@@ -87,10 +127,10 @@ stored preference MUST be re-applied on reload for that browser only.
 
 ### Requirement: Navigation glyphs are hand-built from div elements
 
-Each destination's icon (inbox glyph for Bandeja, gear glyph for Configuración)
-MUST be constructed from `<div>` elements and token-driven CSS only — no `<svg>`,
-no icon font, no external image — per `DESIGN.md`. Pre-existing inline `<svg>` in
-other components is out of scope and untouched.
+Each destination's icon MUST be constructed from `<div>`/`<span>` elements and
+token-driven CSS only — no `<svg>`, no icon font, no external image — per
+`DESIGN.md`. Pre-existing inline `<svg>` in other components is out of scope and
+untouched.
 
 #### Scenario: Glyph markup contains no svg or icon font
 
@@ -117,12 +157,16 @@ literal in the component.
 
 ### Requirement: Shell CSS stays layout-only and within budget
 
-The `ShellLayout` stylesheet MUST contain layout/composition rules only, no
-color/typography/hue literals (every color via `var(--...)`), and MUST stay
-within the `angular.json` `anyComponentStyle` budget (4kB warn / 8kB error).
+The `ShellLayout` and `Sidebar` stylesheets MUST contain layout/composition rules
+only, no color/typography/hue literals (every color via `var(--...)`), and MUST
+stay within the `angular.json` `anyComponentStyle` hard cap (8kB error). The
+per-file warning threshold was raised from 4kB to 6kB when the sidebar grew to
+the handoff's seven hand-built nav glyphs plus the sol/luna theme toggle;
+`Sidebar` is ~5.3kB and MUST stay under the 6kB warning.
 
 #### Scenario: Shell stylesheet has no literals and fits the budget
 
-- GIVEN the `ShellLayout` stylesheet
-- WHEN its declarations are inspected
-- THEN every color references a token and the file is within the 4kB budget
+- GIVEN the `ShellLayout` and `Sidebar` stylesheets
+- WHEN their declarations are inspected
+- THEN every color references a token and the production build reports no
+  `anyComponentStyle` budget error

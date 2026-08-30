@@ -1,16 +1,17 @@
 import { Component, inject } from '@angular/core';
 import { RouterOutlet } from '@angular/router';
-import { PreferenciaTema, TemaService } from '../tema.service';
+import { TemaService } from '../tema.service';
 import { SidebarService } from '../sidebar.service';
+import { SessionService } from '../session.service';
 import { Sidebar } from './sidebar/sidebar';
 
 /**
- * Chrome for the authenticated screens (bandeja, detalle-validacion, configuracion): the macOS
- * sidebar navigation plus a header with the product marca and the theme `<select>`, with a
- * `<router-outlet>` for the routed screen. `/login` is deliberately routed OUTSIDE this layout
- * (app.routes.ts) so it renders with no chrome (spa-visual-login spec: "Login renders without the
- * app shell chrome"; spa-shell-nav spec). This container is the only injector of `SidebarService`
- * and `TemaService` — `Sidebar` stays presentational.
+ * Chrome for the authenticated screens (bandeja, detalle-validacion, configuracion). Per the
+ * design handoff (`Gestor de Facturas.dc.html`) there is NO top header bar: the product identity,
+ * the sol/luna theme toggle and the profile row all live in the sidebar, and the routed screen
+ * owns its own page title. `/login` is deliberately routed OUTSIDE this layout (app.routes.ts) so
+ * it renders with no chrome. This container is the only injector of `SidebarService`,
+ * `TemaService` and `SessionService` — `Sidebar` stays presentational.
  */
 @Component({
   imports: [RouterOutlet, Sidebar],
@@ -21,8 +22,10 @@ import { Sidebar } from './sidebar/sidebar';
 export class ShellLayout {
   protected readonly tema = inject(TemaService);
   protected readonly sidebar = inject(SidebarService);
+  protected readonly session = inject(SessionService);
 
-  onCambiarTema(preferencia: PreferenciaTema): void {
-    this.tema.establecer(preferencia);
+  /** Sol/luna toggle: flips the effective theme, persisting an explicit claro/oscuro choice. */
+  alternarTema(): void {
+    this.tema.establecer(this.tema.efectivo() === 'oscuro' ? 'claro' : 'oscuro');
   }
 }

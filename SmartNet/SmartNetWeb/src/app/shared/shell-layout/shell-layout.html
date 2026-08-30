@@ -2,33 +2,13 @@
   <app-sidebar
     class="app-shell__sidebar"
     [colapsado]="sidebar.colapsado()"
+    [usuario]="session.usuario()"
+    [temaEfectivo]="tema.efectivo()"
     (alternar)="sidebar.alternar()"
+    (alternarTema)="alternarTema()"
   />
 
-  <div class="app-shell__cuerpo">
-    <header class="app-shell__header">
-      <span class="app-shell__marca">
-        <span class="app-shell__logo" data-testid="logo-badge" aria-hidden="true">GF</span>
-        Gestor de Facturas de Compra
-      </span>
-
-      <label class="app-shell__tema">
-        Tema
-        <select
-          class="campo"
-          data-testid="selector-tema"
-          [value]="tema.preferencia()"
-          (change)="onCambiarTema($any($event.target).value)"
-        >
-          <option value="sistema">Sistema</option>
-          <option value="claro">Claro</option>
-          <option value="oscuro">Oscuro</option>
-        </select>
-      </label>
-    </header>
-
-    <main class="app-shell__main">
-      <router-outlet></router-outlet>
-    </main>
-  </div>
+  <main class="app-shell__main">
+    <router-outlet></router-outlet>
+  </main>
 </div>

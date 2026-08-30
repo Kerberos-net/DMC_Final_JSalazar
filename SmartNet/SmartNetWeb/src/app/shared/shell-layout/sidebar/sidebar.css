@@ -1,145 +1,144 @@
-/* spa-shell-nav — layout/composition only. Every color resolves from a global token; no literal
- * enters this file (paleta.spec.ts would go RED). Glyphs are `<div>` constructs shaped here, each
- * within a 1-element + ::before/::after budget, inheriting `currentColor` so the active state
- * recolours them for free. */
+/* spa-shell-nav — layout only; colours via tokens. */
 
 .sidebar {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-2);
-  width: 216px;
-  padding: var(--space-3) var(--space-2);
-  background: var(--fondo-sidebar);
-  border-right: 1px solid var(--borde-hairline);
+  display: flex; flex-direction: column; gap: var(--space-1); width: 216px; height: 100%;
+  padding: var(--space-3); background: var(--fondo-sidebar);
+  border-right: 1px solid var(--borde-hairline); overflow: hidden;
+}
+.sidebar--colapsado { width: 60px; }
+
+.sidebar__cabecera {
+  display: flex; align-items: center; gap: var(--space-2);
+  padding: var(--space-1) var(--space-1) var(--space-4);
 }
 
-.sidebar--colapsado {
-  width: 60px;
+.sidebar__hamburguesa {
+  display: flex; flex-direction: column; justify-content: space-between;
+  width: 16px; height: 11px;
+}
+.sidebar__hamburguesa span {
+  height: 1.5px; border-radius: 1px; background: currentColor; transition: width 0.2s ease;
+}
+.sidebar__hamburguesa span:nth-child(3) { width: 80%; }
+.sidebar--colapsado .sidebar__hamburguesa span:nth-child(1),
+.sidebar--colapsado .sidebar__hamburguesa span:nth-child(3) { width: 60%; }
+
+.sidebar__marca { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; }
+.sidebar__logo {
+  flex: none; width: 22px; height: 22px; border-radius: 6px; background: var(--accento);
+}
+.sidebar__marca-texto {
+  font-size: var(--fs-13); font-weight: var(--peso-semi); color: var(--texto-principal);
 }
 
 .sidebar__grupo {
-  list-style: none;
-  margin: 0;
-  padding: 0;
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
+  list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px;
 }
-
-.sidebar__grupo--utilitario {
-  margin-top: 0;
-}
-
 .sidebar__divisor {
-  margin: var(--space-2) var(--space-1);
-  border: none;
-  border-top: 1px solid var(--borde-hairline);
+  margin: var(--space-2) var(--space-1); border: none; border-top: 1px solid var(--borde-hairline);
 }
 
 .sidebar__enlace,
 .sidebar__toggle {
-  display: flex;
-  align-items: center;
-  gap: var(--space-2);
-  width: 100%;
-  padding: var(--space-2) var(--space-2);
-  border: 1px solid transparent;
-  border-radius: var(--radio-input);
-  font: inherit;
-  font-size: var(--fs-13);
-  font-weight: var(--peso-medio);
-  color: var(--texto-secundario);
-  background: transparent;
-  text-decoration: none;
-  cursor: pointer;
+  display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 10px;
+  border: 1px solid transparent; border-radius: var(--radio-input); font: inherit;
+  font-size: var(--fs-13); font-weight: var(--peso-medio); color: var(--texto-principal);
+  background: transparent; text-decoration: none; cursor: pointer;
 }
-
-.sidebar__enlace:hover,
-.sidebar__toggle:hover {
-  color: var(--texto-principal);
+.sidebar__enlace:hover { background: var(--fondo-superficie-2); }
+.sidebar__enlace--activo,
+.sidebar__enlace--activo:hover {
+  color: var(--accento-contraste); background: var(--accento); font-weight: var(--peso-semi);
 }
-
-.sidebar__enlace--activo {
-  color: var(--accento-texto);
-  background: var(--accento-suave);
-}
+.sidebar__enlace--inerte { color: var(--texto-secundario); opacity: 0.55; cursor: default; }
+.sidebar__enlace--inerte:hover { background: transparent; }
 
 .sidebar__toggle {
-  margin-top: auto;
+  width: 28px; height: 28px; flex: none; padding: 0; justify-content: center;
   color: var(--texto-secundario);
 }
+.sidebar__toggle:hover { color: var(--texto-principal); }
 
-.sidebar__etiqueta {
-  white-space: nowrap;
-  overflow: hidden;
+.sidebar__etiqueta { white-space: nowrap; overflow: hidden; }
+
+.sidebar__espaciador { flex: 1; }
+
+.sidebar__apariencia {
+  display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
+  padding: var(--space-2); margin-bottom: var(--space-2); border-radius: var(--radio-input);
+  background: var(--fondo-superficie-2);
 }
+.sidebar__apariencia-titulo { font-size: var(--fs-12); color: var(--texto-secundario); }
 
-.sidebar--colapsado .sidebar__etiqueta {
-  width: 0;
-  opacity: 0;
+.sidebar__tema {
+  flex: none; width: 30px; height: 30px; display: inline-flex; align-items: center;
+  justify-content: center; padding: 0; border: 1px solid var(--borde-hairline);
+  border-radius: 50%; background: var(--fondo-superficie); color: var(--texto-secundario);
+  cursor: pointer;
 }
+.sidebar__tema:hover { color: var(--texto-principal); }
+.tema-glifo { width: 13px; height: 13px; border-radius: 50%; }
+.tema-glifo--sol { background: currentColor; box-shadow: 0 0 0 2px currentColor; }
+.tema-glifo--luna { border: 1.4px solid currentColor; box-shadow: inset -3px -2px 0 currentColor; }
 
+.sidebar__perfil {
+  display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2);
+}
+.sidebar__avatar {
+  flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--texto-terciario);
+}
+.sidebar__perfil-datos { display: flex; flex-direction: column; min-width: 0; }
+.sidebar__perfil-nombre {
+  font-size: var(--fs-12); font-weight: var(--peso-semi); color: var(--texto-principal);
+  overflow: hidden; text-overflow: ellipsis;
+}
+.sidebar__perfil-rol { font-size: var(--fs-12); color: var(--texto-secundario); }
+
+/* Estado colapsado (60px). */
+.sidebar--colapsado .sidebar__cabecera,
 .sidebar--colapsado .sidebar__enlace,
-.sidebar--colapsado .sidebar__toggle {
-  justify-content: center;
-  padding-inline: 0;
-}
+.sidebar--colapsado .sidebar__apariencia,
+.sidebar--colapsado .sidebar__perfil { justify-content: center; padding-inline: 0; }
+.sidebar--colapsado .sidebar__divisor { margin-inline: 0; }
+.sidebar--colapsado .sidebar__apariencia { background: transparent; }
+.sidebar--colapsado .sidebar__etiqueta { width: 0; opacity: 0; }
+.sidebar--colapsado .sidebar__marca,
+.sidebar--colapsado .sidebar__apariencia-titulo,
+.sidebar--colapsado .sidebar__perfil-datos { display: none; }
 
-.sidebar--colapsado .sidebar__divisor {
-  margin-inline: 0;
-}
+.sidebar__glifo { flex: none; position: relative; width: 15px; height: 15px; }
+.glifo--proveedores,
+.glifo--errores,
+.glifo--sincronizacion,
+.glifo--configuracion { border: 1.5px solid currentColor; border-radius: 50%; }
+.glifo--proveedores::before,
+.glifo--errores::before,
+.glifo--configuracion::before { content: ''; position: absolute; }
 
-/* --- Glyphs ------------------------------------------------------------------------------------ */
-
-.sidebar__glifo {
-  flex: none;
-  position: relative;
-  width: 16px;
-  height: 16px;
-  color: currentColor;
-}
-
-/* Inbox tray: an open-topped box. */
 .glifo--bandeja {
-  border: 1.5px solid currentColor;
-  border-top: none;
-  border-radius: 0 0 3px 3px;
+  background:
+    linear-gradient(currentColor 0 0) 0 0, linear-gradient(currentColor 0 0) 100% 0,
+    linear-gradient(currentColor 0 0) 0 100%, linear-gradient(currentColor 0 0) 100% 100%;
+  background-size: 6.5px 6.5px; background-repeat: no-repeat;
 }
 
-.glifo--bandeja::before {
-  content: '';
-  position: absolute;
-  inset: -1.5px 2px auto 2px;
-  height: 6px;
-  border: 1.5px solid currentColor;
-  border-bottom: none;
-  border-radius: 3px 3px 0 0;
+.glifo--registro,
+.glifo--plan {
+  display: flex; flex-direction: column; justify-content: center; gap: 2.5px;
+  border-top: 2px solid currentColor;
 }
-
-/* Settings mark: a ring with a centre dot (gear fallback per design D5b). */
-.glifo--configuracion {
-  border: 1.5px solid currentColor;
-  border-radius: 50%;
+.glifo--registro::before,
+.glifo--plan::before,
+.glifo--registro::after,
+.glifo--plan::after { content: ''; height: 2px; border-radius: 1px; background: currentColor; }
+.glifo--registro::before,
+.glifo--plan::before { width: 80%; }
+.glifo--registro::after,
+.glifo--plan::after { width: 55%; }
+.glifo--proveedores::before { inset: 3px; border: 1.4px solid currentColor; border-radius: 50%; }
+.glifo--errores::before {
+  left: 50%; top: 3px; width: 1.6px; height: 8px; background: currentColor;
+  transform: translateX(-50%);
 }
-
-.glifo--configuracion::before {
-  content: '';
-  position: absolute;
-  inset: 5px;
-  border-radius: 50%;
-  background: currentColor;
-}
-
-/* Chevron: a rotated corner. */
-.glifo--chevron {
-  width: 9px;
-  height: 9px;
-  border-left: 1.5px solid currentColor;
-  border-bottom: 1.5px solid currentColor;
-  transform: rotate(45deg);
-  margin-left: 3px;
-}
-
-.sidebar--colapsado .glifo--chevron {
-  transform: rotate(-135deg);
-}
+.glifo--sincronizacion { border-right-color: transparent; transform: rotate(45deg); }
+.glifo--configuracion::before { inset: 4.5px; border-radius: 50%; background: currentColor; }

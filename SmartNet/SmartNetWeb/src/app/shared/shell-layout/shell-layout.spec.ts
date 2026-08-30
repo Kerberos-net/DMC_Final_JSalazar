@@ -1,13 +1,21 @@
+import { provideHttpClient } from '@angular/common/http';
+import { provideHttpClientTesting } from '@angular/common/http/testing';
 import { TestBed } from '@angular/core/testing';
 import { provideRouter } from '@angular/router';
+import { afterEach, beforeEach, describe, expect, it } from 'vitest';
 import { ShellLayout } from './shell-layout';
 
+/**
+ * spec `spa-shell-nav` (canvas replica, `Gestor de Facturas.dc.html`): the authenticated shell has
+ * NO top header bar. Product identity, the theme `<select>` ("Apariencia" card) and the profile
+ * row live in the sidebar; the routed screen owns its own page title.
+ */
 describe('ShellLayout', () => {
   beforeEach(async () => {
     localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [ShellLayout],
-      providers: [provideRouter([])],
+      providers: [provideRouter([]), provideHttpClient(), provideHttpClientTesting()],
     }).compileComponents();
   });
 
@@ -18,46 +26,55 @@ describe('ShellLayout', () => {
     expect(fixture.componentInstance).toBeTruthy();
   });
 
-  it('renders the theme control as a native <select> with system/light/dark options', () => {
-    const fixture = TestBed.createComponent(ShellLayout);
-    fixture.detectChanges();
-
-    const control = fixture.nativeElement.querySelector(
-      '[data-testid="selector-tema"]'
-    ) as HTMLSelectElement;
-    expect(control.tagName).toBe('SELECT');
-    expect(Array.from(control.options).map((o) => o.value)).toEqual(['sistema', 'claro', 'oscuro']);
-  });
-
-  it('does not introduce a sun/moon toggle or an "Apariencia" sidebar control', () => {
+  it('places a sol/luna theme toggle button inside the sidebar "Apariencia" card', () => {
     const fixture = TestBed.createComponent(ShellLayout);
     fixture.detectChanges();
 
     const root: HTMLElement = fixture.nativeElement;
-    expect(root.querySelector('[data-testid="toggle-tema"]')).toBeNull();
-    expect(root.textContent).not.toContain('Apariencia');
+    const apariencia = root.querySelector('app-sidebar [data-testid="apariencia"]');
+    expect(apariencia).not.toBeNull();
+    expect(apariencia!.textContent).toContain('Apariencia');
+
+    const boton = apariencia!.querySelector('[data-testid="toggle-tema"]') as HTMLButtonElement;
+    expect(boton).not.toBeNull();
+    expect(boton.tagName).toBe('BUTTON');
+    expect(root.querySelector('[data-testid="selector-tema"]')).toBeNull();
   });
 
-  it('shows the product marca in the shell header', () => {
+  it('the toggle flips the effective theme and persists an explicit choice', () => {
+    localStorage.setItem('fact.tema', 'claro');
     const fixture = TestBed.createComponent(ShellLayout);
     fixture.detectChanges();
 
-    const marca = fixture.nativeElement.querySelector('.app-shell__marca') as HTMLElement;
-    expect(marca.textContent).toContain('Gestor de Facturas de Compra');
+    const boton = fixture.nativeElement.querySelector(
+      '[data-testid="toggle-tema"]'
+    ) as HTMLButtonElement;
+    boton.click();
+    fixture.detectChanges();
 
-    const badge = marca.querySelector('[data-testid="logo-badge"]') as HTMLElement;
-    expect(badge.textContent?.trim()).toBe('GF');
+    expect(localStorage.getItem('fact.tema')).toBe('oscuro');
+    expect(document.documentElement.dataset['tema']).toBe('oscuro');
   });
 
-  it('renders a <router-outlet> below the header for the authenticated screens', () => {
+  it('has no top header bar — the marca lives in the sidebar', () => {
     const fixture = TestBed.createComponent(ShellLayout);
     fixture.detectChanges();
 
-    const header = fixture.nativeElement.querySelector('.app-shell__header') as HTMLElement;
-    const outlet = fixture.nativeElement.querySelector('router-outlet') as HTMLElement;
-    expect(header).not.toBeNull();
+    const root: HTMLElement = fixture.nativeElement;
+    expect(root.querySelector('.app-shell__header')).toBeNull();
+
+    const marca = root.querySelector('app-sidebar .sidebar__marca') as HTMLElement;
+    expect(marca.textContent).toContain('Facturas de Compra');
+    expect(marca.querySelector('[data-testid="logo-badge"]')).not.toBeNull();
+  });
+
+  it('renders a <router-outlet> in the main content area', () => {
+    const fixture = TestBed.createComponent(ShellLayout);
+    fixture.detectChanges();
+
+    const main = fixture.nativeElement.querySelector('.app-shell__main') as HTMLElement;
+    const outlet = main.querySelector('router-outlet') as HTMLElement;
     expect(outlet).not.toBeNull();
-    expect(header.compareDocumentPosition(outlet) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 
   it('renders the sidebar navigation inside the shell', () => {

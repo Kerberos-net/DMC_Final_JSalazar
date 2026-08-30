@@ -1,49 +1,128 @@
 <nav class="sidebar" [class.sidebar--colapsado]="colapsado()" aria-label="Navegación principal">
+  <div class="sidebar__cabecera">
+    <button
+      type="button"
+      class="sidebar__toggle"
+      data-testid="nav-toggle"
+      (click)="alternar.emit()"
+      [attr.aria-label]="colapsado() ? 'Expandir la barra lateral' : 'Colapsar la barra lateral'"
+      [attr.aria-pressed]="colapsado()"
+    >
+      <span class="sidebar__hamburguesa" aria-hidden="true">
+        <span></span><span></span><span></span>
+      </span>
+    </button>
+    <span class="sidebar__marca">
+      <span class="sidebar__logo" data-testid="logo-badge" aria-hidden="true"></span>
+      <span class="sidebar__etiqueta sidebar__marca-texto">Facturas de Compra</span>
+    </span>
+  </div>
+
   <ul class="sidebar__grupo">
-    <li>
-      <a
-        class="sidebar__enlace"
-        data-testid="nav-bandeja"
-        routerLink="/bandeja"
-        routerLinkActive="sidebar__enlace--activo"
-        aria-label="Bandeja"
-      >
-        <div class="sidebar__glifo glifo glifo--bandeja" data-testid="nav-glifo" aria-hidden="true"></div>
-        <span class="sidebar__etiqueta">Bandeja</span>
-      </a>
-    </li>
+    @for (destino of primarios; track destino.testid) {
+      <li>
+        @if (destino.ruta) {
+          <a
+            class="sidebar__enlace"
+            [attr.data-testid]="destino.testid"
+            [routerLink]="destino.ruta"
+            routerLinkActive="sidebar__enlace--activo"
+            [attr.aria-label]="destino.etiqueta"
+          >
+            <span
+              class="sidebar__glifo glifo glifo--{{ destino.glifo }}"
+              data-testid="nav-glifo"
+              aria-hidden="true"
+            ></span>
+            <span class="sidebar__etiqueta">{{ destino.etiqueta }}</span>
+          </a>
+        } @else {
+          <span
+            class="sidebar__enlace sidebar__enlace--inerte"
+            [attr.data-testid]="destino.testid"
+            aria-disabled="true"
+            [attr.aria-label]="destino.etiqueta + ' (disponible próximamente)'"
+            title="Disponible próximamente"
+          >
+            <span
+              class="sidebar__glifo glifo glifo--{{ destino.glifo }}"
+              data-testid="nav-glifo"
+              aria-hidden="true"
+            ></span>
+            <span class="sidebar__etiqueta">{{ destino.etiqueta }}</span>
+          </span>
+        }
+      </li>
+    }
   </ul>
 
   <hr class="sidebar__divisor" data-testid="nav-divisor" />
 
   <ul class="sidebar__grupo sidebar__grupo--utilitario">
-    <li>
-      <a
-        class="sidebar__enlace"
-        data-testid="nav-configuracion"
-        routerLink="/configuracion"
-        routerLinkActive="sidebar__enlace--activo"
-        aria-label="Configuración"
-      >
-        <div
-          class="sidebar__glifo glifo glifo--configuracion"
-          data-testid="nav-glifo"
-          aria-hidden="true"
-        ></div>
-        <span class="sidebar__etiqueta">Configuración</span>
-      </a>
-    </li>
+    @for (destino of utilitarios; track destino.testid) {
+      <li>
+        @if (destino.ruta) {
+          <a
+            class="sidebar__enlace"
+            [attr.data-testid]="destino.testid"
+            [routerLink]="destino.ruta"
+            routerLinkActive="sidebar__enlace--activo"
+            [attr.aria-label]="destino.etiqueta"
+          >
+            <span
+              class="sidebar__glifo glifo glifo--{{ destino.glifo }}"
+              data-testid="nav-glifo"
+              aria-hidden="true"
+            ></span>
+            <span class="sidebar__etiqueta">{{ destino.etiqueta }}</span>
+          </a>
+        } @else {
+          <span
+            class="sidebar__enlace sidebar__enlace--inerte"
+            [attr.data-testid]="destino.testid"
+            aria-disabled="true"
+            [attr.aria-label]="destino.etiqueta + ' (disponible próximamente)'"
+            title="Disponible próximamente"
+          >
+            <span
+              class="sidebar__glifo glifo glifo--{{ destino.glifo }}"
+              data-testid="nav-glifo"
+              aria-hidden="true"
+            ></span>
+            <span class="sidebar__etiqueta">{{ destino.etiqueta }}</span>
+          </span>
+        }
+      </li>
+    }
   </ul>
 
-  <button
-    type="button"
-    class="sidebar__toggle"
-    data-testid="nav-toggle"
-    (click)="alternar.emit()"
-    [attr.aria-label]="colapsado() ? 'Expandir la barra lateral' : 'Colapsar la barra lateral'"
-    [attr.aria-pressed]="colapsado()"
-  >
-    <div class="sidebar__glifo glifo glifo--chevron" aria-hidden="true"></div>
-    <span class="sidebar__etiqueta">Colapsar</span>
-  </button>
+  <div class="sidebar__espaciador"></div>
+
+  <div class="sidebar__apariencia" data-testid="apariencia">
+    <span class="sidebar__etiqueta sidebar__apariencia-titulo">Apariencia</span>
+    <button
+      type="button"
+      class="sidebar__tema"
+      data-testid="toggle-tema"
+      (click)="alternarTema.emit()"
+      [attr.aria-label]="etiquetaTema()"
+      [attr.aria-pressed]="esOscuro()"
+      [title]="etiquetaTema()"
+    >
+      <span
+        class="tema-glifo"
+        [class.tema-glifo--luna]="esOscuro()"
+        [class.tema-glifo--sol]="!esOscuro()"
+        aria-hidden="true"
+      ></span>
+    </button>
+  </div>
+
+  <div class="sidebar__perfil" data-testid="perfil">
+    <span class="sidebar__avatar" aria-hidden="true"></span>
+    <span class="sidebar__etiqueta sidebar__perfil-datos">
+      <span class="sidebar__perfil-nombre">{{ nombreUsuario() }}</span>
+      <span class="sidebar__perfil-rol">Asistente contable</span>
+    </span>
+  </div>
 </nav>
