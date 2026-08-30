@@ -50,16 +50,21 @@ describe('Sidebar', () => {
 
     const bandeja = root.querySelector('[data-testid="nav-bandeja"]')!;
     const configuracion = root.querySelector('[data-testid="nav-configuracion"]')!;
+    const planContable = root.querySelector('[data-testid="nav-plan-contable"]')!;
     expect(bandeja.tagName).toBe('A');
     expect(configuracion.tagName).toBe('A');
+    expect(planContable.tagName).toBe('A');
     expect(
       bandeja.getAttribute('ng-reflect-router-link') ?? bandeja.getAttribute('href')
     ).toContain('bandeja');
     expect(
       configuracion.getAttribute('ng-reflect-router-link') ?? configuracion.getAttribute('href')
     ).toContain('configuracion');
+    expect(
+      planContable.getAttribute('ng-reflect-router-link') ?? planContable.getAttribute('href')
+    ).toContain('catalogos/plan-contable');
 
-    for (const testid of ['nav-registro', 'nav-proveedores', 'nav-plan-contable', 'nav-errores', 'nav-sincronizacion']) {
+    for (const testid of ['nav-registro', 'nav-proveedores', 'nav-errores', 'nav-sincronizacion']) {
       const inerte = root.querySelector(`[data-testid="${testid}"]`)!;
       expect(inerte.tagName).not.toBe('A');
       expect(inerte.getAttribute('aria-disabled')).toBe('true');

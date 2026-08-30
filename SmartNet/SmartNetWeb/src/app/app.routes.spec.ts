@@ -31,4 +31,16 @@ describe('app.routes', () => {
       expect.arrayContaining(['bandeja', 'detalle/:id', 'configuracion'])
     );
   });
+
+  // BACKLOG #22 PR4 (spa spec req 1) -- the catalog screens are additive lazy ShellLayout
+  // children under the grouped `catalogos/` prefix, each behind `authGuard`. Additive: the
+  // `arrayContaining` assertions above still hold.
+  it('registers catalogos/plan-contable as a guarded lazy child of the shell', () => {
+    const ruta = (shellParent?.children ?? []).find(
+      (c: Route) => c.path === 'catalogos/plan-contable'
+    );
+    expect(ruta).toBeDefined();
+    expect((ruta?.canActivate?.length ?? 0) > 0).toBe(true);
+    expect(typeof ruta?.loadComponent).toBe('function');
+  });
 });
