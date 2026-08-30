@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "create-harness": {
+      "source": "adminoryslabs/Armory",
+      "sourceType": "github",
+      "skillPath": "skills/create-harness/SKILL.md",
+      "computedHash": "f1ae272beac675822b3bcc5fe8f2024fa4e1a52bbd1764c9742c93cc885077bb"
+    },
     "generar-backlog": {
       "source": "adminoryslabs/Skills",
       "sourceType": "github",
@@ -24,6 +30,12 @@
       "sourceType": "github",
       "skillPath": "skills/revision-adversarial/SKILL.md",
       "computedHash": "665292baf3d60cab35610557052d21b2aebedd483cd5f82dad4924e2a988cb07"
+    },
+    "security-pass": {
+      "source": "adminoryslabs/Armory",
+      "sourceType": "github",
+      "skillPath": "skills/security-pass/SKILL.md",
+      "computedHash": "f2443bf5b3505b8bb1ef023127541b815b94541c747b8fd552ba2101de2a3eb5"
     }
   }
 }
