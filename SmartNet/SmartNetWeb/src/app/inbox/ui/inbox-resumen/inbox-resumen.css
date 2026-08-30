@@ -1,0 +1,32 @@
+/* BACKLOG #21 (spa-visual-bandeja): dashboard summary strip. Layout/composition only, every
+ * colour via a global token; sits outside the @layer stack. */
+
+.inbox-resumen {
+  list-style: none;
+  margin: 0 0 var(--space-4);
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  gap: var(--space-3);
+}
+
+.inbox-resumen__tarjeta {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-1);
+}
+
+.inbox-resumen__etiqueta {
+  font-size: var(--fs-12);
+  font-weight: var(--peso-semi);
+  color: var(--texto-secundario);
+  text-transform: uppercase;
+  letter-spacing: 0.02em;
+}
+
+.inbox-resumen__valor {
+  font-size: var(--fs-24);
+  font-weight: var(--peso-semi);
+  font-variant-numeric: tabular-nums;
+  color: var(--texto-principal);
+}

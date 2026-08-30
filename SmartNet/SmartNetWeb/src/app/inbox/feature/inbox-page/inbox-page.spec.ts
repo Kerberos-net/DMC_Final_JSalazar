@@ -20,6 +20,12 @@ describe('InboxPage', () => {
     facturaId: null,
     proveedorCodigo: null,
     rucProveedor: null,
+    proveedorNombre: null,
+    tipoComprobante: null,
+    numero: null,
+    totalOrig: null,
+    moneda: null,
+    fechaEmision: null,
     indicadores: null,
     motivoDescarte: null,
     errores: [
@@ -206,6 +212,71 @@ describe('InboxPage', () => {
       '[data-testid="inbox-subtitulo"]'
     );
     expect(subtitulo.textContent?.trim().length).toBeGreaterThan(0);
+  });
+
+  it('renders the four global summary cards from the resumen aggregate, not derived from items', async () => {
+    const fixture = TestBed.createComponent(InboxPage);
+    fixture.detectChanges();
+    httpMock.expectOne(() => true).flush({
+      items: [],
+      pagina: 1,
+      tamanioPagina: 20,
+      totalRegistros: 0,
+      totalPaginas: 0,
+      resumen: { pendientes: 12, validadas: 40, conError: 3, alertas: 5, descartadas: 7, total: 67 },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+
+    const resumen = fixture.nativeElement.querySelector('app-inbox-resumen');
+    expect(resumen).not.toBeNull();
+    const valores = Array.from(
+      resumen.querySelectorAll('[data-testid="tarjeta-valor"]')
+    ).map((v: any) => v.textContent.trim());
+    // 40 "Validadas" while items() is empty proves the numbers are not derived from the list.
+    expect(valores).toEqual(['12', '40', '3', '5']);
+  });
+
+  it('keeps the card numbers stable when a filter changes and the server returns the same resumen', async () => {
+    const fixture = TestBed.createComponent(InboxPage);
+    fixture.detectChanges();
+    const envelope = (over: object) => ({
+      items: [],
+      pagina: 1,
+      tamanioPagina: 20,
+      totalRegistros: 0,
+      totalPaginas: 0,
+      resumen: { pendientes: 9, validadas: 1, conError: 0, alertas: 2, descartadas: 0, total: 12 },
+      ...over,
+    });
+    httpMock.expectOne(() => true).flush(envelope({}));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+
+    fixture.componentInstance.onEstadoChange('PROMOVIDO');
+    fixture.detectChanges();
+    httpMock.expectOne((r) => r.params.get('estado') === 'PROMOVIDO').flush(envelope({}));
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+
+    const valores = Array.from(
+      fixture.nativeElement.querySelectorAll('app-inbox-resumen [data-testid="tarjeta-valor"]')
+    ).map((v: any) => v.textContent.trim());
+    expect(valores).toEqual(['9', '1', '0', '2']);
+  });
+
+  it('renders no summary strip before the first load completes', () => {
+    const fixture = TestBed.createComponent(InboxPage);
+    fixture.detectChanges();
+    expect(fixture.nativeElement.querySelector('app-inbox-resumen')).toBeNull();
+    httpMock.expectOne(() => true).flush({
+      items: [],
+      pagina: 1,
+      tamanioPagina: 20,
+      totalRegistros: 0,
+      totalPaginas: 0,
+      resumen: { pendientes: 0, validadas: 0, conError: 0, alertas: 0, descartadas: 0, total: 0 },
+    });
   });
 
   it('lays out header -> filter -> list -> dialog in document order', () => {

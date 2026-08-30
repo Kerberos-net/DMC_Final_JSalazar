@@ -5,10 +5,12 @@
 Apply the design tokens and the #18 visual playbook to the five inbox/bandeja
 components (`inbox-page`, `inbox-filter`, `inbox-list`, `panel-errores`,
 `confirmar-reproceso`) so the screen matches the design handoff (§2 dashboard,
-§5 panel de errores) using ONLY data already present on `BandejaItem`. This is
-CSS and template structure only; the #13 functional behavior (bandeja query,
-filter semantics, pagination, `chipsDe()` per-indicator logic, reprocesar
-5-minute window, `inbox.service.ts`) is frozen and MUST NOT change.
+§5 panel de errores). Item #20 did this using ONLY data already present on
+`BandejaItem`; item #21 delivers the rest of the §2 dashboard — the enriched
+row columns and the summary cards — and therefore DELIBERATELY UNFREEZES the
+#13 bandeja query and `inbox.service.ts` for those additions. Still frozen and
+MUST NOT change: filter semantics, pagination, the `chipsDe()` per-indicator
+list column, and the reprocesar 5-minute window.
 
 ## Requirements
 
@@ -63,11 +65,23 @@ blocks. The filter inputs and their bound signals MUST remain unchanged from
 
 ### Requirement: inbox-list table with derived Estado chip column
 
-The system MUST render `inbox-list` as a `.tabla` with a component-scoped
-tabular-figures treatment on the date cell (NOT the global right-aligning
-`.tabular-nums` primitive, which is wrong for a left-aligned date) and an
-uppercase small-caps header row. The system MUST add one ADDITIVE derived
-"Estado" chip column computed per row, FIRST MATCH WINS, in this precedence:
+The system MUST render `inbox-list` as a `.tabla` with the handoff §2 compras
+columns in this order: `Recibido` (`creadoEn`), `F. emisión`, `Proveedor`
+(display name), `Tipo` (comprobante), `Número`, `Monto` (with `Moneda`),
+`Estado`, `Detalle`, `Indicadores`, `Acciones`. The `Recibido`, `F. emisión`
+and `Monto` cells MUST carry a component-scoped tabular-figures class (NOT the
+global right-aligning `.tabular-nums` primitive); `Monto` is right-aligned,
+the two dates left-aligned. The header row is uppercase small-caps.
+
+`Tipo` MUST be rendered from a CLIENT-SIDE display-name map of the API code:
+`01` → "Factura", `03` → "Boleta", `07` → "Nota de crédito"; any other non-null
+code renders verbatim. Every factura-only cell (`F. emisión`, `Proveedor`,
+`Tipo`, `Número`, `Monto`) MUST render "—" when its value is null — this
+covers both `origen === 'INCIDENCIA'` rows and a `FACTURA` row missing a field
+(e.g. an unextracted `numero`).
+
+The system MUST keep one ADDITIVE derived "Estado" chip column computed per row,
+FIRST MATCH WINS, in this precedence:
 
 1. `estadoConsumo === 'DESCARTADO'` → `.chip--descartada` "Descartada"
    (unconditional — wins even when the row still carries error history)
@@ -110,10 +124,62 @@ list column MUST remain unchanged.
 #### Scenario: Date cell uses component-scoped tabular figures
 
 - GIVEN any inbox-list row
-- WHEN the date cell renders
-- THEN it carries a component-scoped tabular-figures class
+- WHEN the `Recibido` and `F. emisión` cells render
+- THEN each carries a component-scoped tabular-figures class
   (`.inbox-list__fecha`, `font-variant-numeric: tabular-nums`, left-aligned),
-  not the global `.tabular-nums` primitive
+  not the global `.tabular-nums` primitive, and `Monto` carries
+  `.inbox-list__monto` (tabular, right-aligned)
+
+#### Scenario: FACTURA row renders the compras columns
+
+- GIVEN a `BandejaItem` with `origen === 'FACTURA'` and enriched fields present
+- WHEN the row renders
+- THEN it shows proveedor name, the mapped comprobante tipo, número,
+  monto + moneda, and fecha de emisión
+
+#### Scenario: INCIDENCIA row shows em dashes for factura-only cells
+
+- GIVEN a `BandejaItem` with `origen === 'INCIDENCIA'` (enriched fields null)
+- WHEN the row renders
+- THEN the `F. emisión`, `Proveedor`, `Tipo`, `Número` and `Monto` cells each
+  render "—", and the derived Estado chip still renders
+
+#### Scenario: Comprobante code is mapped client-side
+
+- GIVEN a row whose API `tipoComprobante` is `01`
+- WHEN the tipo cell renders
+- THEN it displays "Factura" (the API response still carries the code `01`)
+
+### Requirement: inbox-page global summary cards
+
+The system MUST render four summary cards in `inbox-page` — "Pendientes",
+"Validadas", "Con error", "Alertas" — fed from the bandeja estado aggregate
+(`resumen` on the `GET /api/bandeja` envelope). The cards MUST show GLOBAL
+totals: independent of the active filter signals and of the current page. The
+cards MUST be display-only — they MUST NOT act as filter shortcuts and MUST
+NOT mutate any filter signal on interaction. Card values map to aggregate
+buckets: Pendientes ← `pendientes`, Validadas ← `validadas`, Con error ←
+`conError`, Alertas ← `alertas`. `descartadas` and `total` MUST NOT be
+rendered. The strip MUST render nothing before the first load completes
+(`resumen` is null).
+
+#### Scenario: Cards show global totals regardless of filters
+
+- GIVEN the aggregate reports pendientes=12, validadas=40, conError=3, alertas=5
+- WHEN the user applies an `estado=PENDIENTE` filter and moves to page 2
+- THEN the four cards still show 12 / 40 / 3 / 5
+
+#### Scenario: Cards are not filter shortcuts
+
+- GIVEN the summary cards are rendered
+- WHEN the user activates the "Con error" card
+- THEN no filter signal changes and the list query is not re-issued
+
+#### Scenario: Validadas card is non-zero when promoted rows exist
+
+- GIVEN promoted facturas exist that the default list view excludes
+- WHEN `inbox-page` renders after the first load
+- THEN the "Validadas" card shows the promoted count, not 0
 
 ### Requirement: panel-errores restrained card treatment
 
@@ -169,12 +235,15 @@ and over their own `--estado-error-fondo` / `--estado-alerta-fondo`.
 
 ## Out of Scope
 
-- Summary/counter cards (Pendientes/Validadas/Con error/Alertas) — BACKLOG #21
-- Rich data columns (proveedor display name, monto, moneda, número, tipo,
-  fecha de emisión, glosa, tipo de cambio, base imponible, IGV) — BACKLOG #21
+- `glosa`, `tipo de cambio`, `base imponible`, `IGV` row columns — BACKLOG #19
+  / future
 - The standalone BACKLOG #17 "Errores y notificaciones" route and its
   `panel-errores` spec
 - `configuracion/*`
-- Any change to the #13 bandeja query, filter semantics, pagination,
-  `chipsDe()` per-indicator logic, reprocesar 5-minute window, or
-  `inbox.service.ts`
+- Any change to the bandeja filter semantics, pagination, the `chipsDe()`
+  per-indicator list column, or the reprocesar 5-minute window
+
+(Item #21 moved the summary cards and the enriched row columns — proveedor
+display name, monto, moneda, número, tipo, fecha de emisión — IN scope, and
+with them the #13 bandeja query and `inbox.service.ts` are no longer frozen
+for additive read fields.)

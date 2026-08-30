@@ -1,0 +1,8 @@
+<ul class="inbox-resumen" aria-label="Resumen de la bandeja">
+  @for (tarjeta of tarjetas(); track tarjeta.etiqueta) {
+    <li class="inbox-resumen__tarjeta panel" data-testid="tarjeta-resumen">
+      <span class="inbox-resumen__etiqueta" data-testid="tarjeta-etiqueta">{{ tarjeta.etiqueta }}</span>
+      <span class="inbox-resumen__valor" data-testid="tarjeta-valor">{{ tarjeta.valor }}</span>
+    </li>
+  }
+</ul>

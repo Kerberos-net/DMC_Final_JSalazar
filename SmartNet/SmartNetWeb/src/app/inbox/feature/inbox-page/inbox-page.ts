@@ -2,6 +2,7 @@ import { ChangeDetectionStrategy, Component, effect, inject, signal, viewChild }
 import { InboxService } from '../../data-access/inbox.service';
 import { InboxFilter } from '../../ui/inbox-filter/inbox-filter';
 import { InboxList } from '../../ui/inbox-list/inbox-list';
+import { InboxResumen } from '../../ui/inbox-resumen/inbox-resumen';
 import { ConfirmarReproceso } from '../../ui/confirmar-reproceso/confirmar-reproceso';
 import { EstadoConsumo, OrdenFecha } from '../../models/bandeja-item.model';
 
@@ -16,7 +17,7 @@ import { EstadoConsumo, OrdenFecha } from '../../models/bandeja-item.model';
 @Component({
   selector: 'app-inbox-page',
   standalone: true,
-  imports: [InboxFilter, InboxList, ConfirmarReproceso],
+  imports: [InboxFilter, InboxList, InboxResumen, ConfirmarReproceso],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './inbox-page.html',
   styleUrl: './inbox-page.css',
@@ -39,6 +40,7 @@ export class InboxPage {
   readonly items = this.inboxService.items;
   readonly loading = this.inboxService.loading;
   readonly error = this.inboxService.error;
+  readonly resumen = this.inboxService.resumen;
   readonly totalPaginas = this.inboxService.totalPaginas;
 
   constructor() {

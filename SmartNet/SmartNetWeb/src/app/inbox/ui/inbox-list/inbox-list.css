@@ -23,6 +23,14 @@
   white-space: nowrap;
 }
 
+/* Money column: tabular figures, right-aligned (design D5 / D7). Component-scoped, NOT the global
+ * .tabular-nums primitive -- the header cell carries the same class for alignment. */
+.inbox-list__monto {
+  font-variant-numeric: tabular-nums;
+  text-align: right;
+  white-space: nowrap;
+}
+
 .inbox-list__indicadores .chip {
   margin: 0 var(--space-1) var(--space-1) 0;
 }

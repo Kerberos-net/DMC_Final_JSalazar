@@ -4,7 +4,35 @@ import { InboxList } from './inbox-list';
 import { BandejaItem } from '../../models/bandeja-item.model';
 
 describe('InboxList', () => {
+  // BACKLOG #21 comprobante fields — null on INCIDENCIA rows, present on FACTURA rows.
+  interface Campos21 {
+    proveedorNombre: string | null;
+    tipoComprobante: string | null;
+    numero: string | null;
+    totalOrig: number | null;
+    moneda: string | null;
+    fechaEmision: string | null;
+  }
+  const CAMPOS_21_NULOS: Campos21 = {
+    proveedorNombre: null,
+    tipoComprobante: null,
+    numero: null,
+    totalOrig: null,
+    moneda: null,
+    fechaEmision: null,
+  };
+  const camposFactura = (over: Partial<Campos21> = {}): Campos21 => ({
+    proveedorNombre: 'Comercial Andina EIRL',
+    tipoComprobante: '01',
+    numero: 'F001-1',
+    totalOrig: 1180,
+    moneda: 'PEN',
+    fechaEmision: '2026-08-10',
+    ...over,
+  });
+
   const promovido: BandejaItem = {
+    ...camposFactura({ tipoComprobante: '07', numero: 'F123-456', totalOrig: 4200.5, moneda: 'USD' }),
     inboxEventId: 1,
     procesamientoId: 101,
     origen: 'FACTURA',
@@ -26,6 +54,7 @@ describe('InboxList', () => {
   };
 
   const descartado: BandejaItem = {
+    ...CAMPOS_21_NULOS,
     inboxEventId: 2,
     procesamientoId: 102,
     origen: 'INCIDENCIA',
@@ -41,6 +70,7 @@ describe('InboxList', () => {
   };
 
   const pendiente: BandejaItem = {
+    ...CAMPOS_21_NULOS,
     inboxEventId: 3,
     procesamientoId: 103,
     origen: 'INCIDENCIA',
@@ -56,6 +86,7 @@ describe('InboxList', () => {
   };
 
   const incidenciaConErrores: BandejaItem = {
+    ...CAMPOS_21_NULOS,
     inboxEventId: 4,
     procesamientoId: 104,
     origen: 'INCIDENCIA',
@@ -79,6 +110,7 @@ describe('InboxList', () => {
   };
 
   const facturaConErroresBloqueada: BandejaItem = {
+    ...camposFactura({ numero: 'F001-5' }),
     inboxEventId: 5,
     procesamientoId: 105,
     origen: 'FACTURA',
@@ -108,6 +140,7 @@ describe('InboxList', () => {
   };
 
   const descartadoConErrores: BandejaItem = {
+    ...CAMPOS_21_NULOS,
     inboxEventId: 6,
     procesamientoId: 106,
     origen: 'INCIDENCIA',
@@ -131,6 +164,7 @@ describe('InboxList', () => {
   };
 
   const promovidoLimpio: BandejaItem = {
+    ...camposFactura({ numero: 'F001-7' }),
     inboxEventId: 7,
     procesamientoId: 107,
     origen: 'FACTURA',
@@ -276,12 +310,87 @@ describe('InboxList', () => {
       expect(fixture.nativeElement.querySelector('table.tabla')).not.toBeNull();
     });
 
-    it('keeps every existing column header in order', () => {
+    it('renders the handoff §2 compras columns in order (BACKLOG #21)', () => {
       const fixture = createComponent([promovido]);
       const headers = Array.from(
         fixture.nativeElement.querySelectorAll('thead th')
       ).map((h) => (h as HTMLElement).textContent?.trim());
-      expect(headers).toEqual(['Fecha', 'Estado', 'Detalle', 'Indicadores', 'Acciones']);
+      expect(headers).toEqual([
+        'Recibido',
+        'F. emisión',
+        'Proveedor',
+        'Tipo',
+        'Número',
+        'Monto',
+        'Estado',
+        'Detalle',
+        'Indicadores',
+        'Acciones',
+      ]);
+    });
+
+    it('renders the compras cells for a FACTURA row, comprobante code mapped client-side', () => {
+      const fixture = createComponent([promovido]);
+      const row: HTMLElement = fixture.nativeElement.querySelector('[data-testid="inbox-row-1"]');
+      expect(row.querySelector('[data-testid="celda-proveedor"]')!.textContent).toContain(
+        'Comercial Andina EIRL'
+      );
+      expect(row.querySelector('[data-testid="celda-tipo"]')!.textContent?.trim()).toBe(
+        'Nota de crédito'
+      );
+      expect(row.querySelector('[data-testid="celda-numero"]')!.textContent?.trim()).toBe('F123-456');
+      expect(row.querySelector('[data-testid="celda-monto"]')!.textContent).toContain('USD');
+      expect(row.querySelector('[data-testid="celda-fecha-emision"]')!.textContent?.trim().length)
+        .toBeGreaterThan(0);
+    });
+
+    it('maps 01 -> Factura and 03 -> Boleta', () => {
+      const f1 = createComponent([{ ...promovido, tipoComprobante: '01' }]);
+      expect(
+        f1.nativeElement.querySelector('[data-testid="celda-tipo"]').textContent?.trim()
+      ).toBe('Factura');
+      const f3 = createComponent([{ ...promovido, tipoComprobante: '03' }]);
+      expect(
+        f3.nativeElement.querySelector('[data-testid="celda-tipo"]').textContent?.trim()
+      ).toBe('Boleta');
+    });
+
+    it('renders an unknown comprobante code verbatim', () => {
+      const fixture = createComponent([{ ...promovido, tipoComprobante: '99' }]);
+      expect(
+        fixture.nativeElement.querySelector('[data-testid="celda-tipo"]').textContent?.trim()
+      ).toBe('99');
+    });
+
+    it('renders "—" in every factura-only cell for an INCIDENCIA row', () => {
+      const fixture = createComponent([pendiente]);
+      const row: HTMLElement = fixture.nativeElement.querySelector('[data-testid="inbox-row-3"]');
+      for (const testid of [
+        'celda-fecha-emision',
+        'celda-proveedor',
+        'celda-tipo',
+        'celda-numero',
+        'celda-monto',
+      ]) {
+        expect(row.querySelector(`[data-testid="${testid}"]`)!.textContent?.trim()).toBe('—');
+      }
+    });
+
+    it('gives the date and monto cells a component-scoped tabular-figures class, not the global one', () => {
+      const fixture = createComponent([promovido]);
+      const row: HTMLElement = fixture.nativeElement.querySelector('[data-testid="inbox-row-1"]');
+      const fechaEmision = row.querySelector('[data-testid="celda-fecha-emision"]') as HTMLElement;
+      const monto = row.querySelector('[data-testid="celda-monto"]') as HTMLElement;
+      expect(fechaEmision.classList.contains('inbox-list__fecha')).toBe(true);
+      expect(fechaEmision.classList.contains('tabular-nums')).toBe(false);
+      expect(monto.classList.contains('inbox-list__monto')).toBe(true);
+      expect(monto.classList.contains('tabular-nums')).toBe(false);
+    });
+
+    it('widens the empty-state colspan to 10', () => {
+      const fixture = createComponent([]);
+      const celda = fixture.nativeElement.querySelector('[data-testid="inbox-vacio"]') as HTMLElement;
+      expect(celda.getAttribute('colspan')).toBe('10');
     });
 
     it('renders exactly one chip-estado per row', () => {

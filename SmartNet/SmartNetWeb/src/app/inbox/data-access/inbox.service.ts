@@ -1,7 +1,12 @@
 import { HttpClient, HttpParams } from '@angular/common/http';
 import { Injectable, inject, signal } from '@angular/core';
 import { firstValueFrom } from 'rxjs';
-import { BandejaItem, FiltrosBandeja, PaginaBandeja } from '../models/bandeja-item.model';
+import {
+  BandejaItem,
+  FiltrosBandeja,
+  PaginaBandeja,
+  ResumenBandeja,
+} from '../models/bandeja-item.model';
 
 /**
  * Server state for the Inbox screen (ADR 0009: signals in `providedIn: 'root'` services,
@@ -20,6 +25,7 @@ export class InboxService {
   private readonly tamanioPaginaSignal = signal(20);
   private readonly totalRegistrosSignal = signal(0);
   private readonly totalPaginasSignal = signal(0);
+  private readonly resumenSignal = signal<ResumenBandeja | null>(null);
   private readonly ultimosFiltrosSignal = signal<FiltrosBandeja>({});
 
   readonly items = this.itemsSignal.asReadonly();
@@ -29,6 +35,8 @@ export class InboxService {
   readonly tamanioPagina = this.tamanioPaginaSignal.asReadonly();
   readonly totalRegistros = this.totalRegistrosSignal.asReadonly();
   readonly totalPaginas = this.totalPaginasSignal.asReadonly();
+  /** BACKLOG #21 -- global estado aggregate for the summary cards; `null` until the first load. */
+  readonly resumen = this.resumenSignal.asReadonly();
   /** design.md Data Flow -- reused by `InboxPage` to refetch the same page after `reprocesar()`. */
   readonly ultimosFiltros = this.ultimosFiltrosSignal.asReadonly();
 
@@ -62,6 +70,7 @@ export class InboxService {
       this.tamanioPaginaSignal.set(respuesta.tamanioPagina);
       this.totalRegistrosSignal.set(respuesta.totalRegistros);
       this.totalPaginasSignal.set(respuesta.totalPaginas);
+      this.resumenSignal.set(respuesta.resumen ?? null);
       this.ultimosFiltrosSignal.set(filtros);
     } catch (err) {
       this.errorSignal.set('No se pudo cargar la bandeja.');

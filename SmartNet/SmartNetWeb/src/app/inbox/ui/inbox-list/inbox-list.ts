@@ -1,5 +1,5 @@
 import { ChangeDetectionStrategy, Component, computed, input, output } from '@angular/core';
-import { DatePipe } from '@angular/common';
+import { DatePipe, DecimalPipe } from '@angular/common';
 import { RouterLink } from '@angular/router';
 import { BandejaItem, IndicadoresFactura } from '../../models/bandeja-item.model';
 import { PanelErrores } from '../panel-errores/panel-errores';
@@ -64,11 +64,34 @@ function chipEstadoDe(item: BandejaItem): ChipEstado {
   return { etiqueta: 'Pendiente', clase: 'chip chip--pendiente' };
 }
 
+const GUION = '—';
+
+const NOMBRE_COMPROBANTE: Readonly<Record<string, string>> = {
+  '01': 'Factura',
+  '03': 'Boleta',
+  '07': 'Nota de crédito',
+};
+
+/**
+ * BACKLOG #21 — client-side comprobante display name. The API returns only the code
+ * (`spa-visual-bandeja` MODIFIED); an unknown non-null code renders verbatim, `null` renders `—`.
+ * Module-level pure function beside `chipsDe()`/`chipEstadoDe()` — the precedent those two set.
+ */
+export function nombreComprobante(codigo: string | null): string {
+  if (codigo === null) {
+    return GUION;
+  }
+  return NOMBRE_COMPROBANTE[codigo] ?? codigo;
+}
+
 interface FilaInbox {
   readonly item: BandejaItem;
   readonly chips: IndicadorChip[];
   readonly chipEstado: ChipEstado;
   readonly reprocesarDisponible: boolean;
+  readonly proveedor: string;
+  readonly tipo: string;
+  readonly numero: string;
 }
 
 /**
@@ -81,7 +104,7 @@ interface FilaInbox {
 @Component({
   selector: 'app-inbox-list',
   standalone: true,
-  imports: [DatePipe, RouterLink, PanelErrores],
+  imports: [DatePipe, DecimalPipe, RouterLink, PanelErrores],
   changeDetection: ChangeDetectionStrategy.OnPush,
   templateUrl: './inbox-list.html',
   styleUrl: './inbox-list.css',
@@ -100,8 +123,13 @@ export class InboxList {
       chipEstado: chipEstadoDe(item),
       reprocesarDisponible:
         item.reprocesarDisponibleEn === null || new Date(item.reprocesarDisponibleEn) <= new Date(),
+      proveedor: item.proveedorNombre ?? GUION,
+      tipo: nombreComprobante(item.tipoComprobante),
+      numero: item.numero ?? GUION,
     }))
   );
+
+  protected readonly guion = GUION;
 
   reprocesarDeshabilitado(fila: FilaInbox): boolean {
     return !fila.reprocesarDisponible || this.reprocesandoId() === fila.item.procesamientoId;

@@ -7,6 +7,10 @@
     </p>
   </header>
 
+  @if (resumen(); as r) {
+    <app-inbox-resumen [resumen]="r" />
+  }
+
   <app-inbox-filter
     [estado]="estado()"
     [orden]="orden()"

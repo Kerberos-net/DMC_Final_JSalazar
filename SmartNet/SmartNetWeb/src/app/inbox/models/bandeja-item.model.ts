@@ -36,6 +36,19 @@ interface BandejaItemBase {
   readonly creadoEn: string;
   readonly proveedorCodigo: string | null;
   readonly rucProveedor: string | null;
+  /**
+   * BACKLOG #21 — comprobante identification from `fact.Factura` / `dbo.Proveedor`. All null for
+   * an `INCIDENCIA` row; `proveedorNombre` is also null when the proveedor code is absent from the
+   * external catalog, and `numero` is null on a `FACTURA` row whose fiscal number was not
+   * extracted. `tipoComprobante` is the raw API code (`'01'`/`'03'`/`'07'`) — the display-name map
+   * lives client-side in `inbox-list.ts`. `fechaEmision` is `yyyy-MM-dd`.
+   */
+  readonly proveedorNombre: string | null;
+  readonly tipoComprobante: string | null;
+  readonly numero: string | null;
+  readonly totalOrig: number | null;
+  readonly moneda: string | null;
+  readonly fechaEmision: string | null;
   readonly motivoDescarte: string | null;
   readonly errores: readonly ErrorProcesamiento[];
   readonly reprocesarDisponibleEn: string | null;
@@ -58,6 +71,21 @@ export type BandejaItem =
       readonly indicadores: null;
     });
 
+/**
+ * BACKLOG #21 — the global per-estado aggregate feeding the dashboard summary cards. Counts are
+ * filter- and pagination-independent and the five buckets partition the full set
+ * (`pendientes + validadas + conError + alertas + descartadas === total`). Only the first four are
+ * shown as cards; `descartadas` rides the wire so the partition stays checkable.
+ */
+export interface ResumenBandeja {
+  readonly pendientes: number;
+  readonly validadas: number;
+  readonly conError: number;
+  readonly alertas: number;
+  readonly descartadas: number;
+  readonly total: number;
+}
+
 /** design.md Interfaces/Contracts -- the pagination envelope `GET /api/bandeja` always returns. */
 export interface PaginaBandeja<T> {
   readonly items: readonly T[];
@@ -65,6 +93,7 @@ export interface PaginaBandeja<T> {
   readonly tamanioPagina: number;
   readonly totalRegistros: number;
   readonly totalPaginas: number;
+  readonly resumen: ResumenBandeja;
 }
 
 /** Filters accepted by `InboxService.cargar()` (design.md Data Flow) -- all optional. */

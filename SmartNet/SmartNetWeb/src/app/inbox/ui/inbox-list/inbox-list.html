@@ -1,7 +1,12 @@
 <table class="tabla inbox-list">
   <thead>
     <tr>
-      <th>Fecha</th>
+      <th>Recibido</th>
+      <th>F. emisión</th>
+      <th>Proveedor</th>
+      <th>Tipo</th>
+      <th>Número</th>
+      <th class="inbox-list__monto">Monto</th>
       <th>Estado</th>
       <th>Detalle</th>
       <th>Indicadores</th>
@@ -12,6 +17,23 @@
     @for (fila of filas(); track fila.item.inboxEventId) {
       <tr [attr.data-testid]="'inbox-row-' + fila.item.inboxEventId">
         <td class="inbox-list__fecha">{{ fila.item.creadoEn | date: 'short' }}</td>
+        <td class="inbox-list__fecha" data-testid="celda-fecha-emision">
+          @if (fila.item.fechaEmision) {
+            {{ fila.item.fechaEmision | date: 'mediumDate' }}
+          } @else {
+            {{ guion }}
+          }
+        </td>
+        <td data-testid="celda-proveedor">{{ fila.proveedor }}</td>
+        <td data-testid="celda-tipo">{{ fila.tipo }}</td>
+        <td data-testid="celda-numero">{{ fila.numero }}</td>
+        <td class="inbox-list__monto" data-testid="celda-monto">
+          @if (fila.item.totalOrig !== null) {
+            {{ fila.item.totalOrig | number: '1.2-2' }} {{ fila.item.moneda }}
+          } @else {
+            {{ guion }}
+          }
+        </td>
         <td>
           <span [class]="fila.chipEstado.clase" data-testid="chip-estado">{{ fila.chipEstado.etiqueta }}</span>
         </td>
@@ -52,7 +74,7 @@
       </tr>
     } @empty {
       <tr>
-        <td class="inbox-list__vacio" colspan="5" data-testid="inbox-vacio">Sin resultados</td>
+        <td class="inbox-list__vacio" colspan="10" data-testid="inbox-vacio">Sin resultados</td>
       </tr>
     }
   </tbody>
