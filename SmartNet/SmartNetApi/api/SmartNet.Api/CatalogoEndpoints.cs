@@ -20,6 +20,7 @@ public static class CatalogoEndpoints
     public static IEndpointRouteBuilder MapCatalogoEndpoints(this IEndpointRouteBuilder app)
     {
         app.MapGet("/api/catalogos/proveedores", (Delegate)BuscarProveedoresAsync).RequireAuthorization();
+        app.MapGet("/api/catalogos/proveedores/exportacion", (Delegate)ExportarProveedoresAsync).RequireAuthorization();
         app.MapGet("/api/catalogos/plan-contable", (Delegate)ListarPlanContableAsync).RequireAuthorization();
         app.MapGet("/api/catalogos/plan-contable/exportacion", (Delegate)ExportarPlanContableAsync).RequireAuthorization();
 
@@ -77,20 +78,91 @@ public static class CatalogoEndpoints
             fileDownloadName: $"plan-contable-{hoy:yyyy-MM-dd}.xlsx");
     }
 
+    // BACKLOG #22 PR5 — catalog-queries-api spec req 1-3, design D1/D6/D7. ONE route, TWO modes
+    // selected by an explicit `modo`:
+    //   absent / "picker"  -> BACKLOG #18 byte-frozen: min 2 chars, P00000 excluded, {resultados,hayMas}.
+    //   "catalogo"         -> lists ALL incl P00000, full pagination + server sort, PaginaBandeja shape.
+    //   anything else       -> 400.
+    // `orden`/`direccion`/`tamanio` only apply to catalogo mode; picker ignores them entirely.
     private static async Task<IResult> BuscarProveedoresAsync(
-        string? q, int? pagina, IProveedorRepository repositorio, CancellationToken ct)
+        string? q, int? pagina, string? modo, string? orden, string? direccion, int? tamanio,
+        IProveedorRepository repositorio, CancellationToken ct)
     {
-        var consulta = (q ?? string.Empty).Trim();
         var pag = pagina is > 0 ? pagina.Value : 1;
 
-        var busqueda = await repositorio.BuscarAsync(consulta, pag, ct);
+        if (modo is null or "picker")
+        {
+            var busqueda = await repositorio.BuscarAsync((q ?? string.Empty).Trim(), pag, ct);
+            var resultados = busqueda.Resultados
+                .Select(p => new ProveedorResultado(p.Codigo, p.Nombre, p.Ruc))
+                .ToArray();
+            return Results.Ok(new BusquedaProveedoresRespuesta(resultados, busqueda.HayMas));
+        }
 
-        var resultados = busqueda.Resultados
+        if (modo != "catalogo")
+        {
+            return Results.BadRequest();
+        }
+
+        var ordenCatalogo = orden ?? "proveedor";
+        var direccionCatalogo = direccion ?? "asc";
+        var tamanioCatalogo = tamanio ?? TamanioCatalogoPorDefecto;
+
+        if (!OrdenProveedor.EsValido(ordenCatalogo)
+            || !DireccionesValidas.Contains(direccionCatalogo)
+            || !TamaniosValidos.Contains(tamanioCatalogo))
+        {
+            return Results.BadRequest();
+        }
+
+        var page = await repositorio.ListarCatalogoAsync(
+            q, ordenCatalogo, direccionCatalogo, pag, tamanioCatalogo, ct);
+
+        var items = page.Items
             .Select(p => new ProveedorResultado(p.Codigo, p.Nombre, p.Ruc))
             .ToArray();
 
-        return Results.Ok(new BusquedaProveedoresRespuesta(resultados, busqueda.HayMas));
+        return Results.Ok(new CatalogoProveedoresRespuesta(
+            items, page.Pagina, page.TamanioPagina, page.TotalRegistros, page.TotalPaginas));
     }
+
+    // BACKLOG #22 PR5 — catalog-queries-api spec req 6 / ADR 0021: real .xlsx of the FULL
+    // filtered+sorted set (no paging). ADR 0021 decision 4: no user input reaches
+    // Content-Disposition — the filename is a constant plus the server date from TimeProvider.
+    private static async Task<IResult> ExportarProveedoresAsync(
+        string? q, string? orden, string? direccion,
+        IProveedorRepository repositorio, TimeProvider reloj, CancellationToken ct)
+    {
+        var ordenCatalogo = orden ?? "proveedor";
+        var direccionCatalogo = direccion ?? "asc";
+
+        if (!OrdenProveedor.EsValido(ordenCatalogo) || !DireccionesValidas.Contains(direccionCatalogo))
+        {
+            return Results.BadRequest();
+        }
+
+        var proveedores = await repositorio.ListarCatalogoCompletoAsync(q, ordenCatalogo, direccionCatalogo, ct);
+
+        var filas = proveedores
+            .Select(p => (IReadOnlyList<string>)new[] { p.Codigo, p.Nombre, p.Ruc ?? string.Empty })
+            .ToArray();
+
+        using var buffer = new MemoryStream();
+        ExportadorXlsx.Escribir(buffer, filas, new[] { "Codigo", "Razon social", "RUC" });
+
+        var hoy = DateOnly.FromDateTime(reloj.GetUtcNow().UtcDateTime);
+        return Results.File(
+            buffer.ToArray(),
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            fileDownloadName: $"proveedores-{hoy:yyyy-MM-dd}.xlsx");
+    }
+
+    private const int TamanioCatalogoPorDefecto = 20;
+
+    // design D6 — the canvas rows-per-page set; anything else is a 400.
+    private static readonly HashSet<int> TamaniosValidos = new() { 6, 10, 20, 50 };
+
+    private static readonly HashSet<string> DireccionesValidas = new(StringComparer.Ordinal) { "asc", "desc" };
 }
 
 /// <summary>Una fila del picker: <c>codigo</c> = <c>codpro</c>, <c>nombre</c> = <c>proveedor</c>,
@@ -100,6 +172,17 @@ internal sealed record ProveedorResultado(string Codigo, string Nombre, string? 
 /// <summary>Cuerpo de <c>GET /api/catalogos/proveedores</c>: la página de resultados más
 /// <c>hayMas</c> (¿existen más páginas para el mismo <c>q</c>?).</summary>
 internal sealed record BusquedaProveedoresRespuesta(IReadOnlyList<ProveedorResultado> Resultados, bool HayMas);
+
+/// <summary>Cuerpo de <c>GET /api/catalogos/proveedores?modo=catalogo</c> (design D6): el mismo
+/// juego de campos que <c>PaginaBandeja&lt;T&gt;</c> ya consume <c>InboxService</c> —
+/// <c>{ items, pagina, tamanioPagina, totalRegistros, totalPaginas }</c>. El modo picker sigue
+/// devolviendo <see cref="BusquedaProveedoresRespuesta"/> sin cambios.</summary>
+internal sealed record CatalogoProveedoresRespuesta(
+    IReadOnlyList<ProveedorResultado> Items,
+    int Pagina,
+    int TamanioPagina,
+    int TotalRegistros,
+    int TotalPaginas);
 
 /// <summary>Una fila del plan contable: <c>cuenta</c> = <c>cuenta</c>, <c>descripcion</c> =
 /// <c>descripcion</c>, <c>nivel</c> = <c>nivel</c> (nullable), <c>esHojaImputable</c> proyectado
