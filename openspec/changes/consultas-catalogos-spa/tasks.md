@@ -32,11 +32,11 @@ TDD is strict: every slice is RED (failing test) -> GREEN (implement) -> REFACTO
 
 ## PR2 — API plan contable (base: PR1) ~230 | satisfies api req 4,6,8
 
-- [ ] 2.1 RED: `SmartNet.Api.Tests/CatalogoEndpointsTests.cs` — `GET /api/catalogos/plan-contable` 200 unpaged, camelCase `{cuenta,descripcion,nivel,esHojaImputable}`, `esHojaImputable` true iff `nivel IS NULL`, order `cuenta` asc, 401 unauth.
-- [ ] 2.2 RED: same test file — `GET /api/catalogos/plan-contable/exportacion` 200, `Content-Type` xlsx, `Content-Disposition: attachment` + `.xlsx`, body opens as workbook with rows = seeded filtered set + 1 header, honors `q`, 401 -> no file; hostile `?q=../..%0d%0aX:1` still yields constant filename.
-- [ ] 2.3 GREEN: `CuentaContableResultado` DTO beside `ProveedorResultado` (no new file); thin endpoint over existing `ListarPlanCompletoAsync`; `EsHojaImputable` projected not recomputed.
-- [ ] 2.4 GREEN: export endpoint — reuse port method, build rows, `Results.File(bytes, <xlsx mime>, fileDownloadName:$"plan-contable-{hoy:yyyy-MM-dd}.xlsx")`, `hoy` from `TimeProvider` singleton; server-side `q` predicate mirrors SPA contains-over-`cuenta|descripcion`.
-- [ ] 2.5 Acceptance: `dotnet test SmartNet.Api.Tests` green. Guardrail: no `dbo.*` write, no new versioned SQL, no new GRANT.
+- [x] 2.1 RED: `SmartNet.Api.Tests/CatalogoEndpointsTests.cs` — `GET /api/catalogos/plan-contable` 200 unpaged, camelCase `{cuenta,descripcion,nivel,esHojaImputable}`, `esHojaImputable` true iff `nivel IS NULL`, order `cuenta` asc, 401 unauth.
+- [x] 2.2 RED: same test file — `GET /api/catalogos/plan-contable/exportacion` 200, `Content-Type` xlsx, `Content-Disposition: attachment` + `.xlsx`, body opens as workbook with rows = seeded filtered set + 1 header, honors `q`, 401 -> no file; hostile `?q=../..%0d%0aX:1` still yields constant filename.
+- [x] 2.3 GREEN: `CuentaContableResultado` DTO beside `ProveedorResultado` (no new file); thin endpoint over existing `ListarPlanCompletoAsync`; `EsHojaImputable` projected not recomputed.
+- [x] 2.4 GREEN: export endpoint — reuse port method, build rows, `Results.File(bytes, <xlsx mime>, fileDownloadName:$"plan-contable-{hoy:yyyy-MM-dd}.xlsx")`, `hoy` from `TimeProvider` singleton; server-side `q` predicate mirrors SPA contains-over-`cuenta|descripcion`.
+- [x] 2.5 Acceptance: `dotnet test SmartNet.Api.Tests` green (172/172). Guardrail: no `dbo.*` write, no new versioned SQL, no new GRANT.
 
 ## PR3 — SPA shared chrome (base: PR2) ~320 | satisfies spa req 5, api req 6
 
