@@ -1,19 +1,130 @@
 ```yaml
 schema: gentle-ai.verify-result/v1
-evidence_revision: sha256:44650c97ef1a8e379a7eebc9cbd45bdaeca23534cf16e62a1e72dfbea677f4ab
+evidence_revision: sha256:3a29eea9d63256976134a08a5d742753f72379305d9323653311a37d20b7d99d
 verdict: pass_with_warnings
 blockers: 0
 critical_findings: 0
-requirements: 6/6
-scenarios: 14/14
-test_command: "dotnet test SmartNet/SmartNetApi/api/SmartNet.Api.Tests"
+requirements: 3/3
+scenarios: 9/9
+test_command: "cd SmartNet/SmartNetWeb && npm test"
 test_exit_code: 0
-test_output_hash: sha256:232312dae45b91d15019a9983fb0e6d1f9207fa3b21c992e2eea423fb3de95e0
-build_command: "dotnet build SmartNet/SmartNetApi/api/SmartNet.Api"
+test_output_hash: sha256:a244e284589fc98492562243ed25b6340dc625dda4779d8c6fe4e9cb30e23fc9
+build_command: "cd SmartNet/SmartNetWeb && npm run build"
 build_exit_code: 0
-build_output_hash: sha256:66b483b37927fa15b2384bf3c88dfc7784e15f191637b7a0689ed7d87268f11b
+build_output_hash: sha256:dd04bae2fe83e254b1816d2f5afc7f465db75e2da1b6e843fccc0c90879cf9ad
 ```
 
+# Verification Report - consultas-catalogos-spa
+
+Envelope reflects the most recent slice verified (PR6). PR1-PR5 sections retained below.
+
+# PR6 (slice 6: SPA proveedores catalogo screen) - PASS WITH WARNINGS
+
+Verified at HEAD f4e7767, branch feat/consultas-catalogos-spa-22-pr6. Scope = slice 6 of 9 only.
+Slices 1-5 verified separately (PASS WITH WARNINGS). Slices 7-9 not implemented and NOT gaps.
+Validator sdd-verify-validate --requirements 3 --scenarios 9 -> valid:true.
+
+## Scope
+
+In-scope catalog-queries-spa surface: proveedores portions of the guarded-lazy-routes requirement
+(3 scenarios), the proveedores-screen requirement (5 scenarios), and the query-only-inbox-pattern
+requirement (1 scenario) = 3 requirements / 9 scenarios. Plan contable and tipo de cambio belong to
+other slices.
+
+## Completeness - tasks 6.1 to 6.6 all done, match commits
+
+RED d74a0d3 test-only: app.routes.spec.ts, catalogo-proveedor.service.spec.ts,
+proveedores-page.spec.ts, proveedores-tabla.spec.ts, sidebar.spec.ts - 5 spec files, 420 ins, zero
+production. Then GREEN f526b2b (+404 prod / -2), then checkboxes f4e7767. git diff vs pr5 = 15 files
+/ 823 ins / 4 del; production delta about 404 LOC.
+
+## Build / test evidence, independent re-run
+
+- npm test (ng test / Vitest) -> 49 files / 443 tests passed, exit 0 (baseline 425, +18 PR6). Re-run twice, identical.
+- npm run lint (tsc --noEmit) -> clean, exit 0.
+- npm run build (production) -> complete, exit 0. proveedores-page chunk 7.00 kB raw / 2.41 kB
+  transfer. NO anyComponentStyle budget warning.
+- No coverage tool configured - coverage skipped, not a failure.
+
+## Spec compliance - 3 requirements / 9 scenarios, all runtime-proven
+
+### Guarded lazy catalog routes, proveedores portion - 3/3
+- Routes resolve: app.routes.ts adds catalogos/proveedores as a sibling ShellLayout child, lazy
+  loadComponent to ProveedoresPage; app.routes.spec.ts asserts defined + canActivate over 0 + loadComponent fn.
+- Unauthenticated blocked: route carries canActivate authGuard.
+- Additive: existing arrayContaining route and per-child guard assertions still green.
+
+### Proveedores screen - paginated browse-all with search, sort, export - 5/5
+- Initial paginated list: rows P00000 then P00012, h1 Proveedores, footer pag-estado Pagina 1 de 2;
+  service requests modo=catalogo, pagina=1, orden=proveedor, direccion=asc, tamanio=20; binds all
+  PaginaBandeja fields.
+- Pagination navigates server pages: Siguiente -> GET pagina=2; page-size change -> exactly 1 GET
+  tamanio=50 pagina=1 (double-emit coalesced by the single-setTimeout scheduler).
+- Sortable header re-queries server-side, NOT client: orden-codigo click -> GET orden=codigo,
+  direccion=asc, pagina=1; test flushes an order no client collator would produce (P00012 before
+  P00000) and asserts rendered rows follow it exactly. proveedores-tabla renders filas verbatim,
+  no client reorder (design D7).
+- Search filters server-side: onFiltro acme -> GET q=acme, orden=ruc, pagina=1; debounced, trimmed,
+  page reset, sort kept.
+- Export downloads full filtered set: boton-exportar -> DescargaXlsx.descargar with
+  /api/catalogos/proveedores/exportacion and q + orden + direccion; PR5 endpoint calls
+  ListarCatalogoCompletoAsync (full set, no paging).
+
+### Screens query-only and follow the inbox pattern, proveedores portion - 1/1
+- No mutation affordance: zero crear/editar/eliminar/guardar testids; only GET + export GET.
+  CatalogoProveedorService is a SEPARATE providedIn-root singleton; picker ProveedorService signals
+  stay pristine (design D4). Container owns filter/orden signals; ui table is input/output only;
+  models typed to the PR5 contract.
+
+## Design / ADR compliance
+
+D4, D6, D7, D8 honored. One documented behaviour-neutral choice: the single-setTimeout scheduler
+doubles as debounce + burst coalescer; irAPagina early-returns when target page equals the
+already-requested page. Covered by dedicated tests.
+
+## TDD compliance, Strict TDD active - PASS
+
+- RED confirmed: d74a0d3 provably test-only (git show --stat: 5 spec files, 0 production); target
+  modules did not exist there, so specs failed at import resolution. Genuine RED.
+- GREEN confirmed: all 18 new tests pass on independent re-run (443/443).
+- Triangulation strong: service 6 cases, page 8 cases, table 3 cases; distinct expected values.
+- Safety net: sidebar.spec.ts and app.routes.spec.ts pre-existing green; full 49-file suite green
+  post-change; picker specs untouched.
+- Assertion quality: all assertions verify real behavior; the 500-case asserts error banner role
+  AND 0 rows; no tautology, ghost loop, smoke-only, or mock-heavy file.
+
+## Test layer distribution
+
+Unit/component (jsdom + HttpTestingController): 18 new tests across 5 files (Vitest). Integration
+browser: 0 not installed. E2E: 0 not installed.
+
+## Issues
+
+CRITICAL: none.
+
+WARNING, none blocking archive:
+1. Pre-existing prettier 3.9.6 trailing-comma drift - flags new PR6 files AND untouched
+   plan-contable files identically; effective style gate is tsc --noEmit (no format-check, no
+   ESLint) and it passes. NOT a PR6 regression.
+2. size:exception - 823 ins vs pr5 (about 404 prod LOC), over the 400-line budget; owner-accepted
+   feature-level exception, consistent with PR3/PR4/PR5.
+
+SUGGESTION:
+1. GREEN commit f526b2b touched catalogo-proveedor.service.spec.ts with a one-line matcher fix
+   (request.params.get to params.get) - harness-API correction, not an assertion softening.
+2. Prompt export URL wording mentions modo=catalogo; the SPA sends only q/orden/direccion, which is
+   correct because the PR5 /exportacion endpoint does not accept modo.
+3. Sidebar still 7 entries / 7 glyphs, nav-proveedores and nav-plan-contable both anchor tags;
+   Tipo de cambio deferred to PR8; canvas-replica docblock note intact.
+
+## Verdict
+
+PASS WITH WARNINGS. Slice 6 correct and complete against its 6 tasks; 3 in-scope requirements / 9
+scenarios runtime-proven by 18 new strict-TDD tests; server-side sort genuinely proven; picker
+contract untouched and non-regressed (443/443). Nothing blocks archiving slice 6.
+Next: sdd-apply PR7 (API tipo de cambio history, base feat/consultas-catalogos-spa-22-pr6).
+
+---
 # Verification Report - consultas-catalogos-spa
 
 Envelope above reflects the most recent slice verified (PR5). PR1-PR4 sections retained below.
