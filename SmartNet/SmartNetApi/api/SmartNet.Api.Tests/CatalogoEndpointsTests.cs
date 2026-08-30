@@ -1,6 +1,9 @@
 using System.Net;
 using System.Net.Http.Json;
 using System.Text.Json;
+using System.Text.RegularExpressions;
+using DocumentFormat.OpenXml.Packaging;
+using DocumentFormat.OpenXml.Spreadsheet;
 using Microsoft.AspNetCore.Mvc.Testing;
 
 namespace SmartNet.Api.Tests;
@@ -145,5 +148,110 @@ public sealed class CatalogoEndpointsTests : SesionEndpointsTestBase
         var response = await client.GetAsync("/api/catalogos/proveedores?q=ACME");
 
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    // ---- BACKLOG #22 PR2: plan contable (api spec req 4, 6, 8) ----
+
+    private async Task SeedCuentaAsync(string cuenta, string descripcion, byte? nivel) =>
+        await Db.ExecuteNonQueryAsync(
+            $"INSERT INTO dbo.CuentaContable (cuenta, descripcion, nivel, ctarefleja, ctapuente) " +
+            $"VALUES ('{cuenta}', N'{descripcion}', {(nivel is null ? "NULL" : nivel.Value.ToString())}, NULL, NULL);");
+
+    private static int ContarFilasHoja(byte[] bytes)
+    {
+        using var ms = new MemoryStream(bytes);
+        using var doc = SpreadsheetDocument.Open(ms, isEditable: false);
+        var sheetData = doc.WorkbookPart!.WorksheetParts.Single().Worksheet.GetFirstChild<SheetData>()!;
+        return sheetData.Elements<Row>().Count();
+    }
+
+    [Fact]
+    public async Task PlanContable_Returns200_Unpaged_CamelCase_OrderedByCuenta_EsHojaImputableIffNivelNull()
+    {
+        await SeedCuentaAsync("40", "Tributos por pagar", nivel: 1);
+        await SeedCuentaAsync("101", "Caja MN", nivel: null);
+        await SeedCuentaAsync("10", "Efectivo y equivalentes", nivel: 2);
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var response = await client.GetAsync("/api/catalogos/plan-contable");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var cuerpo = await LeerCuerpoAsync(response);
+        var items = cuerpo.GetProperty("items");
+        Assert.Equal(3, items.GetArrayLength());
+        Assert.Equal(new[] { "10", "101", "40" },
+            items.EnumerateArray().Select(i => i.GetProperty("cuenta").GetString()).ToArray());
+        Assert.Equal("Efectivo y equivalentes", items[0].GetProperty("descripcion").GetString());
+        Assert.Equal(2, items[0].GetProperty("nivel").GetInt32());
+        Assert.False(items[0].GetProperty("esHojaImputable").GetBoolean());
+        Assert.Equal(JsonValueKind.Null, items[1].GetProperty("nivel").ValueKind);
+        Assert.True(items[1].GetProperty("esHojaImputable").GetBoolean());
+    }
+
+    [Fact]
+    public async Task PlanContable_WithoutACookie_Returns401()
+    {
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+
+        var response = await client.GetAsync("/api/catalogos/plan-contable");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task PlanContableExportacion_Returns200_XlsxHeaders_WorkbookRows_HonorsQ()
+    {
+        await SeedCuentaAsync("631111", "Fletes traslado de mercaderia", nivel: null);
+        await SeedCuentaAsync("656111", "Utiles de escritorio", nivel: null);
+        await SeedCuentaAsync("403", "Proveedores", nivel: 3);
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var response = await client.GetAsync("/api/catalogos/plan-contable/exportacion?q=flete");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            response.Content.Headers.ContentType?.MediaType);
+        var disposition = response.Content.Headers.GetValues("Content-Disposition").Single();
+        Assert.Contains("attachment", disposition);
+        Assert.Contains(".xlsx", disposition);
+
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        Assert.NotEmpty(bytes);
+        Assert.Equal(2, ContarFilasHoja(bytes)); // 1 header + 1 filtered row
+    }
+
+    [Fact]
+    public async Task PlanContableExportacion_WithoutACookie_Returns401_AndNoFile()
+    {
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+
+        var response = await client.GetAsync("/api/catalogos/plan-contable/exportacion");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.NotEqual(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task PlanContableExportacion_HostileQuery_FilenameStaysConstantForm()
+    {
+        await SeedCuentaAsync("10", "Caja", nivel: 2);
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var response = await client.GetAsync("/api/catalogos/plan-contable/exportacion?q=../..%0d%0aX:1");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var disposition = response.Content.Headers.GetValues("Content-Disposition").Single();
+        Assert.DoesNotContain("X:1", disposition);
+        Assert.DoesNotContain('\r', disposition);
+        Assert.DoesNotContain('\n', disposition);
+        Assert.Matches(new Regex(@"filename=plan-contable-\d{4}-\d{2}-\d{2}\.xlsx"), disposition);
     }
 }
