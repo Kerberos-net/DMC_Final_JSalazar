@@ -4,11 +4,14 @@ import { ShellLayout } from './shell-layout';
 
 describe('ShellLayout', () => {
   beforeEach(async () => {
+    localStorage.clear();
     await TestBed.configureTestingModule({
       imports: [ShellLayout],
       providers: [provideRouter([])],
     }).compileComponents();
   });
+
+  afterEach(() => localStorage.clear());
 
   it('should create the shell', () => {
     const fixture = TestBed.createComponent(ShellLayout);
@@ -55,5 +58,38 @@ describe('ShellLayout', () => {
     expect(header).not.toBeNull();
     expect(outlet).not.toBeNull();
     expect(header.compareDocumentPosition(outlet) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+  });
+
+  it('renders the sidebar navigation inside the shell', () => {
+    const fixture = TestBed.createComponent(ShellLayout);
+    fixture.detectChanges();
+
+    const sidebar = fixture.nativeElement.querySelector('app-sidebar') as HTMLElement;
+    expect(sidebar).not.toBeNull();
+    expect(sidebar.querySelector('[data-testid="nav-bandeja"]')).not.toBeNull();
+    expect(sidebar.querySelector('[data-testid="nav-configuracion"]')).not.toBeNull();
+  });
+
+  it('starts expanded with no stored preference and collapses when the sidebar toggle fires', () => {
+    const fixture = TestBed.createComponent(ShellLayout);
+    fixture.detectChanges();
+
+    const shell = fixture.nativeElement.querySelector('.app-shell') as HTMLElement;
+    expect(shell.classList.contains('app-shell--sidebar-colapsado')).toBe(false);
+
+    (fixture.nativeElement.querySelector('[data-testid="nav-toggle"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    expect(shell.classList.contains('app-shell--sidebar-colapsado')).toBe(true);
+  });
+
+  it('re-reads the persisted collapsed state on a fresh instance', () => {
+    localStorage.setItem('fact.sidebar', 'colapsado');
+
+    const fixture = TestBed.createComponent(ShellLayout);
+    fixture.detectChanges();
+
+    const shell = fixture.nativeElement.querySelector('.app-shell') as HTMLElement;
+    expect(shell.classList.contains('app-shell--sidebar-colapsado')).toBe(true);
   });
 });

@@ -1,0 +1,49 @@
+<nav class="sidebar" [class.sidebar--colapsado]="colapsado()" aria-label="Navegación principal">
+  <ul class="sidebar__grupo">
+    <li>
+      <a
+        class="sidebar__enlace"
+        data-testid="nav-bandeja"
+        routerLink="/bandeja"
+        routerLinkActive="sidebar__enlace--activo"
+        aria-label="Bandeja"
+      >
+        <div class="sidebar__glifo glifo glifo--bandeja" data-testid="nav-glifo" aria-hidden="true"></div>
+        <span class="sidebar__etiqueta">Bandeja</span>
+      </a>
+    </li>
+  </ul>
+
+  <hr class="sidebar__divisor" data-testid="nav-divisor" />
+
+  <ul class="sidebar__grupo sidebar__grupo--utilitario">
+    <li>
+      <a
+        class="sidebar__enlace"
+        data-testid="nav-configuracion"
+        routerLink="/configuracion"
+        routerLinkActive="sidebar__enlace--activo"
+        aria-label="Configuración"
+      >
+        <div
+          class="sidebar__glifo glifo glifo--configuracion"
+          data-testid="nav-glifo"
+          aria-hidden="true"
+        ></div>
+        <span class="sidebar__etiqueta">Configuración</span>
+      </a>
+    </li>
+  </ul>
+
+  <button
+    type="button"
+    class="sidebar__toggle"
+    data-testid="nav-toggle"
+    (click)="alternar.emit()"
+    [attr.aria-label]="colapsado() ? 'Expandir la barra lateral' : 'Colapsar la barra lateral'"
+    [attr.aria-pressed]="colapsado()"
+  >
+    <div class="sidebar__glifo glifo glifo--chevron" aria-hidden="true"></div>
+    <span class="sidebar__etiqueta">Colapsar</span>
+  </button>
+</nav>

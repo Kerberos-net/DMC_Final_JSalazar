@@ -40,6 +40,10 @@ cinco premisas externas verificadas y ningún ADR queda condicionado.
 | 20 | **Ajuste visual de bandeja y panel de errores** | Conformar al *handoff* las pantallas que el #18 excluyó: bandeja/dashboard (`inbox-page`, `inbox-list`, `inbox-filter`), panel de errores y `confirmar-reproceso` —hoy sin CSS de componente, solo heredan los tokens globales—. Tabla con alineación tabular, chip de estado por color (Pendiente/Validada/Error/Alerta), barra de filtros, panel de errores contenido; **solo visual, sin datos nuevos** — usa lo que ya trae `BandejaItem`. Mismo patrón que el #18 | #13, #18 | ⚠ *Handoff* de diseño (`DESIGN_BRIEF.md` §2 y §5) |
 | 21 | **Bandeja: datos enriquecidos y contadores de resumen** | Lo que el #20 dejó fuera por ser trabajo funcional: ampliar `GET /api/bandeja` + `BandejaItem` + `SqlBandejaRepository` con las columnas que el *handoff* §2 muestra en la fila (proveedor por nombre, monto, moneda, número, tipo, fecha de emisión) y con un agregado por estado (Pendientes / Validadas / Con error / Alertas) para las 4 tarjetas de resumen del dashboard | #13, #20 | ⚠ *Handoff* §2 |
 
+> **#21** — Incluye el shell de navegación lateral — sidebar con `Bandeja` y `Configuración`,
+> colapsable y persistente — plegado aquí en lugar de abrir un ítem propio: se entrega junto con
+> estos datos y solo cubre destinos con ruta existente. Cambio SDD `item-21-bandeja-shell-nav`.
+
 ## Cómo usar este backlog
 
 Cada ítem es una spec independiente. Al implementarlo, arranca un ciclo de Spec-Driven Development

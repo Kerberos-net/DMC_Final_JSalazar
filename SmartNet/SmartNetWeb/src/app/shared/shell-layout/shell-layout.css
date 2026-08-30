@@ -1,3 +1,25 @@
+/* spa-shell-nav — fixed-sidebar + fluid-content shell (DESIGN.md "Layout & Spacing"). Layout only;
+ * every colour via a global token. */
+
+.app-shell {
+  display: grid;
+  grid-template-columns: auto 1fr;
+  min-height: 100vh;
+}
+
+.app-shell__sidebar {
+  position: sticky;
+  top: 0;
+  align-self: start;
+  height: 100vh;
+}
+
+.app-shell__cuerpo {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+
 .app-shell__header {
   display: flex;
   align-items: center;
@@ -40,4 +62,10 @@
 
 .app-shell__tema select {
   width: auto;
+}
+
+.app-shell__main {
+  flex: 1;
+  min-width: 0;
+  padding: var(--space-5);
 }

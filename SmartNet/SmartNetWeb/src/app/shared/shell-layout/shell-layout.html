@@ -1,22 +1,34 @@
-<header class="app-shell__header">
-  <span class="app-shell__marca">
-    <span class="app-shell__logo" data-testid="logo-badge" aria-hidden="true">GF</span>
-    Gestor de Facturas de Compra
-  </span>
+<div class="app-shell" [class.app-shell--sidebar-colapsado]="sidebar.colapsado()">
+  <app-sidebar
+    class="app-shell__sidebar"
+    [colapsado]="sidebar.colapsado()"
+    (alternar)="sidebar.alternar()"
+  />
 
-  <label class="app-shell__tema">
-    Tema
-    <select
-      class="campo"
-      data-testid="selector-tema"
-      [value]="tema.preferencia()"
-      (change)="onCambiarTema($any($event.target).value)"
-    >
-      <option value="sistema">Sistema</option>
-      <option value="claro">Claro</option>
-      <option value="oscuro">Oscuro</option>
-    </select>
-  </label>
-</header>
+  <div class="app-shell__cuerpo">
+    <header class="app-shell__header">
+      <span class="app-shell__marca">
+        <span class="app-shell__logo" data-testid="logo-badge" aria-hidden="true">GF</span>
+        Gestor de Facturas de Compra
+      </span>
 
-<router-outlet></router-outlet>
+      <label class="app-shell__tema">
+        Tema
+        <select
+          class="campo"
+          data-testid="selector-tema"
+          [value]="tema.preferencia()"
+          (change)="onCambiarTema($any($event.target).value)"
+        >
+          <option value="sistema">Sistema</option>
+          <option value="claro">Claro</option>
+          <option value="oscuro">Oscuro</option>
+        </select>
+      </label>
+    </header>
+
+    <main class="app-shell__main">
+      <router-outlet></router-outlet>
+    </main>
+  </div>
+</div>
