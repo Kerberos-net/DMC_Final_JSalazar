@@ -11,9 +11,9 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | **16 de 21 cerrados** (BACKLOG.md tiene 21 ítems: #18–#21 nacieron al implementar el #12 — #18 "Ajuste visual del diseño SPA" y #20 "Ajuste visual de bandeja y panel de errores" cerrados 2026-08-27; #19 "Campos contables editables y resaltado OCR por campo" y #21 "Bandeja: datos enriquecidos y contadores de resumen" abiertos) |
-| Ciclo SDD activo | Ninguno — último cerrado: ítem #20 (Ajuste visual de bandeja y panel de errores), 2026-08-27 |
-| Última fase cerrada | Ítem #20 (Ajuste visual de bandeja y panel de errores), 4 fases, 23/23 tareas cerradas, verify PASS WITH WARNINGS (0 CRITICAL, 6 WARNING no bloqueantes, 3 SUGGESTIONS), 1 spec nueva (`spa-visual-bandeja`) + 1 delta (`spa-design-tokens`), cadena de 3 *commits* apilados sobre `main` — ítem #20 cerrado 2026-08-27 |
+| Ítems del backlog | **17 de 21 cerrados** (BACKLOG.md tiene 21 ítems: #18–#21 nacieron al implementar el #12 — #18 "Ajuste visual del diseño SPA" y #20 "Ajuste visual de bandeja y panel de errores" cerrados 2026-08-27, #21 "Bandeja: datos enriquecidos y contadores de resumen" cerrado 2026-08-30; #19 "Campos contables editables y resaltado OCR por campo" abierto) |
+| Ciclo SDD activo | Ninguno — último cerrado: ítem #21 (Bandeja: datos enriquecidos y contadores de resumen + shell de navegación macOS), 2026-08-30 |
+| Última fase cerrada | Ítem #21 (Bandeja: datos enriquecidos + shell de navegación), 3 fases, 32/32 tareas cerradas, verify PASS WITH WARNINGS (0 CRITICAL, 3 WARNING reconciliados, 2 SUGGESTION — 1 atendida), 1 spec nueva (`spa-shell-nav`) + 2 delta (`bandeja`, `spa-visual-bandeja`), 4 *commits* apilados sobre `main` (`a93f4c7`/`a83c5ee`/`84c05e4`/`bb1fb59`, `size:exception`) — ítem #21 cerrado 2026-08-30 |
 
 ---
 
@@ -1728,7 +1728,75 @@ Consistente con todos los archivos previos (#12–#18).
 
 ---
 
-## ⬜ Ítems 10, 15, 16, 19 y 21 — sin ciclo SDD abierto
+## ✅ 21. Bandeja: datos enriquecidos y contadores de resumen (+ shell de navegación macOS)
+
+Lo que el #20 dejó fuera por ser trabajo funcional: ampliar `GET /api/bandeja` + `BandejaItem` +
+`SqlBandejaRepository` con las columnas del *handoff* §2 (proveedor por nombre, monto, moneda,
+número, tipo, fecha de emisión) y un agregado por estado para las 4 tarjetas de resumen. Se
+plegó aquí el **shell de navegación lateral** de `DESIGN.md` (sidebar con `Bandeja` y
+`Configuración`, colapsable y persistente), que no era ítem de backlog — decisión del dueño,
+anotada bajo #21 en `BACKLOG.md`.
+
+**Ciclo SDD:** `openspec/changes/archive/2026-08-30-item-21-bandeja-shell-nav/` · **32 de 32
+tareas cerradas** — ✅ **CERRADO 2026-08-30**
+
+| Fase | Unidad | Alcance | Tareas | Estado |
+|---|---|---|---|---|
+| 1 | PR1 | Shell de navegación macOS: `SidebarService` + `Sidebar` presentacional + grid de `ShellLayout`; spec `spa-shell-nav` | 10/10 | ✅ |
+| 2 | PR2 | Contrato `GET /api/bandeja` + SQL: 6 campos de comprobante en `BandejaItem`, `LEFT JOIN dbo.Proveedor`, agregado `resumen` como 3er *resultset* sin `WHERE` | 10/10 | ✅ |
+| 3 | PR3 | Consumo SPA: modelo espejo `.ts`, `InboxService.resumen()`, tabla de 10 columnas del §2 + `nombreComprobante()`, componente `inbox-resumen` (4 tarjetas) | 12/12 | ✅ |
+
+### Pruebas
+
+| Suite | Antes | Después | Nuevas |
+|---|---|---|---|
+| SPA (Vitest) | 364 | **379** | +15 (sidebar service/componente, shell-layout, modelo, inbox-list §2, inbox-resumen, inbox-page tarjetas) |
+| `SmartNet.Inbox.Infrastructure.Tests` | 40 | **49** | +9 (campos enriquecidos, partición de *buckets*, PROMOVIDO en `validadas`, precedencia, agregado invariante a filtros, `usr_api` real, D2b OBSOLETO) |
+| `SmartNet.Api.Tests` | 163 | **164** | +1 (`GET /api/bandeja` con `resumen` + campos enriquecidos, invariante al filtro) |
+
+Ejecutadas por el orquestador contra SQL Server local real: SPA 379/379, Inbox.Infrastructure
+49/49, Api.Tests 164/164. `npm run lint` (tsc) y `npm run build` limpios, todo CSS de componente
+< 4 kB. `paleta.spec.ts` / `contraste.spec.ts` / `app.routes.spec.ts` / `styles.css` /
+`SmartNetBD/schema/**` / `BandejaEndpoints.cs` sin tocar.
+
+### Decisiones de diseño
+
+- **Agregado sin `WHERE`** (design D2): las 4 tarjetas cuentan sobre toda la bandeja, no la vista
+  filtrada. Reusar `FiltroWhere` habría dado "Validadas" siempre 0.
+- **Asimetría OBSOLETO (D2b)**, hallada durante el diseño: `FiltroWhere` filtra
+  `Clasificacion <> 'OBSOLETO'` pero el chip de la fila cuenta cualquier `errores.length > 0`.
+  El agregado usa un `EXISTS` sin filtrar para **coincidir con el chip**, no con `FiltroWhere`.
+  Un cambio futuro a uno debe mover el otro (regla 1). Anotado en el spec `bandeja` con escenario.
+- **Sin script SQL nuevo, sin grant nuevo**: `usr_api` ya tenía `SELECT` sobre `dbo.Proveedor`
+  (`008`) y `fact.ProcesamientoError` (`018`), probado bajo el login real.
+- **Sin token de diseño nuevo**: `--fondo-sidebar` ya existía y ya está en `contraste.spec.ts`.
+- **Sidebar solo a rutas reales**: solo `Bandeja` y `Configuración` — las demás pantallas del
+  *handoff* no existen como ruta todavía.
+
+### Elementos conocidos, no ocultos
+
+`sdd-verify`: 0 CRITICAL, 3 WARNING, 2 SUGGESTION.
+
+- **WARNING 1 (reconciliada)** — `tasks.md` tenía 0/32 casillas marcadas pese a trabajo completo;
+  las 32 se marcaron `[x]` en `bb1fb59`.
+- **WARNING 2 (aceptada)** — `apply-progress` sin tabla estructurada de evidencia TDD; el ciclo
+  RED→GREEN se evidencia por los *commits* apilados y los tests de escenario.
+- **WARNING 3 (aceptada)** — `SqlBandejaRepository.ListarConConexionAsync` es `internal static`
+  para el test de impersonación; costura preexistente del #13, sin riesgo funcional.
+- **SUGGESTION 1 (atendida)** — escenario explícito del D2b OBSOLETO + test en `bb1fb59`.
+- **SUGGESTION 2 (arrastrada)** — la SPA no tiene herramienta de cobertura configurada.
+
+*Follow-ups:* `glosa` / TC / base imponible / IGV como columnas siguen siendo del **#19**; las
+tarjetas como atajos de filtro quedan como mejora futura; `tipo de comprobante` sin catálogo de
+nombres para `usr_api` (mapa cliente `01`/`03`/`07` como solución interina).
+
+**RDD de gentle-ai desactivado a nivel de repo** (exFAT sin ACL), `reviewGate.delivery:
+disabled/unmanaged`. Entrega `size:exception` (≈1960 líneas > presupuesto de 800), 4 *commits*
+apilados sobre `main` local sin *push* — patrón de todos los ítems previos.
+
+---
+
+## ⬜ Ítems 10, 15, 16 y 19 — sin ciclo SDD abierto
 
 Las fases de cada ítem **se definen cuando arranca su ciclo SDD**, no antes. Ponerlas aquí ahora
 sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ítem, y ninguno existe.
@@ -1739,7 +1807,6 @@ sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ít
 | 15 | Publicación a Drive | #14 | — | ⬜ |
 | 16 | Publicación a Sheets | #14 | — | ⬜ |
 | 19 | Campos contables editables y resaltado OCR por campo | #12, #18 | ⚠ `REGLAS.md` §5–§10 | ⬜ |
-| 21 | Bandeja: datos enriquecidos y contadores de resumen | #13, #20 | ⚠ `Handoff` §2 | ⬜ |
 
 ---
 
