@@ -7,6 +7,12 @@
       "skillPath": "skills/create-harness/SKILL.md",
       "computedHash": "f1ae272beac675822b3bcc5fe8f2024fa4e1a52bbd1764c9742c93cc885077bb"
     },
+    "deploy-pass": {
+      "source": "adminoryslabs/Armory",
+      "sourceType": "github",
+      "skillPath": "skills/deploy-pass/SKILL.md",
+      "computedHash": "add0137d1686ed3ec8c5ded67b49da7a35bdb8fdb073bc5d92844027a56f8383"
+    },
     "generar-backlog": {
       "source": "adminoryslabs/Skills",
       "sourceType": "github",

@@ -19,3 +19,8 @@ __pycache__/
 .pytest_cache/
 *.pyc
 .claude/.lecciones-aprendidas-seen
+
+# Indices y estado local de herramientas de asistencia (se regeneran)
+.codegraph/
+.engram/
+Arquitectura SmartNet.png
