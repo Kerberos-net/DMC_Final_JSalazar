@@ -254,4 +254,212 @@ public sealed class CatalogoEndpointsTests : SesionEndpointsTestBase
         Assert.DoesNotContain('\n', disposition);
         Assert.Matches(new Regex(@"filename=plan-contable-\d{4}-\d{2}-\d{2}\.xlsx"), disposition);
     }
+
+    // ---- BACKLOG #22 PR5: proveedores catalogo mode (api spec req 1, 2, 3, 6, 8) ----
+
+    private async Task SeedCatalogoProveedoresAsync(int cantidad, string prefijo)
+    {
+        for (var i = 0; i < cantidad; i++)
+        {
+            await SeedProveedorAsync($"C{i:D5}", $"{prefijo} {i:D3}", $"20{i:D9}");
+        }
+    }
+
+    [Fact]
+    public async Task Proveedores_CatalogoMode_ListsEveryProveedorInclP00000_WithPaginaBandejaEnvelope()
+    {
+        await SeedProveedorAsync("P00000", "VARIOS");
+        await SeedCatalogoProveedoresAsync(2, "CATALOGO");
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var cuerpo = await LeerCuerpoAsync(
+            await client.GetAsync("/api/catalogos/proveedores?modo=catalogo"));
+
+        var items = cuerpo.GetProperty("items");
+        Assert.Equal(3, items.GetArrayLength());
+        Assert.Contains("P00000", items.EnumerateArray().Select(i => i.GetProperty("codigo").GetString()));
+        Assert.Equal(1, cuerpo.GetProperty("pagina").GetInt32());
+        Assert.Equal(20, cuerpo.GetProperty("tamanioPagina").GetInt32());
+        Assert.Equal(3, cuerpo.GetProperty("totalRegistros").GetInt32());
+        Assert.Equal(1, cuerpo.GetProperty("totalPaginas").GetInt32());
+        Assert.Equal("VARIOS", items[2].GetProperty("nombre").GetString());
+        Assert.Equal(JsonValueKind.Null, items[2].GetProperty("ruc").ValueKind);
+    }
+
+    [Fact]
+    public async Task Proveedores_CatalogoMode_PaginationEnvelopeIsAccurate()
+    {
+        await SeedCatalogoProveedoresAsync(45, "PAG");
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var cuerpo = await LeerCuerpoAsync(
+            await client.GetAsync("/api/catalogos/proveedores?modo=catalogo&q=PAG&pagina=2&tamanio=20"));
+
+        var items = cuerpo.GetProperty("items");
+        Assert.Equal(20, items.GetArrayLength());
+        Assert.Equal("PAG 020", items[0].GetProperty("nombre").GetString());
+        Assert.Equal(2, cuerpo.GetProperty("pagina").GetInt32());
+        Assert.Equal(45, cuerpo.GetProperty("totalRegistros").GetInt32());
+        Assert.Equal(3, cuerpo.GetProperty("totalPaginas").GetInt32());
+    }
+
+    [Fact]
+    public async Task Proveedores_CatalogoMode_TextFilter_MatchesNameRucOrCode()
+    {
+        await SeedProveedorAsync("C00001", "ACME PERU", "20100000001");
+        await SeedProveedorAsync("C00002", "OTRO", "20999999999");
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var cuerpo = await LeerCuerpoAsync(
+            await client.GetAsync("/api/catalogos/proveedores?modo=catalogo&q=ACME"));
+
+        Assert.Equal(new[] { "C00001" },
+            cuerpo.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("codigo").GetString()).ToArray());
+    }
+
+    [Theory]
+    [InlineData("codigo", "asc", new[] { "AAA 000", "AAA 001", "AAA 002" })]
+    [InlineData("codigo", "desc", new[] { "AAA 002", "AAA 001", "AAA 000" })]
+    [InlineData("proveedor", "desc", new[] { "AAA 002", "AAA 001", "AAA 000" })]
+    [InlineData("ruc", "desc", new[] { "AAA 002", "AAA 001", "AAA 000" })]
+    public async Task Proveedores_CatalogoMode_ServerSort(string orden, string direccion, string[] esperado)
+    {
+        await SeedCatalogoProveedoresAsync(3, "AAA");
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var cuerpo = await LeerCuerpoAsync(await client.GetAsync(
+            $"/api/catalogos/proveedores?modo=catalogo&q=AAA&orden={orden}&direccion={direccion}"));
+
+        Assert.Equal(esperado,
+            cuerpo.GetProperty("items").EnumerateArray().Select(i => i.GetProperty("nombre").GetString()).ToArray());
+    }
+
+    [Theory]
+    [InlineData("/api/catalogos/proveedores?modo=desconocido")]
+    [InlineData("/api/catalogos/proveedores?modo=catalogo&orden=nombre")]
+    [InlineData("/api/catalogos/proveedores?modo=catalogo&direccion=arriba")]
+    [InlineData("/api/catalogos/proveedores?modo=catalogo&tamanio=7")]
+    public async Task Proveedores_CatalogoMode_BadRequest_OnUnknownParams(string url)
+    {
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var response = await client.GetAsync(url);
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Proveedores_CatalogoMode_WithoutACookie_Returns401()
+    {
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+
+        var response = await client.GetAsync("/api/catalogos/proveedores?modo=catalogo");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
+    // REGRESSION — BACKLOG #18 picker contract is byte-frozen: modo absent or `picker` keeps the
+    // `{resultados,hayMas}` shape, still excludes P00000, still empty for a too-short `q`.
+    [Theory]
+    [InlineData("/api/catalogos/proveedores?q=VARIOS")]
+    [InlineData("/api/catalogos/proveedores?modo=picker&q=VARIOS")]
+    public async Task Proveedores_PickerMode_Unchanged_ExcludesP00000_KeepsResultadosShape(string url)
+    {
+        await SeedProveedorAsync("P00000", "VARIOS");
+        await SeedProveedorAsync("P00F01", "VARIOS HERMANOS SAC", "20222222222");
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var cuerpo = await LeerCuerpoAsync(await client.GetAsync(url));
+
+        Assert.Equal(new[] { "P00F01" },
+            cuerpo.GetProperty("resultados").EnumerateArray().Select(r => r.GetProperty("codigo").GetString()).ToArray());
+        Assert.False(cuerpo.GetProperty("hayMas").GetBoolean());
+        Assert.False(cuerpo.TryGetProperty("items", out _));
+    }
+
+    [Fact]
+    public async Task Proveedores_PickerMode_ShortQuery_StillEmpty_EvenWithSortParams()
+    {
+        await SeedProveedorAsync("P00D01", "ALGUN PROVEEDOR");
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var cuerpo = await LeerCuerpoAsync(
+            await client.GetAsync("/api/catalogos/proveedores?q=a&orden=ruc&direccion=desc"));
+
+        Assert.Equal(0, cuerpo.GetProperty("resultados").GetArrayLength());
+    }
+
+    [Fact]
+    public async Task ProveedoresExportacion_Returns200_XlsxHeaders_WorkbookRows_HonorsQAndSort()
+    {
+        await SeedProveedorAsync("C00001", "EXPORT ACME", "20100000001");
+        await SeedProveedorAsync("C00002", "EXPORT ACME DOS", "20100000002");
+        await SeedProveedorAsync("C00003", "OTRA COSA", "20100000003");
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var response = await client.GetAsync(
+            "/api/catalogos/proveedores/exportacion?q=EXPORT%20ACME&orden=codigo&direccion=asc");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.Equal(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            response.Content.Headers.ContentType?.MediaType);
+        var disposition = response.Content.Headers.GetValues("Content-Disposition").Single();
+        Assert.Contains("attachment", disposition);
+        Assert.Contains(".xlsx", disposition);
+
+        var bytes = await response.Content.ReadAsByteArrayAsync();
+        Assert.Equal(3, ContarFilasHoja(bytes)); // 1 header + 2 filtered rows
+    }
+
+    [Fact]
+    public async Task ProveedoresExportacion_BadRequest_OnUnknownSort()
+    {
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var response = await client.GetAsync("/api/catalogos/proveedores/exportacion?orden=nombre");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task ProveedoresExportacion_WithoutACookie_Returns401_AndNoFile()
+    {
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+
+        var response = await client.GetAsync("/api/catalogos/proveedores/exportacion");
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+        Assert.NotEqual(
+            "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task ProveedoresExportacion_HostileQuery_FilenameStaysConstantForm()
+    {
+        await SeedProveedorAsync("C00001", "CUALQUIERA");
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var response = await client.GetAsync("/api/catalogos/proveedores/exportacion?q=../..%0d%0aX:1");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var disposition = response.Content.Headers.GetValues("Content-Disposition").Single();
+        Assert.DoesNotContain("X:1", disposition);
+        Assert.DoesNotContain('\r', disposition);
+        Assert.DoesNotContain('\n', disposition);
+        Assert.Matches(new Regex(@"filename=proveedores-\d{4}-\d{2}-\d{2}\.xlsx"), disposition);
+    }
 }
