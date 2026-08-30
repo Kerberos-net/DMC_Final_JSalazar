@@ -59,16 +59,16 @@ TDD is strict: every slice is RED (failing test) -> GREEN (implement) -> REFACTO
 
 ## PR5 — API proveedores catalogo mode (base: PR4) ~380 | satisfies api req 1,2,3,6,8
 
-- [ ] 5.1 RED: `SmartNet.Catalogos.Core` tests — `OrdenProveedor.Valores` = {proveedor,ruc,codigo}, `EsValido`.
-- [ ] 5.2 RED: infra tests (`TestDatabaseFixture`) — `totalRegistros` correct on page 1 AND page 3; out-of-range page -> `items []` + correct totals; 3 sort keys x 2 directions; `codpro` tiebreak stable ACROSS a page boundary; `rucpro` NULLs first ASC; `tamanio` whitelist {6,10,20,50}; `ListarCatalogoCompletoAsync` unpaged same order.
-- [ ] 5.3 RED: API tests — `modo=catalogo` lists all incl `P00000`, `PaginaBandeja` envelope `{items,pagina,tamanioPagina,totalRegistros,totalPaginas}`, server sort per field+direction, 400 x unknown `modo`/`orden`/`direccion`/`tamanio`, 401.
-- [ ] 5.4 RED: REGRESSION — `modo` absent/`picker` still `{resultados,hayMas}`, still excludes `P00000`, still empty for `q=a` (byte-frozen #18, zero-line diff in picker files).
-- [ ] 5.5 RED: `GET /api/catalogos/proveedores/exportacion` — headers, workbook rows = filtered set + header, honors `q`/`orden`/`direccion`, 401, hostile-`q` filename. (If PR5 > 400 lines, move 5.5 + 5.9 into PR5b, base PR5.)
-- [ ] 5.6 GREEN: `SmartNet.Catalogos.Core/OrdenProveedor.cs` (pure, `EstadoDerivadoBandeja` shape).
-- [ ] 5.7 GREEN: Core port members `ListarCatalogoAsync(...) -> PaginaProveedores` + `ListarCatalogoCompletoAsync(...) -> IReadOnlyList<Proveedor>`.
-- [ ] 5.8 GREEN: SQL adapter — `CAST(COUNT(*) OVER() AS INT)` in the paged SELECT, conditional fallback `COUNT(*)` for empty page; key -> compile-time constant column switch (`ruc->rucpro`, `codigo->codpro`); every ordering appends `, codpro ASC`. `TamanoPagina=20` picker constant untouched.
-- [ ] 5.9 GREEN: `modo` gate in endpoint (`picker`->`BuscarAsync` frozen, `catalogo`->new path, else 400); export route via `ExportadorXlsx`.
-- [ ] 5.10 Acceptance: `dotnet test` green (Core + Infra + Api); `PurityScanTests` green; no `dbo.*` index/write, no new SQL, no new GRANT (ADR 0003).
+- [x] 5.1 RED: `SmartNet.Catalogos.Core` tests — `OrdenProveedor.Valores` = {proveedor,ruc,codigo}, `EsValido`.
+- [x] 5.2 RED: infra tests (`TestDatabaseFixture`) — `totalRegistros` correct on page 1 AND page 3; out-of-range page -> `items []` + correct totals; 3 sort keys x 2 directions; `codpro` tiebreak stable ACROSS a page boundary; `rucpro` NULLs first ASC; `tamanio` whitelist {6,10,20,50}; `ListarCatalogoCompletoAsync` unpaged same order.
+- [x] 5.3 RED: API tests — `modo=catalogo` lists all incl `P00000`, `PaginaBandeja` envelope `{items,pagina,tamanioPagina,totalRegistros,totalPaginas}`, server sort per field+direction, 400 x unknown `modo`/`orden`/`direccion`/`tamanio`, 401.
+- [x] 5.4 RED: REGRESSION — `modo` absent/`picker` still `{resultados,hayMas}`, still excludes `P00000`, still empty for `q=a` (byte-frozen #18, zero-line diff in picker files).
+- [x] 5.5 RED: `GET /api/catalogos/proveedores/exportacion` — headers, workbook rows = filtered set + header, honors `q`/`orden`/`direccion`, 401, hostile-`q` filename. (If PR5 > 400 lines, move 5.5 + 5.9 into PR5b, base PR5.)
+- [x] 5.6 GREEN: `SmartNet.Catalogos.Core/OrdenProveedor.cs` (pure, `EstadoDerivadoBandeja` shape).
+- [x] 5.7 GREEN: Core port members `ListarCatalogoAsync(...) -> PaginaProveedores` + `ListarCatalogoCompletoAsync(...) -> IReadOnlyList<Proveedor>`.
+- [x] 5.8 GREEN: SQL adapter — `CAST(COUNT(*) OVER() AS INT)` in the paged SELECT, conditional fallback `COUNT(*)` for empty page; key -> compile-time constant column switch (`ruc->rucpro`, `codigo->codpro`); every ordering appends `, codpro ASC`. `TamanoPagina=20` picker constant untouched.
+- [x] 5.9 GREEN: `modo` gate in endpoint (`picker`->`BuscarAsync` frozen, `catalogo`->new path, else 400); export route via `ExportadorXlsx`.
+- [x] 5.10 Acceptance: `dotnet test` green (Core + Infra + Api); `PurityScanTests` green; no `dbo.*` index/write, no new SQL, no new GRANT (ADR 0003).
 
 ## PR6 — SPA proveedores screen (base: PR5) ~330 | satisfies spa req 1,2,5; nav req
 
