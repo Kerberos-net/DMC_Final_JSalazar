@@ -72,12 +72,12 @@ TDD is strict: every slice is RED (failing test) -> GREEN (implement) -> REFACTO
 
 ## PR6 — SPA proveedores screen (base: PR5) ~330 | satisfies spa req 1,2,5; nav req
 
-- [ ] 6.1 RED: `data-access/*catalogo-proveedor*.service.spec.ts` — sends `q/pagina/modo=catalogo/orden/direccion/tamanio`; consumes `PaginaBandeja<T>` fields; NEW service, does not touch picker `ProveedorService` state.
-- [ ] 6.2 RED: container spec — sortable headers -> server re-query + reset page 1; search -> server `q` + reset page 1, keeps sort; rows-per-page bound to `tamanioPagina`; footer `Anterior/Siguiente · Página X de Y`; `Exportar` sends current search+sort.
-- [ ] 6.3 RED: `app.routes.spec.ts` `catalogos/proveedores` additive; `sidebar.spec.ts` `nav-proveedores` `<a>` -> `/catalogos/proveedores`.
-- [ ] 6.4 GREEN: `CatalogoProveedorService` signal service; presentational table (`codigo`/`razón social`/`RUC`); container owns filter/paging/sort signals; wire `tabla-paginador` + `boton-exportar`.
-- [ ] 6.5 GREEN: register `catalogos/proveedores` sibling child + `authGuard`; activate `nav-proveedores`.
-- [ ] 6.6 Acceptance: SPA runner green incl routes + sidebar specs; query-only, no mutate control.
+- [x] 6.1 RED: `data-access/*catalogo-proveedor*.service.spec.ts` — sends `q/pagina/modo=catalogo/orden/direccion/tamanio`; consumes `PaginaBandeja<T>` fields; NEW service, does not touch picker `ProveedorService` state.
+- [x] 6.2 RED: container spec — sortable headers -> server re-query + reset page 1; search -> server `q` + reset page 1, keeps sort; rows-per-page bound to `tamanioPagina`; footer `Anterior/Siguiente · Página X de Y`; `Exportar` sends current search+sort.
+- [x] 6.3 RED: `app.routes.spec.ts` `catalogos/proveedores` additive; `sidebar.spec.ts` `nav-proveedores` `<a>` -> `/catalogos/proveedores`.
+- [x] 6.4 GREEN: `CatalogoProveedorService` signal service; presentational table (`codigo`/`razón social`/`RUC`); container owns filter/paging/sort signals; wire `tabla-paginador` + `boton-exportar`.
+- [x] 6.5 GREEN: register `catalogos/proveedores` sibling child + `authGuard`; activate `nav-proveedores`.
+- [x] 6.6 Acceptance: SPA runner green incl routes + sidebar specs; query-only, no mutate control.
 
 ## PR7 — API tipo de cambio history (base: PR6) ~330 | satisfies api req 5,6,7,8
 
