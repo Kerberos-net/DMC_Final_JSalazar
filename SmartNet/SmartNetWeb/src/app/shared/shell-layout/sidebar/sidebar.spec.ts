@@ -6,15 +6,17 @@ import { Sidebar } from './sidebar';
 /**
  * spec `spa-shell-nav` (canvas replica, `Gestor de Facturas.dc.html`): the sidebar mirrors the
  * handoff navigation — a primary group (Bandeja principal, Registro de compra, Proveedores, Plan
- * contable), one hairline divider, then a utility group (Errores y notificaciones, Sincronización,
- * Configuración). `Bandeja`, `Proveedores` (BACKLOG #22 PR6 → `/catalogos/proveedores`),
- * `Plan contable` (BACKLOG #22 PR4 → `/catalogos/plan-contable`) and
- * `Configuración` resolve to a route; the rest render as
- * inert entries (`aria-disabled`, not links) marked "disponible próximamente". The list stays the
- * canvas's 7 entries — the canvas has no `Tipo de cambio` entry and adding one is a later owner
- * decision (PR8), not a reviewer "fix". Glyphs are
- * `<div>`/`<span>` only (no `<svg>`, no icon font). Below the nav: an "Apariencia" theme card and
- * a profile row.
+ * contable, Tipo de cambio), one hairline divider, then a utility group (Errores y notificaciones,
+ * Sincronización, Configuración). `Bandeja`, `Proveedores` (BACKLOG #22 PR6 →
+ * `/catalogos/proveedores`), `Plan contable` (BACKLOG #22 PR4 → `/catalogos/plan-contable`),
+ * `Tipo de cambio` (BACKLOG #22 PR8 → `/catalogos/tipo-cambio`) and `Configuración` resolve to a
+ * route; the rest render as inert entries (`aria-disabled`, not links) marked "disponible
+ * próximamente". Glyphs are `<div>`/`<span>` only (no `<svg>`, no icon font). Below the nav: an
+ * "Apariencia" theme card and a profile row.
+ *
+ * NOTE (BACKLOG #22 PR8, memory `shell-nav-canvas-replica`): the canvas has NO `Tipo de cambio`
+ * entry. Adding it as the 8th destination is a ratified owner decision (design D5 / spec decision
+ * 5) — a reviewer must NOT "restore" the 7-entry list or the prior 7-glyph sidebar rules.
  */
 describe('Sidebar', () => {
   async function crear(colapsado = false, usuario: string | null = null, temaEfectivo = 'claro') {
@@ -42,6 +44,7 @@ describe('Sidebar', () => {
       'Registro de compra',
       'Proveedores',
       'Plan contable',
+      'Tipo de cambio',
       'Errores y notificaciones',
       'Sincronización',
       'Configuración',
@@ -56,10 +59,15 @@ describe('Sidebar', () => {
     const configuracion = root.querySelector('[data-testid="nav-configuracion"]')!;
     const planContable = root.querySelector('[data-testid="nav-plan-contable"]')!;
     const proveedores = root.querySelector('[data-testid="nav-proveedores"]')!;
+    const tipoCambio = root.querySelector('[data-testid="nav-tipo-cambio"]')!;
     expect(bandeja.tagName).toBe('A');
     expect(configuracion.tagName).toBe('A');
     expect(planContable.tagName).toBe('A');
     expect(proveedores.tagName).toBe('A');
+    expect(tipoCambio.tagName).toBe('A');
+    expect(
+      tipoCambio.getAttribute('ng-reflect-router-link') ?? tipoCambio.getAttribute('href')
+    ).toContain('catalogos/tipo-cambio');
     expect(
       bandeja.getAttribute('ng-reflect-router-link') ?? bandeja.getAttribute('href')
     ).toContain('bandeja');
@@ -103,7 +111,7 @@ describe('Sidebar', () => {
     expect(root.querySelectorAll('svg').length).toBe(0);
     expect(root.querySelectorAll('img').length).toBe(0);
     const glifos = root.querySelectorAll('[data-testid="nav-glifo"]');
-    expect(glifos.length).toBe(7);
+    expect(glifos.length).toBe(8);
     glifos.forEach((g) => expect(['DIV', 'SPAN']).toContain(g.tagName));
   });
 

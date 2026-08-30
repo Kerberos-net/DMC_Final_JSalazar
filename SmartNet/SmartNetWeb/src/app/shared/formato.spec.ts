@@ -1,4 +1,4 @@
-import { dosDecimales, importeOpcional } from './formato';
+import { dosDecimales, fechaIso, importeOpcional, rangoMesActual } from './formato';
 
 describe('formato', () => {
   describe('dosDecimales', () => {
@@ -19,6 +19,33 @@ describe('formato', () => {
 
     it('renders a 2-decimal amount when present', () => {
       expect(importeOpcional(90)).toBe('90.00');
+    });
+  });
+
+  describe('fechaIso', () => {
+    it('formats a Date as LOCAL yyyy-MM-dd, never UTC', () => {
+      expect(fechaIso(new Date(2026, 0, 5))).toBe('2026-01-05');
+      expect(fechaIso(new Date(2026, 11, 31))).toBe('2026-12-31');
+    });
+  });
+
+  describe('rangoMesActual', () => {
+    it('spans the first day of the given month .. that day, in LOCAL time', () => {
+      expect(rangoMesActual(new Date(2026, 7, 17))).toEqual({
+        desde: '2026-08-01',
+        hasta: '2026-08-17',
+      });
+    });
+
+    it('defaults to today when no date is passed', () => {
+      const hoy = new Date();
+      const esperado = {
+        desde: `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-01`,
+        hasta: `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}-${String(
+          hoy.getDate()
+        ).padStart(2, '0')}`,
+      };
+      expect(rangoMesActual()).toEqual(esperado);
     });
   });
 });
