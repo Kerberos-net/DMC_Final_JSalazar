@@ -232,9 +232,9 @@ resolve to an existing semantic success/positive token.
 
 | Route | Params | Notes |
 |---|---|---|
-| `GET /api/catalogos/proveedores/exportacion` | `q`, `orden`, `direccion` | Same filter+sort as the list, no paging |
-| `GET /api/catalogos/plan-contable/exportacion` | `q`, `orden`, `direccion` | `q` mirrors the SPA's client-side filter (see below) |
-| `GET /api/tipos-cambio/exportacion` | `desde`, `hasta` (required), `orden`, `direccion` | Same 400s as the list route |
+| `GET /api/catalogos/proveedores/exportacion` | `q`, `orden`, `direccion` | Same filter+sort as the list (server-side sort applies here), no paging |
+| `GET /api/catalogos/plan-contable/exportacion` | `q` | `q` mirrors the SPA's client-side filter; default order, user sorts in Excel (sort is client-side on screen) |
+| `GET /api/tipos-cambio/exportacion` | `desde`, `hasta` (required) | Same 400s as the list route; default order (sort is client-side on screen) |
 
 Rejected: one `GET /api/catalogos/exportacion?catalogo=…`. ADR 0008 already rejected the generic
 parameterized endpoint by name ("el contrato deja de ser inspeccionable"), and TC lives on a
@@ -353,8 +353,8 @@ Route registration and SPA router config are ordinary authenticated routing, cov
 | Route | Query | 200 body | Errors |
 |---|---|---|---|
 | `GET /api/catalogos/proveedores` | `q`, `pagina`, `modo=picker\|catalogo`, `orden`, `direccion`, `tamanio` | picker: `{resultados, hayMas}` · catalogo: `{items, pagina, tamanioPagina, totalRegistros, totalPaginas}` | 400 unknown `modo`/`orden`/`direccion`/`tamanio`; 401 |
-| `GET /api/catalogos/plan-contable` | `q?`, `orden?`, `direccion?` | `{items:[{cuenta,descripcion,nivel,esHojaImputable}]}` | 400 unknown `orden`/`direccion`; 401 |
-| `GET /api/tipos-cambio` | `desde`, `hasta` (required), `orden?`, `direccion?` | `{items:[{fecha,origen,compra,venta,fechaConsulta}]}` | 400 missing/unparseable/inverted/>366 d; 401 |
+| `GET /api/catalogos/plan-contable` | `q?` | `{items:[{cuenta,descripcion,nivel,esHojaImputable}]}` | 401 |
+| `GET /api/tipos-cambio` | `desde`, `hasta` (required) | `{items:[{fecha,origen,compra,venta,fechaConsulta}]}` | 400 missing/unparseable/inverted/>366 d; 401 |
 | `GET …/{proveedores\|plan-contable}/exportacion`, `GET /api/tipos-cambio/exportacion` | same as their list route | `.xlsx` bytes | same 400s; 401 |
 
 `origen` is serialized as the string `"SBS"`/`"MANUAL"` by an explicit mapper in
