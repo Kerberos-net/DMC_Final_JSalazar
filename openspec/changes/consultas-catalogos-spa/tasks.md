@@ -50,12 +50,12 @@ TDD is strict: every slice is RED (failing test) -> GREEN (implement) -> REFACTO
 
 ## PR4 — SPA plan contable screen (base: PR3) ~330 | satisfies spa req 1,3,5; nav req
 
-- [ ] 4.1 RED: `data-access/*plan-contable*.service.spec.ts` — GETs full plan once; no request on filter/sort.
-- [ ] 4.2 RED: `feature/*plan-contable*` container spec — client-side filter + client-side column sort (no new request); `Exportar a Excel` calls `descarga-xlsx` with current `q`+sort.
-- [ ] 4.3 RED: `app.routes.spec.ts` — `catalogos/plan-contable` present (extend `arrayContaining` additively); `sidebar.spec.ts` — `nav-plan-contable` `<a>` active to `/catalogos/plan-contable`.
-- [ ] 4.4 GREEN: data-access signal service, presentational `ui/` table (`codigo`/`denominacion` <- API `descripcion`), typed `models/`, container owns filter/sort signals.
-- [ ] 4.5 GREEN: register `catalogos/plan-contable` as a sibling ShellLayout child with `authGuard`; activate sidebar `nav-plan-contable` link.
-- [ ] 4.6 Acceptance: SPA runner green incl `app.routes.spec.ts` + `sidebar.spec.ts`; no create/edit/delete control.
+- [x] 4.1 RED: `data-access/*plan-contable*.service.spec.ts` — GETs full plan once; no request on filter/sort.
+- [x] 4.2 RED: `feature/*plan-contable*` container spec — client-side filter + client-side column sort (no new request); `Exportar a Excel` calls `descarga-xlsx` with current `q`+sort.
+- [x] 4.3 RED: `app.routes.spec.ts` — `catalogos/plan-contable` present (extend `arrayContaining` additively); `sidebar.spec.ts` — `nav-plan-contable` `<a>` active to `/catalogos/plan-contable`.
+- [x] 4.4 GREEN: data-access signal service, presentational `ui/` table (`codigo`/`denominacion` <- API `descripcion`), typed `models/`, container owns filter/sort signals.
+- [x] 4.5 GREEN: register `catalogos/plan-contable` as a sibling ShellLayout child with `authGuard`; activate sidebar `nav-plan-contable` link.
+- [x] 4.6 Acceptance: SPA runner green incl `app.routes.spec.ts` + `sidebar.spec.ts`; no create/edit/delete control.
 
 ## PR5 — API proveedores catalogo mode (base: PR4) ~380 | satisfies api req 1,2,3,6,8
 
