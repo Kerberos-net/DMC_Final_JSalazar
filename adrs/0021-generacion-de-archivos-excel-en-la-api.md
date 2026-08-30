@@ -2,8 +2,8 @@
 
 ## Estado
 
-Propuesto. Revisión 1. Nace del ítem #22 (BACKLOG), que es el primero en pedir que la API entregue un
-archivo y no un JSON. ADR 0002 fijó el stack por componente y ADR 0008 fijó la forma de los contratos;
+Aceptado. Revisión 1. Ratificado por el dueño del proyecto el 2026-08-30, junto con el cierre del
+ítem #22 (BACKLOG), que es el primero en pedir que la API entregue un archivo y no un JSON. ADR 0002 fijó el stack por componente y ADR 0008 fijó la forma de los contratos;
 ninguno de los dos dice qué ocurre cuando el diseño de interfaz pide un `.xlsx` real, que es un
 formato que .NET no sabe escribir de fábrica. Este ADR no reabre esas decisiones: añade la primera
 dependencia de generación de archivos del backend y, sobre todo, **acota dónde puede vivir**.
