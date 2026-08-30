@@ -7,11 +7,12 @@ import { Sidebar } from './sidebar';
  * spec `spa-shell-nav` (canvas replica, `Gestor de Facturas.dc.html`): the sidebar mirrors the
  * handoff navigation — a primary group (Bandeja principal, Registro de compra, Proveedores, Plan
  * contable), one hairline divider, then a utility group (Errores y notificaciones, Sincronización,
- * Configuración). `Bandeja`, `Plan contable` (BACKLOG #22 PR4 → `/catalogos/plan-contable`) and
+ * Configuración). `Bandeja`, `Proveedores` (BACKLOG #22 PR6 → `/catalogos/proveedores`),
+ * `Plan contable` (BACKLOG #22 PR4 → `/catalogos/plan-contable`) and
  * `Configuración` resolve to a route; the rest render as
  * inert entries (`aria-disabled`, not links) marked "disponible próximamente". The list stays the
  * canvas's 7 entries — the canvas has no `Tipo de cambio` entry and adding one is a later owner
- * decision, not a reviewer "fix". Glyphs are
+ * decision (PR8), not a reviewer "fix". Glyphs are
  * `<div>`/`<span>` only (no `<svg>`, no icon font). Below the nav: an "Apariencia" theme card and
  * a profile row.
  */
@@ -54,9 +55,11 @@ describe('Sidebar', () => {
     const bandeja = root.querySelector('[data-testid="nav-bandeja"]')!;
     const configuracion = root.querySelector('[data-testid="nav-configuracion"]')!;
     const planContable = root.querySelector('[data-testid="nav-plan-contable"]')!;
+    const proveedores = root.querySelector('[data-testid="nav-proveedores"]')!;
     expect(bandeja.tagName).toBe('A');
     expect(configuracion.tagName).toBe('A');
     expect(planContable.tagName).toBe('A');
+    expect(proveedores.tagName).toBe('A');
     expect(
       bandeja.getAttribute('ng-reflect-router-link') ?? bandeja.getAttribute('href')
     ).toContain('bandeja');
@@ -66,8 +69,11 @@ describe('Sidebar', () => {
     expect(
       planContable.getAttribute('ng-reflect-router-link') ?? planContable.getAttribute('href')
     ).toContain('catalogos/plan-contable');
+    expect(
+      proveedores.getAttribute('ng-reflect-router-link') ?? proveedores.getAttribute('href')
+    ).toContain('catalogos/proveedores');
 
-    for (const testid of ['nav-registro', 'nav-proveedores', 'nav-errores', 'nav-sincronizacion']) {
+    for (const testid of ['nav-registro', 'nav-errores', 'nav-sincronizacion']) {
       const inerte = root.querySelector(`[data-testid="${testid}"]`)!;
       expect(inerte.tagName).not.toBe('A');
       expect(inerte.getAttribute('aria-disabled')).toBe('true');

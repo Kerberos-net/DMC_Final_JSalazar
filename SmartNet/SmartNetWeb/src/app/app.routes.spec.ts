@@ -43,4 +43,15 @@ describe('app.routes', () => {
     expect((ruta?.canActivate?.length ?? 0) > 0).toBe(true);
     expect(typeof ruta?.loadComponent).toBe('function');
   });
+
+  // BACKLOG #22 PR6 (spa spec req 1,2) -- additive guarded lazy child; the `arrayContaining`
+  // assertions above still hold.
+  it('registers catalogos/proveedores as a guarded lazy child of the shell', () => {
+    const ruta = (shellParent?.children ?? []).find(
+      (c: Route) => c.path === 'catalogos/proveedores'
+    );
+    expect(ruta).toBeDefined();
+    expect((ruta?.canActivate?.length ?? 0) > 0).toBe(true);
+    expect(typeof ruta?.loadComponent).toBe('function');
+  });
 });
