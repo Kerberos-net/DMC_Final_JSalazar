@@ -57,6 +57,15 @@ export class Sidebar {
       glifo: 'plan',
       ruta: '/catalogos/plan-contable',
     },
+    // BACKLOG #22 PR8 (design D5, memory `shell-nav-canvas-replica`): the canvas has NO
+    // `Tipo de cambio` entry. This 8th destination is a ratified owner decision — do NOT
+    // "restore" the 7-entry list or the prior 7-glyph sidebar rules.
+    {
+      testid: 'nav-tipo-cambio',
+      etiqueta: 'Tipo de cambio',
+      glifo: 'tipo-cambio',
+      ruta: '/catalogos/tipo-cambio',
+    },
   ];
 
   protected readonly utilitarios: readonly DestinoNav[] = [

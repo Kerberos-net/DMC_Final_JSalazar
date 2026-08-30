@@ -1,0 +1,34 @@
+<table class="tabla-catalogo">
+  <thead>
+    <tr>
+      @for (columna of columnas; track columna.clave) {
+        <th
+          class="tabla-catalogo__th--ordenable"
+          [class.tabla-catalogo__th--numerica]="columna.numerica"
+          [attr.data-testid]="'orden-' + columna.clave"
+          [attr.aria-sort]="
+            orden()?.campo === columna.clave
+              ? orden()?.direccion === 'asc'
+                ? 'ascending'
+                : 'descending'
+              : 'none'
+          "
+          (click)="ordenar.emit(columna.clave)"
+        >
+          {{ columna.etiqueta }}
+          <span class="tabla-catalogo__flecha" aria-hidden="true">{{ flechas()[columna.clave] }}</span>
+        </th>
+      }
+    </tr>
+  </thead>
+  <tbody>
+    @for (fila of filas(); track fila.fecha + '|' + fila.origen) {
+      <tr [attr.data-testid]="'tc-fila-' + fila.fecha + '-' + fila.origen">
+        <td>{{ fila.fecha }}</td>
+        <td>{{ fila.origen }}</td>
+        <td class="tabla-catalogo__td--numerica">{{ dosDecimales(fila.compra) }}</td>
+        <td class="tabla-catalogo__td--numerica">{{ dosDecimales(fila.venta) }}</td>
+      </tr>
+    }
+  </tbody>
+</table>

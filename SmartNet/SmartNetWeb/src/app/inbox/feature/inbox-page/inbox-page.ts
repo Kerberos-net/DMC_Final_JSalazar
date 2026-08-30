@@ -9,13 +9,7 @@ import {
   OrdenFecha,
   ResumenBandeja,
 } from '../../models/bandeja-item.model';
-
-/** Local `yyyy-MM-dd` (NOT `toISOString`, which is UTC and can shift the day at the boundaries). */
-function fechaIso(d: Date): string {
-  const mes = String(d.getMonth() + 1).padStart(2, '0');
-  const dia = String(d.getDate()).padStart(2, '0');
-  return `${d.getFullYear()}-${mes}-${dia}`;
-}
+import { fechaIso } from '../../../shared/formato';
 
 interface ChipEstadoFiltro {
   readonly valor: EstadoDerivado;

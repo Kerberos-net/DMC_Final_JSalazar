@@ -1,0 +1,42 @@
+<section class="tipo-cambio-page">
+  <header class="tipo-cambio-page__cabecera">
+    <h1>Tipo de cambio</h1>
+    <p class="tipo-cambio-page__subtitulo" data-testid="tc-subtitulo">
+      Consulta de solo lectura del histórico de tipo de cambio (SBS y manual).
+    </p>
+  </header>
+
+  <div class="tipo-cambio-page__controles">
+    <label class="campo tipo-cambio-page__fecha">
+      Fecha inicial
+      <input
+        type="date"
+        data-testid="tc-desde"
+        [value]="desde()"
+        (change)="onDesde($any($event.target).value)"
+      />
+    </label>
+
+    <label class="campo tipo-cambio-page__fecha">
+      Fecha final
+      <input
+        type="date"
+        data-testid="tc-hasta"
+        [value]="hasta()"
+        (change)="onHasta($any($event.target).value)"
+      />
+    </label>
+
+    <app-boton-exportar [descargando]="descargando()" (exportar)="exportar()" />
+  </div>
+
+  @if (cargando()) {
+    <p data-testid="tc-cargando">Cargando…</p>
+  }
+
+  @if (error()) {
+    <p class="banner banner--error" data-testid="tc-error" role="alert">{{ error() }}</p>
+  }
+
+  <app-tipo-cambio-tabla [filas]="filas()" [orden]="orden()" (ordenar)="onOrdenar($event)" />
+</section>

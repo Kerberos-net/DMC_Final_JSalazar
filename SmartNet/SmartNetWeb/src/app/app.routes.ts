@@ -47,6 +47,14 @@ export const routes: Routes = [
             (m) => m.PlanContablePage
           ),
       },
+      {
+        path: 'catalogos/tipo-cambio',
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./catalogos/feature/tipo-cambio-page/tipo-cambio-page').then(
+            (m) => m.TipoCambioPage
+          ),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'bandeja' },
     ],
   },

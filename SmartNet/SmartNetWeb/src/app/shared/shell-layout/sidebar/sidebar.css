@@ -1,20 +1,16 @@
 /* spa-shell-nav — layout only; colours via tokens. */
-
 .sidebar {
   display: flex; flex-direction: column; gap: var(--space-1); width: 216px; height: 100%;
   padding: var(--space-3); background: var(--fondo-sidebar);
   border-right: 1px solid var(--borde-hairline); overflow: hidden;
 }
 .sidebar--colapsado { width: 60px; }
-
 .sidebar__cabecera {
   display: flex; align-items: center; gap: var(--space-2);
   padding: var(--space-1) var(--space-1) var(--space-4);
 }
-
 .sidebar__hamburguesa {
-  display: flex; flex-direction: column; justify-content: space-between;
-  width: 16px; height: 11px;
+  display: flex; flex-direction: column; justify-content: space-between; width: 16px; height: 11px;
 }
 .sidebar__hamburguesa span {
   height: 1.5px; border-radius: 1px; background: currentColor; transition: width 0.2s ease;
@@ -22,7 +18,6 @@
 .sidebar__hamburguesa span:nth-child(3) { width: 80%; }
 .sidebar--colapsado .sidebar__hamburguesa span:nth-child(1),
 .sidebar--colapsado .sidebar__hamburguesa span:nth-child(3) { width: 60%; }
-
 .sidebar__marca { display: inline-flex; align-items: center; gap: var(--space-2); min-width: 0; }
 .sidebar__logo {
   flex: none; width: 22px; height: 22px; border-radius: 6px; background: var(--accento);
@@ -30,14 +25,12 @@
 .sidebar__marca-texto {
   font-size: var(--fs-13); font-weight: var(--peso-semi); color: var(--texto-principal);
 }
-
 .sidebar__grupo {
   list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 2px;
 }
 .sidebar__divisor {
   margin: var(--space-2) var(--space-1); border: none; border-top: 1px solid var(--borde-hairline);
 }
-
 .sidebar__enlace,
 .sidebar__toggle {
   display: flex; align-items: center; gap: 10px; width: 100%; padding: 7px 10px;
@@ -52,24 +45,19 @@
 }
 .sidebar__enlace--inerte { color: var(--texto-secundario); opacity: 0.55; cursor: default; }
 .sidebar__enlace--inerte:hover { background: transparent; }
-
 .sidebar__toggle {
   width: 28px; height: 28px; flex: none; padding: 0; justify-content: center;
   color: var(--texto-secundario);
 }
 .sidebar__toggle:hover { color: var(--texto-principal); }
-
 .sidebar__etiqueta { white-space: nowrap; overflow: hidden; }
-
 .sidebar__espaciador { flex: 1; }
-
 .sidebar__apariencia {
   display: flex; align-items: center; justify-content: space-between; gap: var(--space-2);
   padding: var(--space-2); margin-bottom: var(--space-2); border-radius: var(--radio-input);
   background: var(--fondo-superficie-2);
 }
 .sidebar__apariencia-titulo { font-size: var(--fs-12); color: var(--texto-secundario); }
-
 .sidebar__tema {
   flex: none; width: 30px; height: 30px; display: inline-flex; align-items: center;
   justify-content: center; padding: 0; border: 1px solid var(--borde-hairline);
@@ -80,10 +68,7 @@
 .tema-glifo { width: 13px; height: 13px; border-radius: 50%; }
 .tema-glifo--sol { background: currentColor; box-shadow: 0 0 0 2px currentColor; }
 .tema-glifo--luna { border: 1.4px solid currentColor; box-shadow: inset -3px -2px 0 currentColor; }
-
-.sidebar__perfil {
-  display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2);
-}
+.sidebar__perfil { display: flex; align-items: center; gap: var(--space-2); padding: var(--space-2); }
 .sidebar__avatar {
   flex: none; width: 24px; height: 24px; border-radius: 50%; background: var(--texto-terciario);
 }
@@ -93,7 +78,6 @@
   overflow: hidden; text-overflow: ellipsis;
 }
 .sidebar__perfil-rol { font-size: var(--fs-12); color: var(--texto-secundario); }
-
 /* Estado colapsado (60px). */
 .sidebar--colapsado .sidebar__cabecera,
 .sidebar--colapsado .sidebar__enlace,
@@ -105,7 +89,7 @@
 .sidebar--colapsado .sidebar__marca,
 .sidebar--colapsado .sidebar__apariencia-titulo,
 .sidebar--colapsado .sidebar__perfil-datos { display: none; }
-
+/* Glyphs: div/span + pseudo only. `tipo-cambio` = BACKLOG #22 PR8 owner decision (no 7-entry restore). */
 .sidebar__glifo { flex: none; position: relative; width: 15px; height: 15px; }
 .glifo--proveedores,
 .glifo--errores,
@@ -114,19 +98,17 @@
 .glifo--proveedores::before,
 .glifo--errores::before,
 .glifo--configuracion::before { content: ''; position: absolute; }
-
 .glifo--bandeja {
-  background:
-    linear-gradient(currentColor 0 0) 0 0, linear-gradient(currentColor 0 0) 100% 0,
+  background: linear-gradient(currentColor 0 0) 0 0, linear-gradient(currentColor 0 0) 100% 0,
     linear-gradient(currentColor 0 0) 0 100%, linear-gradient(currentColor 0 0) 100% 100%;
   background-size: 6.5px 6.5px; background-repeat: no-repeat;
 }
-
 .glifo--registro,
-.glifo--plan {
-  display: flex; flex-direction: column; justify-content: center; gap: 2.5px;
-  border-top: 2px solid currentColor;
-}
+.glifo--plan,
+.glifo--tipo-cambio { display: flex; flex-direction: column; justify-content: center; gap: 2.5px; }
+.glifo--registro,
+.glifo--plan { border-top: 2px solid currentColor; }
+.glifo--tipo-cambio { align-items: center; }
 .glifo--registro::before,
 .glifo--plan::before,
 .glifo--registro::after,
@@ -135,6 +117,12 @@
 .glifo--plan::before { width: 80%; }
 .glifo--registro::after,
 .glifo--plan::after { width: 55%; }
+.glifo--tipo-cambio::before,
+.glifo--tipo-cambio::after {
+  content: ''; width: 8px; height: 8px; border: 1.6px solid currentColor; border-left: 0; border-bottom: 0;
+}
+.glifo--tipo-cambio::before { transform: rotate(45deg); }
+.glifo--tipo-cambio::after { transform: rotate(-135deg); }
 .glifo--proveedores::before { inset: 3px; border: 1.4px solid currentColor; border-radius: 50%; }
 .glifo--errores::before {
   left: 50%; top: 3px; width: 1.6px; height: 8px; background: currentColor;
