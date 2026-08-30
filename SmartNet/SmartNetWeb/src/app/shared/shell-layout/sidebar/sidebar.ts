@@ -46,7 +46,12 @@ export class Sidebar {
     { testid: 'nav-bandeja', etiqueta: 'Bandeja principal', glifo: 'bandeja', ruta: '/bandeja' },
     { testid: 'nav-registro', etiqueta: 'Registro de compra', glifo: 'registro' },
     { testid: 'nav-proveedores', etiqueta: 'Proveedores', glifo: 'proveedores' },
-    { testid: 'nav-plan-contable', etiqueta: 'Plan contable', glifo: 'plan' },
+    {
+      testid: 'nav-plan-contable',
+      etiqueta: 'Plan contable',
+      glifo: 'plan',
+      ruta: '/catalogos/plan-contable',
+    },
   ];
 
   protected readonly utilitarios: readonly DestinoNav[] = [

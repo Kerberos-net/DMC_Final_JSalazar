@@ -31,6 +31,14 @@ export const routes: Routes = [
             (m) => m.ConfiguracionPage
           ),
       },
+      {
+        path: 'catalogos/plan-contable',
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./catalogos/feature/plan-contable-page/plan-contable-page').then(
+            (m) => m.PlanContablePage
+          ),
+      },
       { path: '', pathMatch: 'full', redirectTo: 'bandeja' },
     ],
   },

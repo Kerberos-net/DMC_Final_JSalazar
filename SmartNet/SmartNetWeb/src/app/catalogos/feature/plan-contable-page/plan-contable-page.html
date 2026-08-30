@@ -1,0 +1,42 @@
+<section class="plan-contable-page">
+  <header class="plan-contable-page__cabecera">
+    <h1>Plan contable</h1>
+    <p class="plan-contable-page__subtitulo" data-testid="plan-subtitulo">
+      Consulta de solo lectura del plan de cuentas.
+    </p>
+  </header>
+
+  <div class="plan-contable-page__controles">
+    <label class="campo plan-contable-page__buscador">
+      Buscar por código o denominación
+      <input
+        type="search"
+        data-testid="plan-filtro"
+        [value]="filtro()"
+        (input)="onFiltro($any($event.target).value)"
+        placeholder="Ej. 42 o proveedores"
+      />
+    </label>
+
+    <app-boton-exportar [descargando]="descargando()" (exportar)="exportar()" />
+  </div>
+
+  @if (cargando()) {
+    <p data-testid="plan-cargando">Cargando…</p>
+  }
+
+  @if (error()) {
+    <p class="banner banner--error" data-testid="plan-error" role="alert">{{ error() }}</p>
+  }
+
+  <app-plan-contable-tabla [filas]="visibles()" [orden]="orden()" (ordenar)="onOrdenar($event)" />
+
+  <app-tabla-paginador
+    [pagina]="paginaActual()"
+    [totalPaginas]="totalPaginas()"
+    [tamanio]="tamanio()"
+    [tamaniosDisponibles]="tamaniosDisponibles"
+    (paginaChange)="onPagina($event)"
+    (tamanioChange)="onTamanio($event)"
+  />
+</section>

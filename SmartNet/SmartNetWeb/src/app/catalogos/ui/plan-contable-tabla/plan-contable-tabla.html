@@ -1,0 +1,31 @@
+<table class="tabla-catalogo">
+  <thead>
+    <tr>
+      @for (columna of columnas; track columna.clave) {
+        <th
+          class="tabla-catalogo__th--ordenable"
+          [attr.data-testid]="'orden-' + columna.clave"
+          [attr.aria-sort]="
+            orden()?.campo === columna.clave
+              ? orden()?.direccion === 'asc'
+                ? 'ascending'
+                : 'descending'
+              : 'none'
+          "
+          (click)="ordenar.emit(columna.clave)"
+        >
+          {{ columna.etiqueta }}
+          <span class="tabla-catalogo__flecha" aria-hidden="true">{{ flechas()[columna.clave] }}</span>
+        </th>
+      }
+    </tr>
+  </thead>
+  <tbody>
+    @for (fila of filas(); track fila.cuenta) {
+      <tr [attr.data-testid]="'plan-fila-' + fila.cuenta">
+        <td>{{ fila.cuenta }}</td>
+        <td>{{ fila.descripcion }}</td>
+      </tr>
+    }
+  </tbody>
+</table>

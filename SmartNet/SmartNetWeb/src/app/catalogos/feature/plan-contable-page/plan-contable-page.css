@@ -1,0 +1,27 @@
+/* BACKLOG #22 PR4 -- layout only; every colour comes from a global token (outside the @layer
+ * stack, per the repo's component-CSS convention). */
+
+.plan-contable-page {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-4);
+}
+
+.plan-contable-page__subtitulo {
+  color: var(--texto-secundario);
+  font-size: var(--fs-13);
+  margin: 0;
+}
+
+.plan-contable-page__controles {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: var(--space-4);
+  flex-wrap: wrap;
+}
+
+.plan-contable-page__buscador {
+  flex: 1 1 20rem;
+  margin: 0;
+}

@@ -7,8 +7,11 @@ import { Sidebar } from './sidebar';
  * spec `spa-shell-nav` (canvas replica, `Gestor de Facturas.dc.html`): the sidebar mirrors the
  * handoff navigation — a primary group (Bandeja principal, Registro de compra, Proveedores, Plan
  * contable), one hairline divider, then a utility group (Errores y notificaciones, Sincronización,
- * Configuración). Only `Bandeja` and `Configuración` resolve to a route today; the rest render as
- * inert entries (`aria-disabled`, not links) marked "disponible próximamente". Glyphs are
+ * Configuración). `Bandeja`, `Plan contable` (BACKLOG #22 PR4 → `/catalogos/plan-contable`) and
+ * `Configuración` resolve to a route; the rest render as
+ * inert entries (`aria-disabled`, not links) marked "disponible próximamente". The list stays the
+ * canvas's 7 entries — the canvas has no `Tipo de cambio` entry and adding one is a later owner
+ * decision, not a reviewer "fix". Glyphs are
  * `<div>`/`<span>` only (no `<svg>`, no icon font). Below the nav: an "Apariencia" theme card and
  * a profile row.
  */
