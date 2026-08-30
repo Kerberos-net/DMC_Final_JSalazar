@@ -1,58 +1,43 @@
 <div class="inbox-filter">
-  <label class="campo inbox-filter__campo">
-    Estado
-    <select
-      data-testid="estado-select"
-      [value]="estado() ?? ''"
-      (change)="onEstadoSelect($any($event.target).value)"
-    >
-      <option value="">Todos</option>
-      <option value="PROMOVIDO">Promovido</option>
-      <option value="DESCARTADO">Descartado</option>
-      <option value="PENDIENTE">Pendiente</option>
-    </select>
-  </label>
+  <input
+    class="campo inbox-filter__buscar"
+    type="text"
+    data-testid="proveedor-input"
+    placeholder="Buscar por proveedor o documento…"
+    aria-label="Buscar por proveedor o documento"
+    [value]="proveedor() ?? ''"
+    (change)="onProveedorChange($any($event.target).value)"
+    (keydown.enter)="onProveedorChange($any($event.target).value)"
+  />
 
-  <label class="campo inbox-filter__campo">
-    Desde
-    <input
-      type="date"
-      data-testid="desde-input"
-      [value]="desde() ?? ''"
-      (change)="onDesdeChange($any($event.target).value)"
-    />
-  </label>
+  <input
+    class="campo inbox-filter__fecha"
+    type="date"
+    data-testid="desde-input"
+    aria-label="Desde"
+    [value]="desde() ?? ''"
+    (change)="onDesdeChange($any($event.target).value)"
+  />
 
-  <label class="campo inbox-filter__campo">
-    Hasta
-    <input
-      type="date"
-      data-testid="hasta-input"
-      [value]="hasta() ?? ''"
-      (change)="onHastaChange($any($event.target).value)"
-    />
-  </label>
+  <span class="inbox-filter__separador" aria-hidden="true">—</span>
 
-  <label class="campo inbox-filter__campo">
-    Proveedor
-    <input
-      type="text"
-      data-testid="proveedor-input"
-      [value]="proveedor() ?? ''"
-      (change)="onProveedorChange($any($event.target).value)"
-      (keydown.enter)="onProveedorChange($any($event.target).value)"
-    />
-  </label>
+  <input
+    class="campo inbox-filter__fecha"
+    type="date"
+    data-testid="hasta-input"
+    aria-label="Hasta"
+    [value]="hasta() ?? ''"
+    (change)="onHastaChange($any($event.target).value)"
+  />
 
-  <label class="campo inbox-filter__campo">
-    Orden por fecha
-    <select
-      data-testid="orden-select"
-      [value]="orden()"
-      (change)="onOrdenSelect($any($event.target).value)"
-    >
-      <option value="desc">Más reciente primero</option>
-      <option value="asc">Más antiguo primero</option>
-    </select>
-  </label>
+  <select
+    class="campo inbox-filter__orden"
+    data-testid="orden-select"
+    aria-label="Orden por fecha"
+    [value]="orden()"
+    (change)="onOrdenSelect($any($event.target).value)"
+  >
+    <option value="desc">Más reciente primero</option>
+    <option value="asc">Más antiguo primero</option>
+  </select>
 </div>

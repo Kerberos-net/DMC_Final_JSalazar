@@ -102,15 +102,7 @@ public sealed class SqlBandejaRepository : IBandejaRepository
                  SUM(CASE WHEN b.Bucket = 'DESCARTADA' THEN 1 ELSE 0 END) AS Descartadas,
                  COUNT(*) AS Total
              FROM (
-                 SELECT CASE
-                     WHEN ie.EstadoConsumo = 'DESCARTADO' THEN 'DESCARTADA'
-                     WHEN EXISTS (
-                         SELECT 1 FROM fact.ProcesamientoError pe WHERE pe.ProcesamientoId = ie.ProcesamientoId
-                     ) THEN 'ERROR'
-                     WHEN f.FacturaId IS NOT NULL AND (f.EsProveedorGenerico = 1 OR f.PosibleDuplicado = 1) THEN 'ALERTA'
-                     WHEN ie.EstadoConsumo = 'PROMOVIDO' THEN 'VALIDADA'
-                     ELSE 'PENDIENTE'
-                 END AS Bucket
+                 SELECT {BucketDerivado} AS Bucket
                  FROM fact.InboxEvent ie
                  LEFT JOIN fact.Factura f ON f.FacturaId = ie.FacturaId
              ) b;
@@ -125,6 +117,7 @@ public sealed class SqlBandejaRepository : IBandejaRepository
              """;
 
         command.Parameters.AddWithValue("@estado", (object?)filtros.Estado ?? DBNull.Value);
+        command.Parameters.AddWithValue("@estadoDerivado", (object?)filtros.EstadoDerivado ?? DBNull.Value);
         AgregarParametroFecha(command, "@desde", filtros.Desde);
         AgregarParametroFecha(command, "@hasta", filtros.Hasta);
         command.Parameters.AddWithValue("@proveedor", (object?)filtros.Proveedor ?? DBNull.Value);
@@ -246,17 +239,47 @@ public sealed class SqlBandejaRepository : IBandejaRepository
     /// `InboxEvent.Payload` JSON for rows not yet promoted (design D7 -- `DatosExtraidos` stays
     /// DENY'd).
     /// </summary>
-    private const string FiltroWhere =
+    /// <summary>
+    /// The derived-estado bucket — first match wins, byte-identical to the resumen aggregate's CASE
+    /// (design D2b: chip, card and <c>estadoDerivado</c> filter MUST agree). References <c>ie</c>/
+    /// <c>f</c>, so it is only valid where both are in scope (the paging INSERT, the D4 fallback
+    /// COUNT, and result set 3 — all three <c>FROM fact.InboxEvent ie LEFT JOIN fact.Factura f</c>).
+    /// </summary>
+    private const string BucketDerivado =
         """
+        CASE
+            WHEN ie.EstadoConsumo = 'DESCARTADO' THEN 'DESCARTADA'
+            WHEN EXISTS (
+                SELECT 1 FROM fact.ProcesamientoError pe WHERE pe.ProcesamientoId = ie.ProcesamientoId
+            ) THEN 'ERROR'
+            WHEN f.FacturaId IS NOT NULL AND (f.EsProveedorGenerico = 1 OR f.PosibleDuplicado = 1) THEN 'ALERTA'
+            WHEN ie.EstadoConsumo = 'PROMOVIDO' THEN 'VALIDADA'
+            ELSE 'PENDIENTE'
+        END
+        """;
+
+    /// <summary>
+    /// `estado` (raw EstadoConsumo, #13) and `estadoDerivado` (bucket, #21 follow-up) are mutually
+    /// exclusive — the endpoint 400s on both. When both are null the design.md default-view
+    /// predicate applies (`OrigenBandeja.EsVistaPorDefecto`). `estadoDerivado='TODOS'` widens to
+    /// every eligible row; any other value keeps exactly the rows whose <see cref="BucketDerivado"/>
+    /// equals it, so the filtered `totalRegistros` matches that bucket's `resumen` count.
+    /// `hasta` is inclusive of the whole day. `proveedor` matches identity
+    /// (`RucProveedor`/`ProveedorCodigo`) or the `InboxEvent.Payload` JSON for not-yet-promoted rows.
+    /// </summary>
+    private static readonly string FiltroWhere =
+        $$"""
         (
             (@estado IS NOT NULL AND ie.EstadoConsumo = @estado)
-            OR (@estado IS NULL AND (
+            OR (@estado IS NULL AND @estadoDerivado IS NULL AND (
                 ie.EstadoConsumo = 'PENDIENTE'
                 OR EXISTS (
                     SELECT 1 FROM fact.ProcesamientoError pe
                     WHERE pe.ProcesamientoId = ie.ProcesamientoId AND pe.Clasificacion <> 'OBSOLETO'
                 )
             ))
+            OR (@estadoDerivado = 'TODOS')
+            OR (@estadoDerivado IS NOT NULL AND @estadoDerivado <> 'TODOS' AND ({{BucketDerivado}}) = @estadoDerivado)
         )
         AND (@desde IS NULL OR ie.CreadoEn >= @desde)
         AND (@hasta IS NULL OR ie.CreadoEn < DATEADD(DAY, 1, @hasta))

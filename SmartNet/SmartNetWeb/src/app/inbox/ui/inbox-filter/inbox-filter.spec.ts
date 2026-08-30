@@ -4,7 +4,6 @@ import { InboxFilter } from './inbox-filter';
 describe('InboxFilter', () => {
   const createComponent = () => {
     const fixture = TestBed.createComponent(InboxFilter);
-    fixture.componentRef.setInput('estado', null);
     fixture.componentRef.setInput('orden', 'desc');
     fixture.componentRef.setInput('desde', null);
     fixture.componentRef.setInput('hasta', null);
@@ -19,53 +18,26 @@ describe('InboxFilter', () => {
     }).compileComponents();
   });
 
-  it('renders an option for every EstadoConsumo plus "todos"', () => {
+  it('no longer carries the estado control — it moved to the estado-chip row', () => {
     const fixture = createComponent();
-    const options = Array.from(
-      fixture.nativeElement.querySelectorAll('select[data-testid="estado-select"] option')
-    ) as HTMLOptionElement[];
-    const values = options.map((o) => o.value);
-    expect(values).toEqual(['', 'PROMOVIDO', 'DESCARTADO', 'PENDIENTE']);
+    expect(fixture.nativeElement.querySelector('[data-testid="estado-select"]')).toBeNull();
+    expect('estadoChange' in fixture.componentInstance).toBe(false);
   });
 
-  it('lays out every field label with the shared campo + component class', () => {
+  it('is one inline row of unlabelled controls, each accessible-named and on the shared campo class', () => {
     const fixture = createComponent();
-    const labels = Array.from(
-      fixture.nativeElement.querySelectorAll('.inbox-filter label')
-    ) as HTMLLabelElement[];
-    expect(labels).toHaveLength(5);
-    for (const label of labels) {
-      expect(label.classList.contains('campo')).toBe(true);
-      expect(label.classList.contains('inbox-filter__campo')).toBe(true);
+    const root: HTMLElement = fixture.nativeElement;
+
+    // Handoff §2: no visible <label> text — the search uses a placeholder, the rest aria-label.
+    expect(root.querySelectorAll('.inbox-filter label')).toHaveLength(0);
+
+    const controles = Array.from(
+      root.querySelectorAll('.inbox-filter .campo')
+    ) as HTMLElement[];
+    expect(controles).toHaveLength(4);
+    for (const c of controles) {
+      expect(c.getAttribute('aria-label') ?? c.getAttribute('placeholder')).toBeTruthy();
     }
-  });
-
-  it('emits estadoChange with the selected estado', () => {
-    const fixture = createComponent();
-    const emitted: (string | null)[] = [];
-    fixture.componentInstance.estadoChange.subscribe((v) => emitted.push(v));
-
-    const select: HTMLSelectElement = fixture.nativeElement.querySelector(
-      'select[data-testid="estado-select"]'
-    );
-    select.value = 'DESCARTADO';
-    select.dispatchEvent(new Event('change'));
-
-    expect(emitted).toEqual(['DESCARTADO']);
-  });
-
-  it('emits estadoChange(null) when "todos" is selected', () => {
-    const fixture = createComponent();
-    const emitted: (string | null)[] = [];
-    fixture.componentInstance.estadoChange.subscribe((v) => emitted.push(v));
-
-    const select: HTMLSelectElement = fixture.nativeElement.querySelector(
-      'select[data-testid="estado-select"]'
-    );
-    select.value = '';
-    select.dispatchEvent(new Event('change'));
-
-    expect(emitted).toEqual([null]);
   });
 
   it('emits ordenChange with the selected order', () => {

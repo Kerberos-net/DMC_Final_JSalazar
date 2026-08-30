@@ -40,7 +40,6 @@
         <td>
           @if (fila.item.origen === 'FACTURA') {
             <span data-testid="factura-id">Factura #{{ fila.item.facturaId }}</span>
-            <a data-testid="ir-a-detalle" [routerLink]="['/detalle', fila.item.facturaId]">Ver detalle</a>
           } @else if (fila.item.estadoConsumo === 'DESCARTADO') {
             <span data-testid="motivo-descarte">{{ fila.item.motivoDescarte }}</span>
           } @else {
@@ -60,9 +59,29 @@
           }
         </td>
         <td class="inbox-list__acciones">
+          @if (fila.item.origen === 'FACTURA') {
+            <a
+              class="inbox-list__icono"
+              data-testid="ir-a-detalle"
+              [routerLink]="['/detalle', fila.item.facturaId]"
+              [attr.aria-label]="'Editar la factura ' + fila.item.facturaId + ' en el detalle'"
+              title="Editar en el detalle"
+            >
+              <svg viewBox="0 0 16 16" aria-hidden="true" focusable="false">
+                <path
+                  d="M11.5 1.7 14.3 4.5 5.6 13.2 2 14l.8-3.6 8.7-8.7Z"
+                  fill="none"
+                  stroke="currentColor"
+                  stroke-width="1.4"
+                  stroke-linejoin="round"
+                />
+              </svg>
+            </a>
+          }
           @if (fila.item.errores.length > 0) {
             <button
               type="button"
+              class="inbox-list__reprocesar"
               [attr.data-testid]="'reprocesar-' + fila.item.inboxEventId"
               [disabled]="reprocesarDeshabilitado(fila)"
               (click)="onReprocesar(fila)"

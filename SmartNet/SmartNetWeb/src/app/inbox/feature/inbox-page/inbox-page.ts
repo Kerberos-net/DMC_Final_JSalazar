@@ -4,7 +4,26 @@ import { InboxFilter } from '../../ui/inbox-filter/inbox-filter';
 import { InboxList } from '../../ui/inbox-list/inbox-list';
 import { InboxResumen } from '../../ui/inbox-resumen/inbox-resumen';
 import { ConfirmarReproceso } from '../../ui/confirmar-reproceso/confirmar-reproceso';
-import { EstadoConsumo, OrdenFecha } from '../../models/bandeja-item.model';
+import {
+  EstadoDerivado,
+  OrdenFecha,
+  ResumenBandeja,
+} from '../../models/bandeja-item.model';
+
+/** Local `yyyy-MM-dd` (NOT `toISOString`, which is UTC and can shift the day at the boundaries). */
+function fechaIso(d: Date): string {
+  const mes = String(d.getMonth() + 1).padStart(2, '0');
+  const dia = String(d.getDate()).padStart(2, '0');
+  return `${d.getFullYear()}-${mes}-${dia}`;
+}
+
+interface ChipEstadoFiltro {
+  readonly valor: EstadoDerivado;
+  readonly etiqueta: string;
+  readonly conteo: number;
+  /** Drives the per-estado colour class (`inbox-page__chip--{tono}`). */
+  readonly tono: 'todos' | 'pendiente' | 'validada' | 'error' | 'alerta' | 'descartada';
+}
 
 /**
  * Container (smart) component: owns the filter/orden/pagina signals (ADR 0009 -- "los filtros de
@@ -26,10 +45,20 @@ export class InboxPage {
   private readonly inboxService = inject(InboxService);
   private readonly dialogo = viewChild.required(ConfirmarReproceso);
 
-  readonly estado = signal<EstadoConsumo | null>(null);
+  /** Handoff §2 header: "30 de agosto de 2026 · ¿Qué necesito atender hoy?" (today's date, es-PE). */
+  protected readonly encabezadoFecha =
+    new Intl.DateTimeFormat('es-PE', { day: 'numeric', month: 'long', year: 'numeric' }).format(
+      new Date()
+    ) + ' · ¿Qué necesito atender hoy?';
+
+  readonly estadoDerivado = signal<EstadoDerivado>('TODOS');
   readonly orden = signal<OrdenFecha>('desc');
-  readonly desde = signal<string | null>(null);
-  readonly hasta = signal<string | null>(null);
+  /** Handoff §2: the date range starts on the first day of the current month … */
+  readonly desde = signal<string | null>(
+    fechaIso(new Date(new Date().getFullYear(), new Date().getMonth(), 1))
+  );
+  /** … and ends today. */
+  readonly hasta = signal<string | null>(fechaIso(new Date()));
   readonly proveedor = signal<string | null>(null);
   readonly pagina = signal<number | null>(null);
 
@@ -45,7 +74,7 @@ export class InboxPage {
 
   constructor() {
     effect(() => {
-      const estado = this.estado();
+      const estadoDerivado = this.estadoDerivado();
       const orden = this.orden();
       const desde = this.desde();
       const hasta = this.hasta();
@@ -55,7 +84,7 @@ export class InboxPage {
       // error signal it sets, so the rejection is swallowed here (no unhandled promise rejection).
       void this.inboxService
         .cargar({
-          estado,
+          estadoDerivado,
           orden,
           desde,
           hasta,
@@ -66,9 +95,20 @@ export class InboxPage {
     });
   }
 
-  onEstadoChange(estado: EstadoConsumo | null): void {
+  chipsEstado(r: ResumenBandeja): ChipEstadoFiltro[] {
+    return [
+      { valor: 'TODOS', etiqueta: 'Todos', conteo: r.total, tono: 'todos' },
+      { valor: 'PENDIENTE', etiqueta: 'Pendiente', conteo: r.pendientes, tono: 'pendiente' },
+      { valor: 'VALIDADA', etiqueta: 'Validada', conteo: r.validadas, tono: 'validada' },
+      { valor: 'ERROR', etiqueta: 'Error', conteo: r.conError, tono: 'error' },
+      { valor: 'ALERTA', etiqueta: 'Alerta', conteo: r.alertas, tono: 'alerta' },
+      { valor: 'DESCARTADA', etiqueta: 'Descartada', conteo: r.descartadas, tono: 'descartada' },
+    ];
+  }
+
+  onEstadoDerivadoChange(estadoDerivado: EstadoDerivado): void {
     this.pagina.set(null);
-    this.estado.set(estado);
+    this.estadoDerivado.set(estadoDerivado);
   }
 
   onOrdenChange(orden: OrdenFecha): void {

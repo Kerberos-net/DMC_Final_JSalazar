@@ -189,6 +189,55 @@ public sealed class BandejaEndpointsTests : SesionEndpointsTestBase
     }
 
     [Fact]
+    public async Task GetBandeja_EstadoDerivadoValidada_ReturnsPromotedRow_NotVisibleInDefaultView()
+    {
+        var procesamientoId = await Db.InsertarProcesamientoAsync(gmailMessageId: "msg-bandeja-ed-validada");
+        var inboxEventId = await Db.InsertarInboxEventAsync(procesamientoId, "{}");
+        var promocionRepository = new SqlPromocionRepository(Db.ConnectionString);
+        await promocionRepository.PromoverAsync(
+            inboxEventId, procesamientoId,
+            new FacturaPromovida(
+                ProveedorCodigo: "P00001", TipoComprobante: "01", Numero: "F001-ED", RucProveedor: "20100000001",
+                TotalOrig: 100m, Moneda: "PEN", FechaEmision: new DateOnly(2026, 8, 10),
+                Indicadores: new IndicadoresFactura(false, false, false, false, false),
+                Extracciones: Array.Empty<FacturaExtraccionPromovida>(), Estado: "PENDIENTE_VALIDACION"),
+            MuestraDocumentoPromovido(), CancellationToken.None);
+
+        using var client = await ObtenerClienteAutenticadoAsync();
+
+        var response = await client.GetAsync("/api/bandeja?estadoDerivado=VALIDADA");
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        var pagina = await response.Content.ReadFromJsonAsync<PaginaBandeja<BandejaItem>>(ResponseJsonOptions);
+        Assert.Contains(pagina!.Items, i => i.InboxEventId == inboxEventId);
+        Assert.All(pagina.Items, i => Assert.Equal("PROMOVIDO", i.EstadoConsumo));
+    }
+
+    [Fact]
+    public async Task GetBandeja_EstadoAndEstadoDerivadoTogether_Returns400ProblemDetails()
+    {
+        using var client = await ObtenerClienteAutenticadoAsync();
+
+        var response = await client.GetAsync("/api/bandeja?estado=PROMOVIDO&estadoDerivado=VALIDADA");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problema = await response.Content.ReadFromJsonAsync<ProblemDetails>(ResponseJsonOptions);
+        Assert.Equal(400, problema!.Status);
+    }
+
+    [Fact]
+    public async Task GetBandeja_UnknownEstadoDerivado_Returns400ProblemDetails()
+    {
+        using var client = await ObtenerClienteAutenticadoAsync();
+
+        var response = await client.GetAsync("/api/bandeja?estadoDerivado=INVENTADO");
+
+        Assert.Equal(HttpStatusCode.BadRequest, response.StatusCode);
+        var problema = await response.Content.ReadFromJsonAsync<ProblemDetails>(ResponseJsonOptions);
+        Assert.Equal(400, problema!.Status);
+    }
+
+    [Fact]
     public async Task GetBandeja_DesdeAfterHasta_Returns400ProblemDetails()
     {
         using var client = await ObtenerClienteAutenticadoAsync();

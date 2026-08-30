@@ -23,6 +23,7 @@ public static class BandejaEndpoints
 
     private static async Task<IResult> GetBandejaAsync(
         string? estado,
+        string? estadoDerivado,
         DateOnly? desde,
         DateOnly? hasta,
         string? proveedor,
@@ -46,7 +47,23 @@ public static class BandejaEndpoints
                 statusCode: StatusCodes.Status400BadRequest);
         }
 
-        var filtros = new FiltrosBandeja(estado, desde, hasta, proveedor, orden ?? "desc", numeroPagina);
+        if (estado is not null && estadoDerivado is not null)
+        {
+            return Results.Problem(
+                title: "No se pueden combinar 'estado' y 'estadoDerivado' en la misma consulta.",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        if (estadoDerivado is not null && !EstadoDerivadoBandeja.EsValido(estadoDerivado))
+        {
+            return Results.Problem(
+                title: "El parámetro 'estadoDerivado' debe ser uno de: "
+                    + string.Join(", ", EstadoDerivadoBandeja.Valores) + ".",
+                statusCode: StatusCodes.Status400BadRequest);
+        }
+
+        var filtros = new FiltrosBandeja(
+            estado, desde, hasta, proveedor, orden ?? "desc", numeroPagina, EstadoDerivado: estadoDerivado);
         var resultado = await bandeja.ListarAsync(filtros, ct);
         return Results.Ok(resultado);
     }

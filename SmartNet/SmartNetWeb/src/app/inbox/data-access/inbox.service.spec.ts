@@ -114,6 +114,26 @@ describe('InboxService', () => {
     await promise;
   });
 
+  it('sends estadoDerivado whenever set — including "TODOS" (the API no-param default is narrower)', async () => {
+    const p1 = service.cargar({ estadoDerivado: 'ERROR' });
+    const r1 = httpMock.expectOne((r) => r.url === '/api/bandeja');
+    expect(r1.request.params.get('estadoDerivado')).toBe('ERROR');
+    r1.flush(paginaVacia);
+    await p1;
+
+    const p2 = service.cargar({ estadoDerivado: 'TODOS' });
+    const r2 = httpMock.expectOne((r) => r.url === '/api/bandeja');
+    expect(r2.request.params.get('estadoDerivado')).toBe('TODOS');
+    r2.flush(paginaVacia);
+    await p2;
+
+    const p3 = service.cargar({});
+    const r3 = httpMock.expectOne((r) => r.url === '/api/bandeja');
+    expect(r3.request.params.has('estadoDerivado')).toBe(false);
+    r3.flush(paginaVacia);
+    await p3;
+  });
+
   it('caches the last-used filters as ultimosFiltros after each call', async () => {
     const promise = service.cargar({ estado: 'PROMOVIDO', pagina: 3 });
     httpMock.expectOne(() => true).flush(paginaVacia);

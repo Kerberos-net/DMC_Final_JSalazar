@@ -48,6 +48,11 @@ export class InboxService {
     if (filtros.estado) {
       params = params.set('estado', filtros.estado);
     }
+    if (filtros.estadoDerivado) {
+      // Sent even for 'TODOS' — the API's no-param default is the NARROW non-terminal view; the
+      // "Todos" chip must reach the wide predicate (`estadoDerivado=TODOS`).
+      params = params.set('estadoDerivado', filtros.estadoDerivado);
+    }
     if (filtros.desde) {
       params = params.set('desde', filtros.desde);
     }

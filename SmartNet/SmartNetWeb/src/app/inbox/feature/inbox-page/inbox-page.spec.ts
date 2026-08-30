@@ -48,7 +48,7 @@ describe('InboxPage', () => {
     httpMock = TestBed.inject(HttpTestingController);
   });
 
-  it('loads the bandeja on init with the default order (desc) and no estado filter', () => {
+  it('loads the bandeja on init: orden desc, estadoDerivado=TODOS, and the current-month date range', () => {
     const fixture = TestBed.createComponent(InboxPage);
     fixture.detectChanges();
 
@@ -56,22 +56,35 @@ describe('InboxPage', () => {
       (r) => r.url === '/api/bandeja' && r.params.get('orden') === 'desc'
     );
     expect(req.request.params.has('estado')).toBe(false);
+    // "Todos" must reach the wide predicate, not the API's narrow no-param default.
+    expect(req.request.params.get('estadoDerivado')).toBe('TODOS');
+
+    const hoy = new Date();
+    const primero = new Date(hoy.getFullYear(), hoy.getMonth(), 1);
+    const iso = (d: Date) =>
+      `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+    expect(req.request.params.get('desde')).toBe(iso(primero));
+    expect(req.request.params.get('hasta')).toBe(iso(hoy));
     req.flush({ items: [], pagina: 1, tamanioPagina: 20, totalRegistros: 0, totalPaginas: 0 });
   });
 
-  it('re-fetches with the new estado when the filter control emits a change', () => {
+  it('re-fetches with estadoDerivado when a chip is picked, and with TODOS again on reset', () => {
     const fixture = TestBed.createComponent(InboxPage);
     fixture.detectChanges();
     httpMock
       .expectOne(() => true)
       .flush({ items: [], pagina: 1, tamanioPagina: 20, totalRegistros: 0, totalPaginas: 0 });
 
-    fixture.componentInstance.onEstadoChange('DESCARTADO');
+    fixture.componentInstance.onEstadoDerivadoChange('ERROR');
     fixture.detectChanges();
+    httpMock
+      .expectOne((r) => r.url === '/api/bandeja' && r.params.get('estadoDerivado') === 'ERROR')
+      .flush({ items: [], pagina: 1, tamanioPagina: 20, totalRegistros: 0, totalPaginas: 0 });
 
-    const req = httpMock.expectOne(
-      (r) => r.url === '/api/bandeja' && r.params.get('estado') === 'DESCARTADO'
-    );
+    fixture.componentInstance.onEstadoDerivadoChange('TODOS');
+    fixture.detectChanges();
+    const req = httpMock.expectOne((r) => r.url === '/api/bandeja');
+    expect(req.request.params.get('estadoDerivado')).toBe('TODOS');
     req.flush({ items: [], pagina: 1, tamanioPagina: 20, totalRegistros: 0, totalPaginas: 0 });
   });
 
@@ -118,11 +131,11 @@ describe('InboxPage', () => {
       .expectOne((r) => r.params.get('pagina') === '3')
       .flush({ items: [], pagina: 3, tamanioPagina: 20, totalRegistros: 0, totalPaginas: 3 });
 
-    fixture.componentInstance.onEstadoChange('PROMOVIDO');
+    fixture.componentInstance.onEstadoDerivadoChange('VALIDADA');
     fixture.detectChanges();
 
     const req = httpMock.expectOne(
-      (r) => r.params.get('estado') === 'PROMOVIDO'
+      (r) => r.params.get('estadoDerivado') === 'VALIDADA'
     );
     expect(req.request.params.has('pagina')).toBe(false);
     req.flush({ items: [], pagina: 1, tamanioPagina: 20, totalRegistros: 0, totalPaginas: 0 });
@@ -253,9 +266,9 @@ describe('InboxPage', () => {
     await new Promise((resolve) => setTimeout(resolve, 0));
     fixture.detectChanges();
 
-    fixture.componentInstance.onEstadoChange('PROMOVIDO');
+    fixture.componentInstance.onEstadoDerivadoChange('VALIDADA');
     fixture.detectChanges();
-    httpMock.expectOne((r) => r.params.get('estado') === 'PROMOVIDO').flush(envelope({}));
+    httpMock.expectOne((r) => r.params.get('estadoDerivado') === 'VALIDADA').flush(envelope({}));
     await new Promise((resolve) => setTimeout(resolve, 0));
     fixture.detectChanges();
 
@@ -263,6 +276,60 @@ describe('InboxPage', () => {
       fixture.nativeElement.querySelectorAll('app-inbox-resumen [data-testid="tarjeta-valor"]')
     ).map((v: any) => v.textContent.trim());
     expect(valores).toEqual(['9', '1', '0', '2']);
+  });
+
+  it('estado chips filter: clicking a chip re-fetches with that estadoDerivado and marks it active', async () => {
+    const fixture = TestBed.createComponent(InboxPage);
+    fixture.detectChanges();
+    httpMock.expectOne(() => true).flush({
+      items: [],
+      pagina: 1,
+      tamanioPagina: 20,
+      totalRegistros: 0,
+      totalPaginas: 0,
+      resumen: { pendientes: 4, validadas: 4, conError: 2, alertas: 2, descartadas: 0, total: 12 },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+
+    const chips = fixture.nativeElement.querySelectorAll('[data-testid^="chip-filtro-"]');
+    expect(Array.from(chips).map((c: any) => c.dataset.testid)).toEqual([
+      'chip-filtro-TODOS',
+      'chip-filtro-PENDIENTE',
+      'chip-filtro-VALIDADA',
+      'chip-filtro-ERROR',
+      'chip-filtro-ALERTA',
+      'chip-filtro-DESCARTADA',
+    ]);
+
+    const chipError = fixture.nativeElement.querySelector(
+      '[data-testid="chip-filtro-ERROR"]'
+    ) as HTMLButtonElement;
+    expect(chipError.textContent).toContain('2');
+    chipError.click();
+    fixture.detectChanges();
+
+    httpMock.expectOne((r) => r.params.get('estadoDerivado') === 'ERROR').flush({
+      items: [],
+      pagina: 1,
+      tamanioPagina: 20,
+      totalRegistros: 2,
+      totalPaginas: 1,
+      resumen: { pendientes: 4, validadas: 4, conError: 2, alertas: 2, descartadas: 0, total: 12 },
+    });
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    fixture.detectChanges();
+
+    expect(
+      fixture.nativeElement
+        .querySelector('[data-testid="chip-filtro-ERROR"]')
+        .classList.contains('inbox-page__chip--activo')
+    ).toBe(true);
+    expect(
+      fixture.nativeElement
+        .querySelector('[data-testid="chip-filtro-TODOS"]')
+        .classList.contains('inbox-page__chip--activo')
+    ).toBe(false);
   });
 
   it('renders no summary strip before the first load completes', () => {

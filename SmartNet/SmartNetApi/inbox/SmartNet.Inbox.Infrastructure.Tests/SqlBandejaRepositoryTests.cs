@@ -20,8 +20,8 @@ public sealed class SqlBandejaRepositoryTests : IAsyncLifetime
 
     private static FiltrosBandeja Filtros(
         string? estado = null, DateOnly? desde = null, DateOnly? hasta = null, string? proveedor = null,
-        string orden = "desc", int pagina = 1, int tamanioPagina = 20) =>
-        new(estado, desde, hasta, proveedor, orden, pagina, tamanioPagina);
+        string orden = "desc", int pagina = 1, int tamanioPagina = 20, string? estadoDerivado = null) =>
+        new(estado, desde, hasta, proveedor, orden, pagina, tamanioPagina, estadoDerivado);
 
     // --- Approval tests (migrated to FiltrosBandeja) -----------------------------------------
 
@@ -470,6 +470,99 @@ public sealed class SqlBandejaRepositoryTests : IAsyncLifetime
         Assert.Equal(baseline, conProveedor);
         Assert.Equal(baseline, conFechas);
         Assert.Equal(baseline, pagina2);
+    }
+
+    // --- BACKLOG #21 follow-up: estadoDerivado bucket filter (SPA estado chips) --------------
+
+    /// <summary>
+    /// Seeds one row per derived bucket and returns their InboxEventIds keyed by bucket name.
+    /// </summary>
+    private async Task<Dictionary<string, long>> SeedUnaFilaPorBucketAsync(string sufijo)
+    {
+        var ids = new Dictionary<string, long>();
+
+        var pendProc = await _db.InsertarProcesamientoAsync(gmailMessageId: $"msg-ed-{sufijo}-pend");
+        ids["PENDIENTE"] = await _db.InsertarInboxEventAsync(pendProc, "{}");
+
+        ids["VALIDADA"] = await PromoverFacturaAsync(
+            $"msg-ed-{sufijo}-val", proveedorCodigo: "P00001", numero: $"F-{sufijo}-1");
+
+        var errProc = await _db.InsertarProcesamientoAsync(gmailMessageId: $"msg-ed-{sufijo}-err");
+        ids["ERROR"] = await _db.InsertarInboxEventAsync(errProc, "{}");
+        await _db.InsertarProcesamientoErrorAsync(errProc, mensaje: "boom");
+
+        ids["ALERTA"] = await PromoverFacturaAsync(
+            $"msg-ed-{sufijo}-ale", proveedorCodigo: "P00002", numero: $"F-{sufijo}-2", esProveedorGenerico: true);
+
+        var descProc = await _db.InsertarProcesamientoAsync(gmailMessageId: $"msg-ed-{sufijo}-desc");
+        ids["DESCARTADA"] = await _db.InsertarInboxEventAsync(descProc, "{}");
+        await _db.ExecuteNonQueryAsync(
+            $"UPDATE fact.InboxEvent SET EstadoConsumo = 'DESCARTADO', MotivoDescarte = 'x' WHERE InboxEventId = {ids["DESCARTADA"]};");
+
+        return ids;
+    }
+
+    [Theory]
+    [InlineData("PENDIENTE")]
+    [InlineData("VALIDADA")]
+    [InlineData("ERROR")]
+    [InlineData("ALERTA")]
+    [InlineData("DESCARTADA")]
+    public async Task ListarAsync_EstadoDerivado_ReturnsOnlyRowsInThatBucket(string bucket)
+    {
+        var ids = await SeedUnaFilaPorBucketAsync(bucket.ToLowerInvariant());
+        var sut = new SqlBandejaRepository(_db.ConnectionString);
+
+        var resultado = await sut.ListarAsync(Filtros(estadoDerivado: bucket, orden: "asc"), CancellationToken.None);
+
+        Assert.Equal(new[] { ids[bucket] }, resultado.Items.Select(i => i.InboxEventId));
+        Assert.Equal(1, resultado.TotalRegistros);
+    }
+
+    [Fact]
+    public async Task ListarAsync_EstadoDerivadoTodos_ReturnsEveryEligibleRow_MatchingResumenTotal()
+    {
+        await SeedUnaFilaPorBucketAsync("todos");
+        var sut = new SqlBandejaRepository(_db.ConnectionString);
+
+        var resultado = await sut.ListarAsync(Filtros(estadoDerivado: "TODOS", orden: "asc"), CancellationToken.None);
+
+        Assert.Equal(5, resultado.TotalRegistros);
+        Assert.Equal(resultado.Resumen.Total, resultado.TotalRegistros);
+    }
+
+    [Fact]
+    public async Task ListarAsync_EstadoDerivadoError_IncludesObsoletoOnlyRow_MatchingTheCard()
+    {
+        var procId = await _db.InsertarProcesamientoAsync(gmailMessageId: "msg-ed-obsoleto");
+        var inboxId = await _db.InsertarInboxEventAsync(procId, "{}");
+        await _db.InsertarProcesamientoErrorAsync(procId, clasificacion: "OBSOLETO", mensaje: "reintento superado");
+        var sut = new SqlBandejaRepository(_db.ConnectionString);
+
+        var resultado = await sut.ListarAsync(Filtros(estadoDerivado: "ERROR", orden: "asc"), CancellationToken.None);
+
+        // D2b: the ERROR bucket (chip + card + estadoDerivado) counts any ProcesamientoError,
+        // unlike the default list view which drops OBSOLETO.
+        Assert.Contains(resultado.Items, i => i.InboxEventId == inboxId);
+        Assert.Equal(resultado.Resumen.ConError, resultado.TotalRegistros);
+    }
+
+    [Fact]
+    public async Task ListarAsync_EstadoDerivadoBucketTotals_MatchTheResumenBuckets()
+    {
+        await SeedUnaFilaPorBucketAsync("match");
+        var sut = new SqlBandejaRepository(_db.ConnectionString);
+        var resumen = (await sut.ListarAsync(Filtros(orden: "asc"), CancellationToken.None)).Resumen;
+
+        foreach (var (bucket, esperado) in new[]
+        {
+            ("PENDIENTE", resumen.Pendientes), ("VALIDADA", resumen.Validadas), ("ERROR", resumen.ConError),
+            ("ALERTA", resumen.Alertas), ("DESCARTADA", resumen.Descartadas),
+        })
+        {
+            var r = await sut.ListarAsync(Filtros(estadoDerivado: bucket, orden: "asc"), CancellationToken.None);
+            Assert.Equal(esperado, r.TotalRegistros);
+        }
     }
 
     // --- BACKLOG #21 task 2.4: the whole widened batch runs as usr_api ---------------------

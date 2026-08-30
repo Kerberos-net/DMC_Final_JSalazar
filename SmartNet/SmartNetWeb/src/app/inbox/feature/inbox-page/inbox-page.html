@@ -1,23 +1,38 @@
 <section class="inbox-page">
   <header class="inbox-page__cabecera">
     <h1 class="inbox-page__titulo">Bandeja principal</h1>
-    <p class="inbox-page__subtitulo" data-testid="inbox-subtitulo">
-      Qué necesito atender hoy: incidencias con error, alertas de calidad y facturas pendientes de
-      promover.
-    </p>
+    <p class="inbox-page__subtitulo" data-testid="inbox-subtitulo">{{ encabezadoFecha }}</p>
   </header>
 
   @if (resumen(); as r) {
     <app-inbox-resumen [resumen]="r" />
   }
 
+  <div class="inbox-page__seccion">
+    <h2 class="inbox-page__seccion-titulo">Bandeja de facturas</h2>
+    @if (resumen(); as r) {
+      <div class="inbox-page__chips" role="group" aria-label="Filtrar por estado">
+        @for (chip of chipsEstado(r); track chip.valor) {
+          <button
+            type="button"
+            class="inbox-page__chip inbox-page__chip--{{ chip.tono }}"
+            [class.inbox-page__chip--activo]="estadoDerivado() === chip.valor"
+            [attr.aria-pressed]="estadoDerivado() === chip.valor"
+            [attr.data-testid]="'chip-filtro-' + chip.valor"
+            (click)="onEstadoDerivadoChange(chip.valor)"
+          >
+            {{ chip.etiqueta }} <span>{{ chip.conteo }}</span>
+          </button>
+        }
+      </div>
+    }
+  </div>
+
   <app-inbox-filter
-    [estado]="estado()"
     [orden]="orden()"
     [desde]="desde()"
     [hasta]="hasta()"
     [proveedor]="proveedor()"
-    (estadoChange)="onEstadoChange($event)"
     (ordenChange)="onOrdenChange($event)"
     (desdeChange)="onDesdeChange($event)"
     (hastaChange)="onHastaChange($event)"

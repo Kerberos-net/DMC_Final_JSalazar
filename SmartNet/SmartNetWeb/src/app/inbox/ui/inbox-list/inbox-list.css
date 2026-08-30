@@ -37,6 +37,47 @@
 
 .inbox-list__acciones {
   white-space: nowrap;
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+}
+
+/* Icon affordance for "edit in the detail screen" (handoff §2 row action). Navigation only —
+ * the bandeja stays read-only; editing happens on /detalle/:id. */
+.inbox-list__icono {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 24px;
+  height: 24px;
+  border-radius: var(--radio-input);
+  color: var(--texto-secundario);
+}
+
+.inbox-list__icono:hover {
+  color: var(--texto-principal);
+  background: var(--fondo-superficie-2);
+}
+
+.inbox-list__icono svg {
+  width: 14px;
+  height: 14px;
+}
+
+.inbox-list__reprocesar {
+  font: inherit;
+  font-size: var(--fs-12);
+  padding: var(--space-1) var(--space-2);
+  border: 1px solid var(--borde-control);
+  border-radius: var(--radio-input);
+  background: transparent;
+  color: var(--texto-principal);
+  cursor: pointer;
+}
+
+.inbox-list__reprocesar:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
 }
 
 .inbox-list__vacio {

@@ -1,19 +1,20 @@
-/* BACKLOG #21 (spa-visual-bandeja): dashboard summary strip. Layout/composition only, every
- * colour via a global token; sits outside the @layer stack. */
+/* BACKLOG #21 (spa-visual-bandeja) / handoff §2: dashboard summary strip. Layout/composition only,
+ * every colour via a global token; sits outside the @layer stack. */
 
 .inbox-resumen {
   list-style: none;
-  margin: 0 0 var(--space-4);
+  margin: 0;
   padding: 0;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(140px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
   gap: var(--space-3);
 }
 
 .inbox-resumen__tarjeta {
   display: flex;
   flex-direction: column;
-  gap: var(--space-1);
+  gap: 5px;
+  padding: var(--space-2) var(--space-4);
 }
 
 .inbox-resumen__etiqueta {
@@ -21,12 +22,59 @@
   font-weight: var(--peso-semi);
   color: var(--texto-secundario);
   text-transform: uppercase;
-  letter-spacing: 0.02em;
+  letter-spacing: 0.05em;
 }
 
 .inbox-resumen__valor {
-  font-size: var(--fs-24);
+  font-size: var(--fs-28);
   font-weight: var(--peso-semi);
   font-variant-numeric: tabular-nums;
+  line-height: 1;
+  letter-spacing: -0.02em;
   color: var(--texto-principal);
+}
+
+.inbox-resumen__nota {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  font-size: var(--fs-12);
+  color: var(--texto-secundario);
+}
+
+.inbox-resumen__punto {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--texto-terciario);
+}
+
+/* Semantic tone: the number ink + the caption dot, resolved from the estado tokens. */
+.inbox-resumen__tarjeta--pendiente .inbox-resumen__valor {
+  color: var(--estado-pendiente-texto);
+}
+.inbox-resumen__tarjeta--pendiente .inbox-resumen__punto {
+  background: var(--estado-pendiente-texto);
+}
+
+.inbox-resumen__tarjeta--validada .inbox-resumen__valor {
+  color: var(--estado-validada-texto);
+}
+.inbox-resumen__tarjeta--validada .inbox-resumen__punto {
+  background: var(--estado-validada-borde);
+}
+
+.inbox-resumen__tarjeta--error .inbox-resumen__valor {
+  color: var(--estado-error-texto);
+}
+.inbox-resumen__tarjeta--error .inbox-resumen__punto {
+  background: var(--estado-error-texto);
+}
+
+.inbox-resumen__tarjeta--alerta .inbox-resumen__valor {
+  color: var(--estado-alerta-texto);
+}
+.inbox-resumen__tarjeta--alerta .inbox-resumen__punto {
+  background: var(--estado-alerta-texto);
 }

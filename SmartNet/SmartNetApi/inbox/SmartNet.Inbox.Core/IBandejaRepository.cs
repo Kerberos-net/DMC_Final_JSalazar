@@ -5,6 +5,13 @@ namespace SmartNet.Inbox.Core;
 /// <c>GET /api/bandeja</c>. <see cref="Pagina"/> is 1-based; <see cref="TamanioPagina"/> is fixed
 /// at 20 (product-owner decision, proposal.md) but kept as a parameter so
 /// <c>SqlBandejaRepository</c> never hardcodes it twice.
+///
+/// <see cref="Estado"/> is the raw <c>EstadoConsumo</c> filter (<c>PENDIENTE</c>/<c>PROMOVIDO</c>/
+/// <c>DESCARTADO</c>) — unchanged since #13. <see cref="EstadoDerivado"/> (BACKLOG #21 follow-up,
+/// SPA estado chips) filters instead by the SAME first-match bucket the dashboard cards and the
+/// derived Estado chip use — <c>PENDIENTE</c>/<c>VALIDADA</c>/<c>ERROR</c>/<c>ALERTA</c>/
+/// <c>DESCARTADA</c>, or <c>TODOS</c> for the whole eligible set. The endpoint rejects a request
+/// that supplies both; when both are null the legacy default-view predicate applies.
 /// </summary>
 public sealed record FiltrosBandeja(
     string? Estado,
@@ -13,7 +20,8 @@ public sealed record FiltrosBandeja(
     string? Proveedor,
     string Orden,
     int Pagina,
-    int TamanioPagina = 20);
+    int TamanioPagina = 20,
+    string? EstadoDerivado = null);
 
 /// <summary>
 /// One <c>fact.ProcesamientoError</c> entry projected for the panel de errores (design.md D1/D3).

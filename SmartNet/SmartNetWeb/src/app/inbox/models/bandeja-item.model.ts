@@ -9,6 +9,13 @@
 
 export type EstadoConsumo = 'PENDIENTE' | 'PROMOVIDO' | 'DESCARTADO';
 
+/**
+ * BACKLOG #21 follow-up — the estado-chip filter vocabulary. Maps 1:1 to the dashboard cards and
+ * the derived Estado chip buckets, plus `TODOS` for the whole eligible set. Sent to
+ * `GET /api/bandeja?estadoDerivado=`; mutually exclusive with the raw `estado` param.
+ */
+export type EstadoDerivado = 'TODOS' | 'PENDIENTE' | 'VALIDADA' | 'ERROR' | 'ALERTA' | 'DESCARTADA';
+
 export type OrdenFecha = 'asc' | 'desc';
 
 export type Origen = 'FACTURA' | 'INCIDENCIA';
@@ -99,6 +106,8 @@ export interface PaginaBandeja<T> {
 /** Filters accepted by `InboxService.cargar()` (design.md Data Flow) -- all optional. */
 export interface FiltrosBandeja {
   readonly estado?: EstadoConsumo | null;
+  /** BACKLOG #21 follow-up -- estado-chip bucket filter; `'TODOS'`/`undefined` = no narrowing. */
+  readonly estadoDerivado?: EstadoDerivado | null;
   readonly desde?: string | null;
   readonly hasta?: string | null;
   readonly proveedor?: string | null;

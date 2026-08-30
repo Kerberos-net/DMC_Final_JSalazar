@@ -4,7 +4,6 @@
   display: flex;
   flex-direction: column;
   gap: var(--space-4);
-  padding: var(--space-4) var(--space-5);
 }
 
 .inbox-page__cabecera {
@@ -15,7 +14,9 @@
 
 .inbox-page__titulo {
   margin: 0;
-  font-size: var(--fs-24);
+  font-size: var(--fs-28);
+  font-weight: var(--peso-semi);
+  letter-spacing: -0.02em;
 }
 
 .inbox-page__subtitulo {
@@ -23,4 +24,80 @@
   max-width: 60ch;
   font-size: var(--fs-13);
   color: var(--texto-secundario);
+}
+
+.inbox-page__seccion {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: var(--space-2) var(--space-3);
+  margin: 0;
+}
+
+.inbox-page__seccion-titulo {
+  margin: 0;
+  font-size: var(--fs-14);
+  font-weight: var(--peso-semi);
+}
+
+/* Estado filter chips — handoff §2 sizing, tinted per estado so colour identifies the bucket.
+ * Active chip: same estado hue at full strength (solid fill + white text). */
+.inbox-page__chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-1);
+  margin: 0;
+}
+
+.inbox-page__chip {
+  font: inherit;
+  font-size: var(--fs-12);
+  font-weight: var(--peso-semi);
+  padding: 3px 12px;
+  border-radius: var(--radio-pill);
+  border: 1px solid var(--borde-sutil);
+  color: var(--texto-principal);
+  background: var(--fondo-superficie);
+  cursor: pointer;
+  white-space: nowrap;
+}
+
+.inbox-page__chip span {
+  margin-left: 2px;
+  opacity: 0.65;
+}
+
+/* Resting state: estado tint (same tokens as the row Estado chip / summary cards). */
+.inbox-page__chip--pendiente {
+  color: var(--estado-pendiente-texto);
+  background: var(--estado-pendiente-fondo);
+  border-color: var(--estado-pendiente-borde);
+}
+.inbox-page__chip--validada {
+  color: var(--estado-validada-texto);
+  background: var(--estado-validada-fondo);
+  border-color: var(--estado-validada-borde);
+}
+.inbox-page__chip--error {
+  color: var(--estado-error-texto);
+  background: var(--estado-error-fondo);
+  border-color: var(--estado-error-borde);
+}
+.inbox-page__chip--alerta {
+  color: var(--estado-alerta-texto);
+  background: var(--estado-alerta-fondo);
+  border-color: var(--estado-alerta-borde);
+}
+.inbox-page__chip--descartada {
+  color: var(--estado-descartada-texto);
+  background: var(--fondo-superficie-2);
+  border-color: var(--estado-descartada-borde);
+}
+
+/* Active chip: solid accent fill (handoff §2) + a ring so the selection also reads by shape. */
+.inbox-page__chip--activo {
+  color: var(--accento-contraste);
+  background: var(--accento);
+  border-color: var(--accento);
+  box-shadow: 0 0 0 2px var(--accento-suave);
 }

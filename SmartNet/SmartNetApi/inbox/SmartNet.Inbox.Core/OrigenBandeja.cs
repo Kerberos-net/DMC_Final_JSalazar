@@ -24,6 +24,23 @@ public static class OrigenBandeja
 }
 
 /// <summary>
+/// BACKLOG #21 follow-up — the closed vocabulary for <c>GET /api/bandeja?estadoDerivado=</c>, the
+/// SPA estado-chip filter. Values map 1:1 to the dashboard cards / derived Estado chip buckets,
+/// plus <c>TODOS</c> for the whole eligible set. Pure (ADR 0019 level 1): the endpoint validates
+/// against this set, <c>SqlBandejaRepository</c> applies the same first-match CASE the resumen uses.
+/// </summary>
+public static class EstadoDerivadoBandeja
+{
+    public static readonly IReadOnlySet<string> Valores =
+        new HashSet<string>(StringComparer.Ordinal)
+        {
+            "TODOS", "PENDIENTE", "VALIDADA", "ERROR", "ALERTA", "DESCARTADA",
+        };
+
+    public static bool EsValido(string? valor) => valor is not null && Valores.Contains(valor);
+}
+
+/// <summary>
 /// BACKLOG #13, design.md D5 — the 5-minute reprocesar window lives here, testable, not buried in a
 /// SQL string. The engine still evaluates "now" (SQL's SYSUTCDATETIME) against this window (D5); this
 /// pure function only adds the window to a given timestamp (ADR 0019 level 1 — no ambient clock).

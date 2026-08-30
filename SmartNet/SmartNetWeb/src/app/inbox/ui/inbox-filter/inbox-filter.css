@@ -1,25 +1,45 @@
-/* item #20 (spa-visual-bandeja R3): horizontal filter bar on a card surface. Layout only --
- * tokens for every surface/radius/spacing value, no color or typography literal. Signals and
- * template controls are unchanged from #13. Sits outside the @layer stack. */
+/* spa-visual-bandeja — filter bar sized to the handoff §2 dashboard: one tight inline row of
+ * unlabelled controls (search placeholder + narrow date range + orden), on the card surface.
+ * Layout only; tokens for every surface/radius/spacing value. Sits outside the @layer stack. */
 .inbox-filter {
   display: flex;
   flex-wrap: wrap;
-  align-items: flex-end;
-  gap: var(--space-3) var(--space-4);
-  padding: var(--space-3) var(--space-4);
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3);
   background: var(--fondo-superficie);
   border: 1px solid var(--borde-sutil);
   border-radius: var(--radio-card);
   box-shadow: var(--sombra-panel);
 }
 
-/* Per-field column: overrides the base `label { display: block }` (component CSS is outside
- * the cascade layers, so it wins without !important). */
-.inbox-filter__campo {
-  display: flex;
-  flex-direction: column;
-  gap: var(--space-1);
-  margin-bottom: 0;
-  flex: 1 1 10rem;
-  min-width: 8rem;
+/* Shared control sizing (handoff: 12.5px text, 8px radius, ~7px/10px padding, app-bg fill). */
+.inbox-filter .campo {
+  width: auto;
+  font-size: var(--fs-12);
+  padding: 6px 10px;
+  border-radius: var(--radio-input);
+  background: var(--fondo-app);
+}
+
+.inbox-filter__buscar {
+  flex: 1 1 14rem;
+  min-width: 12rem;
+  padding-inline: 10px;
+}
+
+.inbox-filter__fecha {
+  flex: 0 0 auto;
+  width: 8.5rem;
+  color-scheme: inherit;
+}
+
+.inbox-filter__separador {
+  color: var(--texto-secundario);
+  font-size: var(--fs-12);
+}
+
+.inbox-filter__orden {
+  flex: 0 0 auto;
+  margin-left: auto;
 }

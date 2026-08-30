@@ -91,6 +91,41 @@ appear unless the caller supplies an explicit `estado` filter selecting that sta
 - WHEN `GET /api/bandeja?estado=PROMOVIDO` is called
 - THEN validated (promoted) rows are returned
 
+### Requirement: `GET /api/bandeja` filters by derived estado bucket (BACKLOG #21 follow-up)
+
+The endpoint MUST accept an optional `estadoDerivado` query parameter for the SPA
+estado-chip filter. Its allowed values are `TODOS`, `PENDIENTE`, `VALIDADA`,
+`ERROR`, `ALERTA`, `DESCARTADA`. `TODOS` widens the result to every
+bandeja-eligible row; any other value keeps exactly the rows whose derived bucket
+equals it, using the SAME first-match precedence as the `resumen` aggregate and
+the derived Estado chip (DESCARTADO → errores → alerta indicators → PROMOVIDO →
+PENDIENTE), including the `OBSOLETO` asymmetry (`ERROR` counts any
+`fact.ProcesamientoError`, not only non-`OBSOLETO` ones). Therefore the filtered
+`totalRegistros` for a bucket value MUST equal that bucket's `resumen` count.
+
+`estadoDerivado` and the raw `estado` param are mutually exclusive: a request
+supplying both MUST get `400`. An unrecognised `estadoDerivado` value MUST get
+`400`. When neither is supplied the default-view rule applies. `estadoDerivado`
+does not affect the `resumen` aggregate (still global, filter-independent).
+
+#### Scenario: Bucket value returns only that bucket's rows
+- GIVEN one row in each derived bucket
+- WHEN `GET /api/bandeja?estadoDerivado=ERROR` is called
+- THEN only the ERROR-bucket row is returned and `totalRegistros` equals `resumen.conError`
+
+#### Scenario: TODOS returns every eligible row
+- GIVEN rows across every bucket
+- WHEN `GET /api/bandeja?estadoDerivado=TODOS` is called
+- THEN `totalRegistros` equals `resumen.total`
+
+#### Scenario: estado and estadoDerivado together are rejected
+- WHEN `GET /api/bandeja?estado=PROMOVIDO&estadoDerivado=VALIDADA` is called
+- THEN the response is `400` problem+json
+
+#### Scenario: unknown estadoDerivado is rejected
+- WHEN `GET /api/bandeja?estadoDerivado=INVENTADO` is called
+- THEN the response is `400` problem+json
+
 ### Requirement: Bandeja rows carry comprobante identification fields (BACKLOG #21)
 
 Each `GET /api/bandeja` row MUST include the proveedor display name (resolved via a
