@@ -99,9 +99,9 @@ TDD is strict: every slice is RED (failing test) -> GREEN (implement) -> REFACTO
 
 ## PR9 — Integration harness (base: PR8) ~40 | satisfies api req 8
 
-- [ ] 9.1 Re-run the `integration-spa-api` harness against the 3 new route families.
-- [ ] 9.2 Manually append the 3 new routes (`/api/catalogos/plan-contable`, `/api/catalogos/proveedores?modo=catalogo`, `/api/tipos-cambio`) + their `/exportacion` variants to the harness report.
-- [ ] 9.3 Acceptance: harness report shows the 3 route families PASS; no code change in this slice.
+- [x] 9.1 Re-run the `integration-spa-api` harness against the 3 new route families. `cd SmartNet/SmartNetApi && dotnet test api/SmartNet.Api.Tests` -> Superado 203, Con error 0, Omitido 0 (exit 0), local SQL Server real. Scoped session/bandeja/catalogo/tipo-cambio filter -> 77/77.
+- [x] 9.2 Manually append the 3 new routes (`/api/catalogos/plan-contable`, `/api/catalogos/proveedores?modo=catalogo`, `/api/tipos-cambio`) + their `/exportacion` variants to the harness report. Added "Flujos en alcance" entry #3 + report-template flow + "Salida" template line to `SmartNet/harnesses/integration-spa-api/SKILL.md`; mirrored the flow summary into `HARNESS.md`.
+- [x] 9.3 Acceptance: harness report shows the 3 route families PASS; no code change in this slice. Only doc edits (SKILL.md, HARNESS.md); zero production/test source touched.
 
 ---
 
