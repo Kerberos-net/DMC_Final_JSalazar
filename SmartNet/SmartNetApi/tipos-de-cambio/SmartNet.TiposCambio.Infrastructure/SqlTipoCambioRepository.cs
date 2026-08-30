@@ -75,6 +75,32 @@ public sealed class SqlTipoCambioRepository : ITipoCambioRepository
         }
     }
 
+    public async Task<IReadOnlyList<TipoCambio>> ListarHistoricoAsync(
+        DateOnly desde, DateOnly hasta, CancellationToken ct)
+    {
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync(ct);
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT Fecha, Origen, Compra, Venta, FechaConsulta
+            FROM fact.TipoCambio
+            WHERE Fecha >= @desde AND Fecha <= @hasta AND Origen IN ('SBS', 'MANUAL')
+            ORDER BY Fecha, Origen;
+            """;
+        command.Parameters.AddWithValue("@desde", desde.ToDateTime(TimeOnly.MinValue));
+        command.Parameters.AddWithValue("@hasta", hasta.ToDateTime(TimeOnly.MinValue));
+
+        var filas = new List<TipoCambio>();
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        while (await reader.ReadAsync(ct))
+        {
+            filas.Add(Map(reader));
+        }
+
+        return filas;
+    }
+
     private static TipoCambio Map(SqlDataReader reader)
     {
         var origenTexto = reader.GetString(1).TrimEnd();
