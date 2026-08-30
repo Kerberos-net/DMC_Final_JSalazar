@@ -11,7 +11,7 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | **17 de 21 cerrados** (BACKLOG.md tiene 21 ítems: #18–#21 nacieron al implementar el #12 — #18 "Ajuste visual del diseño SPA" y #20 "Ajuste visual de bandeja y panel de errores" cerrados 2026-08-27, #21 "Bandeja: datos enriquecidos y contadores de resumen" cerrado 2026-08-30; #19 "Campos contables editables y resaltado OCR por campo" abierto) |
+| Ítems del backlog | **17 de 22 cerrados** (BACKLOG.md tiene 22 ítems: #18–#22 nacieron al implementar el #12 — #18 "Ajuste visual del diseño SPA" y #20 "Ajuste visual de bandeja y panel de errores" cerrados 2026-08-27, #21 "Bandeja: datos enriquecidos y contadores de resumen" cerrado 2026-08-30; abiertos: #19 "Campos contables editables y resaltado OCR por campo" y #22 "Consultas de catálogos en la SPA (solo lectura)") |
 | Ciclo SDD activo | Ninguno — último cerrado: ítem #21 (Bandeja: datos enriquecidos y contadores de resumen + shell de navegación macOS), 2026-08-30 |
 | Última fase cerrada | Ítem #21 (Bandeja: datos enriquecidos + shell de navegación), 3 fases, 32/32 tareas cerradas, verify PASS WITH WARNINGS (0 CRITICAL, 3 WARNING reconciliados, 2 SUGGESTION — 1 atendida), 1 spec nueva (`spa-shell-nav`) + 2 delta (`bandeja`, `spa-visual-bandeja`), 4 *commits* apilados sobre `main` (`a93f4c7`/`a83c5ee`/`84c05e4`/`bb1fb59`, `size:exception`) — ítem #21 cerrado 2026-08-30 |
 
@@ -1796,7 +1796,7 @@ apilados sobre `main` local sin *push* — patrón de todos los ítems previos.
 
 ---
 
-## ⬜ Ítems 10, 15, 16 y 19 — sin ciclo SDD abierto
+## ⬜ Ítems 10, 15, 16, 19 y 22 — sin ciclo SDD abierto
 
 Las fases de cada ítem **se definen cuando arranca su ciclo SDD**, no antes. Ponerlas aquí ahora
 sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ítem, y ninguno existe.
@@ -1807,6 +1807,23 @@ sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ít
 | 15 | Publicación a Drive | #14 | — | ⬜ |
 | 16 | Publicación a Sheets | #14 | — | ⬜ |
 | 19 | Campos contables editables y resaltado OCR por campo | #12, #18 | ⚠ `REGLAS.md` §5–§10 | ⬜ |
+| 22 | Consultas de catálogos en la SPA (solo lectura) | #3, #4, #21 | ⚠ *Handoff* de diseño (pantallas de catálogo) | ⬜ |
+
+### #22 — alcance recordado (solo lectura)
+
+Tres pantallas de **consulta** y sus endpoints `GET /api/*`, sobre repositorios que ya existen y
+bajo el `SELECT` que `usr_api` ya tiene:
+
+| Pantalla | Fuente | Repositorio existente | Endpoint hoy |
+|---|---|---|---|
+| Proveedores | `dbo.Proveedor` | `IProveedorRepository` (#3) | solo `GET /api/catalogos/proveedores` como *picker* paginado del #18 — falta la vista de catálogo |
+| Plan contable | `dbo.CuentaContable` | `ICuentaContableRepository` (#3) | ninguno |
+| Tipo de cambio | `fact.TipoCambio` | `ITipoCambioRepository` (#4) — hoy solo `ObtenerVigenteAsync`, falta un método de histórico | ninguno |
+
+**Sin escritura en ninguna de las tres** — la carga manual de tipo de cambio es del #4 (CLI de
+administración). El sidebar del #21 dejó `Proveedores` y `Plan contable` como entradas inertes;
+`Tipo de cambio` es entrada nueva del sidebar. El #22 solo les cablea ruta y pantalla. No hay SQL
+versionado nuevo ni `GRANT` nuevo.
 
 ---
 

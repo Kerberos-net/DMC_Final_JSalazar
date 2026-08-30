@@ -5,11 +5,12 @@ implementables. Cada ítem es un ciclo de desarrollo completo: lo bastante grand
 algo coherente, lo bastante acotado para especificarse y construirse sin convertirse en un
 proyecto propio.
 
-Los ítems #18–#21 nacieron después del despiece inicial, al implementar el #12: el #18 aisló el
+Los ítems #18–#22 nacieron después del despiece inicial, al implementar el #12: el #18 aisló el
 retrabajo visual del detalle, el #19 recoge los campos que quedaron en solo lectura porque hacerlos
 editables cruza al núcleo contable, el #20 lleva la misma pasada visual a la bandeja y el panel de
-errores, y el #21 agrupa los datos y contadores que el *handoff* de la bandeja muestra pero que
-requieren ampliar el contrato de `GET /api/bandeja` (trabajo funcional, no visual).
+errores, el #21 agrupa los datos y contadores que el *handoff* de la bandeja muestra pero que
+requieren ampliar el contrato de `GET /api/bandeja` (trabajo funcional, no visual), y el #22 abre
+las pantallas de consulta de catálogos que el sidebar del #21 dejó como destinos inertes.
 
 El diseño está cerrado: los 30 hallazgos de la segunda revisión adversarial están resueltos, las
 cinco premisas externas verificadas y ningún ADR queda condicionado.
@@ -39,10 +40,17 @@ cinco premisas externas verificadas y ningún ADR queda condicionado.
 | 19 | **Campos contables editables y resaltado OCR por campo** | Lo que el #18 dejó fuera por requerir trabajo de servidor coordinado: hacer editables en el detalle `base imponible`, `IGV` y `tipo de cambio` (proyección y contrato de escritura nuevos, impacto sobre el asiento revisado contra `REGLAS.md`); columna `glosa` y su edición (SQL versionado); resaltado OCR **por campo** vía una lista `camposNoExtraidos` en la extracción —hoy solo existe un booleano por factura—; recálculo de `PosibleDuplicado` al cambiar el triple de identidad (`tipoComprobante`/`numero`) | #12, #18 | ⚠ **`REGLAS.md` §5–§10** |
 | 20 | **Ajuste visual de bandeja y panel de errores** | Conformar al *handoff* las pantallas que el #18 excluyó: bandeja/dashboard (`inbox-page`, `inbox-list`, `inbox-filter`), panel de errores y `confirmar-reproceso` —hoy sin CSS de componente, solo heredan los tokens globales—. Tabla con alineación tabular, chip de estado por color (Pendiente/Validada/Error/Alerta), barra de filtros, panel de errores contenido; **solo visual, sin datos nuevos** — usa lo que ya trae `BandejaItem`. Mismo patrón que el #18 | #13, #18 | ⚠ *Handoff* de diseño (`DESIGN_BRIEF.md` §2 y §5) |
 | 21 | **Bandeja: datos enriquecidos y contadores de resumen** | Lo que el #20 dejó fuera por ser trabajo funcional: ampliar `GET /api/bandeja` + `BandejaItem` + `SqlBandejaRepository` con las columnas que el *handoff* §2 muestra en la fila (proveedor por nombre, monto, moneda, número, tipo, fecha de emisión) y con un agregado por estado (Pendientes / Validadas / Con error / Alertas) para las 4 tarjetas de resumen del dashboard | #13, #20 | ⚠ *Handoff* §2 |
+| 22 | **Consultas de catálogos en la SPA (solo lectura)** | Tres pantallas de **consulta** y sus endpoints `GET /api/*` de solo lectura, sobre repositorios que ya existen: **Proveedores** (lista y búsqueda sobre `dbo.Proveedor` vía `IProveedorRepository` — hoy solo existe el *picker* paginado del #18, no una pantalla de catálogo); **Plan contable** (lista y filtro de `dbo.CuentaContable` vía `ICuentaContableRepository`: cuenta, descripción, nivel, hoja imputable); **Tipo de cambio** (histórico de `fact.TipoCambio` por rango de fechas y origen SBS/MANUAL — método de lectura nuevo sobre `ITipoCambioRepository`, hoy solo `ObtenerVigenteAsync`). Ruteo y navegación del sidebar: `Proveedores` y `Plan contable` ya están como entradas inertes tras el #21; `Tipo de cambio` es una entrada nueva del sidebar. **Sin alta, edición ni borrado**: la carga manual de tipo de cambio sigue siendo del #4 (CLI de administración), y ninguna pantalla escribe. Sin SQL versionado nuevo ni `GRANT` nuevo — `usr_api` ya tiene `SELECT` sobre las tres tablas (`008`) | #3, #4, #21 | ⚠ *Handoff* de diseño (pantallas de catálogo) |
 
 > **#21** — Incluye el shell de navegación lateral — sidebar con `Bandeja` y `Configuración`,
 > colapsable y persistente — plegado aquí en lugar de abrir un ítem propio: se entrega junto con
 > estos datos y solo cubre destinos con ruta existente. Cambio SDD `item-21-bandeja-shell-nav`.
+>
+> **#22** — El sidebar quedó ampliado a la réplica del *handoff* (7 destinos, 5 inertes) por
+> pedido del dueño después del #21. El #22 les da ruta y pantalla a **Proveedores** y **Plan
+> contable** (hoy inertes) y **agrega** la entrada **Tipo de cambio**; los demás destinos inertes
+> (`Registro de compra`, `Errores y notificaciones`, `Sincronización`) quedan fuera de su alcance.
+> Es solo lectura: no reabre ningún contrato de escritura ni toca el núcleo contable.
 
 ## Cómo usar este backlog
 
