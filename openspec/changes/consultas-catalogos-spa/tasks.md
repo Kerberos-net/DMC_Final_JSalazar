@@ -90,12 +90,12 @@ TDD is strict: every slice is RED (failing test) -> GREEN (implement) -> REFACTO
 
 ## PR8 — SPA tipo de cambio screen + sidebar 7->8 delta (base: PR7) ~360 | satisfies spa req 1,4,5; shell-nav delta
 
-- [ ] 8.1 RED: `data-access/*tipo-cambio*.service.spec.ts` — GET `desde/hasta`; default range = first-of-month -> today, LOCAL not UTC (via `shared/formato.ts` helper).
-- [ ] 8.2 RED: container spec — columns `fecha/origen/compra/venta`, both origins, no origin selector; client-side sort + slice; API 400 -> non-blocking validation message, no stale-as-current; `Exportar` for current range.
-- [ ] 8.3 RED: `sidebar.spec.ts` — exact ordered 8-entry list, exactly 5 `<a>`, 8 glyphs; `nav-tipo-cambio` in PRIMARY group after Plan contable -> `/catalogos/tipo-cambio`; docblock note "canvas has no TC entry; owner decision — do not restore 7". `app.routes.spec.ts` `catalogos/tipo-cambio` additive.
-- [ ] 8.4 GREEN: `shared/formato.ts` local-date helper; data-access signal service; presentational table; container owns range + sort signals.
-- [ ] 8.5 GREEN: register `catalogos/tipo-cambio` sibling child + `authGuard`; add `nav-tipo-cambio` link + 8th hand-built glyph folded into existing `.glifo--registro,.glifo--plan` bar rules.
-- [ ] 8.6 Acceptance: SPA runner green incl `sidebar.spec.ts` + `app.routes.spec.ts` + `contraste`/`paleta`; sidebar CSS under 6kB warn (refactor glyph CSS to shared rules if breached — do NOT raise budget); `angular.json` 6kB budget holds.
+- [x] 8.1 RED: `data-access/*tipo-cambio*.service.spec.ts` — GET `desde/hasta`; default range = first-of-month -> today, LOCAL not UTC (via `shared/formato.ts` helper).
+- [x] 8.2 RED: container spec — columns `fecha/origen/compra/venta`, both origins, no origin selector; client-side sort + slice; API 400 -> non-blocking validation message, no stale-as-current; `Exportar` for current range.
+- [x] 8.3 RED: `sidebar.spec.ts` — exact ordered 8-entry list, exactly 5 `<a>`, 8 glyphs; `nav-tipo-cambio` in PRIMARY group after Plan contable -> `/catalogos/tipo-cambio`; docblock note "canvas has no TC entry; owner decision — do not restore 7". `app.routes.spec.ts` `catalogos/tipo-cambio` additive.
+- [x] 8.4 GREEN: `shared/formato.ts` local-date helper; data-access signal service; presentational table; container owns range + sort signals.
+- [x] 8.5 GREEN: register `catalogos/tipo-cambio` sibling child + `authGuard`; add `nav-tipo-cambio` link + 8th hand-built glyph folded into existing `.glifo--registro,.glifo--plan` bar rules.
+- [x] 8.6 Acceptance: SPA runner green incl `sidebar.spec.ts` + `app.routes.spec.ts` + `contraste`/`paleta`; sidebar CSS under 6kB warn (refactor glyph CSS to shared rules if breached — do NOT raise budget); `angular.json` 6kB budget holds.
 
 ## PR9 — Integration harness (base: PR8) ~40 | satisfies api req 8
 
