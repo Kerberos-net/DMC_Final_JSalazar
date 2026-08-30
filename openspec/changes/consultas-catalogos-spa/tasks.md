@@ -40,13 +40,13 @@ TDD is strict: every slice is RED (failing test) -> GREEN (implement) -> REFACTO
 
 ## PR3 — SPA shared chrome (base: PR2) ~320 | satisfies spa req 5, api req 6
 
-- [ ] 3.1 RED: `ui/tabla-paginador/tabla-paginador.spec.ts` — prev disabled on page 1, next disabled on last, `tamanio` change resets to page 1 and emits `tamanioChange`; renders `Página X de Y`.
-- [ ] 3.2 RED: `ui/orden.spec.ts` — pure toggle (asc<->desc, switch field resets asc) + arrow glyph selector.
-- [ ] 3.3 RED: `data-access/descarga-xlsx.spec.ts` — `http.get` with `responseType:'blob', observe:'response'`; reads `Content-Disposition` filename; calls `createObjectURL` then `revokeObjectURL`; `descargando` signal toggles.
-- [ ] 3.4 GREEN: `ui/tabla-paginador/` component (inputs `pagina/totalPaginas/tamanio/tamaniosDisponibles`, outputs `paginaChange/tamanioChange`; source-agnostic).
-- [ ] 3.5 GREEN: `ui/boton-exportar/` component (input `descargando`, output `exportar`, CSS-div green sheet glyph, no svg/img); `ui/orden.ts` pure module fns; `data-access/descarga-xlsx.ts` root service (anchor download, not `window.open`).
-- [ ] 3.6 GREEN: shared `.tabla-catalogo*` + `.tabla-catalogo__th--ordenable` CSS in `@layer primitives`, semantic tokens only; one module-level `Intl.Collator('es')`.
-- [ ] 3.7 Acceptance: SPA test runner green for new specs; `contraste.spec.ts` + `paleta.spec.ts` green; `angular.json` 6kB `anyComponentStyle` budget not breached.
+- [x] 3.1 RED: `ui/tabla-paginador/tabla-paginador.spec.ts` — prev disabled on page 1, next disabled on last, `tamanio` change resets to page 1 and emits `tamanioChange`; renders `Página X de Y`.
+- [x] 3.2 RED: `ui/orden.spec.ts` — pure toggle (asc<->desc, switch field resets asc) + arrow glyph selector.
+- [x] 3.3 RED: `data-access/descarga-xlsx.spec.ts` — `http.get` with `responseType:'blob', observe:'response'`; reads `Content-Disposition` filename; calls `createObjectURL` then `revokeObjectURL`; `descargando` signal toggles.
+- [x] 3.4 GREEN: `ui/tabla-paginador/` component (inputs `pagina/totalPaginas/tamanio/tamaniosDisponibles`, outputs `paginaChange/tamanioChange`; source-agnostic).
+- [x] 3.5 GREEN: `ui/boton-exportar/` component (input `descargando`, output `exportar`, CSS-div green sheet glyph, no svg/img); `ui/orden.ts` pure module fns; `data-access/descarga-xlsx.ts` root service (anchor download, not `window.open`).
+- [x] 3.6 GREEN: shared `.tabla-catalogo*` + `.tabla-catalogo__th--ordenable` CSS in `@layer primitives`, semantic tokens only; one module-level `Intl.Collator('es')`.
+- [x] 3.7 Acceptance: SPA test runner green for new specs; `contraste.spec.ts` + `paleta.spec.ts` green; `angular.json` 6kB `anyComponentStyle` budget not breached.
 
 ## PR4 — SPA plan contable screen (base: PR3) ~330 | satisfies spa req 1,3,5; nav req
 
