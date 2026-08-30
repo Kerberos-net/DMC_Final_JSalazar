@@ -1,18 +1,140 @@
 ```yaml
 schema: gentle-ai.verify-result/v1
-evidence_revision: sha256:c2a51190e3a00fe944a1392fa692419c884468a83f33e15f5653c0566742b953
+evidence_revision: sha256:44650c97ef1a8e379a7eebc9cbd45bdaeca23534cf16e62a1e72dfbea677f4ab
 verdict: pass_with_warnings
 blockers: 0
 critical_findings: 0
-requirements: 2/2
-scenarios: 4/4
-test_command: "cd SmartNet/SmartNetWeb && npm test"
+requirements: 6/6
+scenarios: 14/14
+test_command: "dotnet test SmartNet/SmartNetApi/api/SmartNet.Api.Tests"
 test_exit_code: 0
-test_output_hash: sha256:71a9ac2e3809b0805c59bf6b51b51af85a0a8f9ac238d5216d803db79af75a62
-build_command: "cd SmartNet/SmartNetWeb && npm run build"
+test_output_hash: sha256:232312dae45b91d15019a9983fb0e6d1f9207fa3b21c992e2eea423fb3de95e0
+build_command: "dotnet build SmartNet/SmartNetApi/api/SmartNet.Api"
 build_exit_code: 0
-build_output_hash: sha256:aae27a7c6e74cc1d24a1878ada7f737b555de18023673b11ed81befe60a4358a
+build_output_hash: sha256:66b483b37927fa15b2384bf3c88dfc7784e15f191637b7a0689ed7d87268f11b
 ```
+
+# Verification Report - consultas-catalogos-spa
+
+Envelope above reflects the most recent slice verified (PR5). PR1-PR4 sections retained below.
+
+# PR5 (slice 5: API proveedores modo=catalogo + /exportacion) - verified at HEAD 273e6e0, branch feat/consultas-catalogos-spa-22-pr5
+
+Scope: slice 5 of 9 ONLY. Slices 1-4 verified separately (PASS WITH WARNINGS). Slices 6-9 are intentionally not implemented and are NOT gaps.
+
+## Completeness - tasks 5.1-5.10 all [x], match commits
+
+RED eaebb5b (test-only: 3 test files, +387 insertions, zero production code) then GREEN 0dc990c (+265 prod / -6) then checkboxes 273e6e0.
+
+- 5.1/5.6 OrdenProveedor.cs: pure static, Valores = {proveedor,ruc,codigo}, EsValido(string?). Same shape as EstadoDerivadoBandeja. No DB/HTTP/clock.
+- 5.2/5.7/5.8 SqlProveedorRepository: PaginaProveedores record + ListarCatalogoAsync / ListarCatalogoCompletoAsync port members added; BuscarAsync + TamanoPagina=20 picker constant byte-unchanged. FiltroCatalogo lists all incl P00000 on blank q (DBNull). OrdenSql is a closed switch mapping key to a compile-time constant column (ruc to rucpro, codigo to codpro, else proveedor) plus constant ASC/DESC plus a codpro ASC tiebreak, dropped only when the primary column is codpro.
+- 5.3/5.9 CatalogoEndpoints.BuscarProveedoresAsync: gains modo/orden/direccion/tamanio. modo null or picker keeps the existing BuscarAsync path and the resultados/hayMas shape byte-frozen (sort params ignored); modo catalogo validates orden (OrdenProveedor.EsValido), direccion (asc/desc), tamanio (6/10/20/50) with 400 on any invalid, then ListarCatalogoAsync then CatalogoProveedoresRespuesta with items/pagina/tamanioPagina/totalRegistros/totalPaginas; any other modo returns BadRequest.
+- 5.5 GET /api/catalogos/proveedores/exportacion: validates orden/direccion (400), ListarCatalogoCompletoAsync (no paging), ExportadorXlsx.Escribir, Results.File xlsx-mime with proveedores-DATE.xlsx where DATE comes from the injected TimeProvider - NO user input in Content-Disposition.
+- 5.10 Acceptance: Core + Infra + Api + Exportacion suites green; PurityScanTests green; no dbo write/index, no versioned SQL, no GRANT.
+
+git diff --stat vs feat/consultas-catalogos-spa-22-pr4 = 6 files, 632 insertions / 6 deletions. Authored production delta only 245 LOC; the rest is strict-TDD test coverage plus doc-comment blocks. Feature-level size:exception owner-accepted in design; the 5b export split was offered and declined. See WARNING 3.
+
+## Build / Test evidence (independent re-run this session, local SQL Server available)
+
+- dotnet test SmartNet/SmartNetApi/api/SmartNet.Api.Tests -> Superado 191, Con error 0, Omitido 0, Total 191 (3 m 50 s), exit 0. PR2 baseline was 172; PR5 adds 19 theory-expanded cases. Nothing else in the shared suite regressed - the picker path still green.
+- dotnet build SmartNet/SmartNetApi/api/SmartNet.Api -> Compilacion correcta, 0 Advertencias, 0 Errores, exit 0.
+- dotnet test SmartNet/SmartNetApi/catalogos/SmartNet.Catalogos.Core.Tests -> 41/41 green (incl PurityScanTests), exit 0.
+- dotnet test SmartNet/SmartNetApi/catalogos/SmartNet.Catalogos.Infrastructure.Tests full suite not filtered -> 81/81 green (1 m 53 s), exit 0. The 13 pre-existing BuscarAsync/Obtener/BuscarPorRuc cases plus the new ListarCatalogo cases plus the partition/permission structural guards all pass.
+- dotnet test SmartNet/SmartNetApi/exportacion/SmartNet.Exportacion.Infrastructure.Tests -> 4/4 green (incl NoCoreReferencesOpenXmlGuardTests), exit 0.
+- No test recorded as not run (no DB) - every infra/API case ran against real fact_test databases.
+
+## Spec compliance (slice 5 in-scope grain) - 6 requirements / 14 scenarios, all runtime-proven
+
+### Requirement: Proveedores endpoint serves both picker and browse-all modes - 5/5 scenarios PASS
+- Catalogo mode lists every proveedor including P00000: PASS - ListsEveryProveedorInclP00000_WithPaginaBandejaEnvelope seeds P00000 plus 2 rows, asserts items contains P00000, envelope fields populated, null ruc surfaces as JSON null. Infra ListarCatalogoAsync_IncludesP00000 confirms at the SQL layer.
+- Catalogo mode text filter: PASS - CatalogoMode_TextFilter_MatchesNameRucOrCode (only ACME PERU for q=ACME); filter is proveedor OR rucpro OR codpro LIKE.
+- Picker mode is unchanged: PASS - PickerMode_Unchanged_ExcludesP00000_KeepsResultadosShape (Theory: modo absent AND modo=picker) asserts the resultados array excludes P00000, hayMas present, items property ABSENT. PickerMode_ShortQuery_StillEmpty_EvenWithSortParams proves q=a returns empty even with sort params supplied. The picker code path never forwards sort to BuscarAsync. SqlProveedorRepository.BuscarAsync source byte-unchanged.
+- Unknown mode rejected: PASS - CatalogoMode_BadRequest_OnUnknownParams (Theory) covers modo=desconocido plus orden=nombre, direccion=arriba, tamanio=7, all 400.
+- Unauthenticated: PASS - CatalogoMode_WithoutACookie_Returns401 (RequireAuthorization; 401 before any query).
+
+### Requirement: Catalogo mode returns the PaginaBandeja envelope - 2/2 scenarios PASS
+- Pagination envelope is accurate: PASS - CatalogoMode_PaginationEnvelopeIsAccurate (45 rows, page 2, size 20 gives 20 items, first item PAG 020, pagina 2, totalRegistros 45, totalPaginas 3). Infra TotalRegistros_IsFullFilteredCount_OnPage1AndPage3 asserts totalRegistros 45 on BOTH page 1 and page 3.
+- Page past the end: PASS - infra PagePastTheEnd_ReturnsEmptyItems_WithCorrectTotals (10 rows, page 9 gives empty items, totalRegistros 10, totalPaginas 1). Exercises the conditional fallback count result set.
+- totalRegistros source: VERIFIED by source inspection - single SELECT with CAST(COUNT(*) OVER() AS INT) AS TotalRegistros in the same paged pass. The only second statement is a guarded IF nroPagina greater than 1 AND NOT EXISTS then SELECT COUNT(*), read in C-sharp ONLY when the page came back empty - never a second scan on a populated page. No dbo.Proveedor name index added.
+
+### Requirement: Catalogo mode supports server-side sort - 3/3 scenarios PASS
+- Sort by RUC descending: PASS - endpoint CatalogoMode_ServerSort (Theory: codigo asc/desc, proveedor desc, ruc desc) plus infra ServerSort_PerKeyAndDirection (Theory: 3 keys x 2 directions). Sort applied across the full filtered set before OFFSET/FETCH.
+- Invalid sort field rejected: PASS - orden=nombre gives 400 (BadRequest theory plus OrdenProveedorTests.EsValido_IsFalse_ForAnythingElse including an injection-style string).
+- Picker mode ignores sort: PASS - see picker scenario above; picker handler does not pass sort to BuscarAsync.
+- No user string reaches SQL text: VERIFIED - OrdenSql is a closed switch returning compile-time string constants; direccion resolves to literal ASC or DESC; the query is otherwise fully parameterised. OrdenProveedor.EsValido gates at the endpoint before the adapter is called.
+
+### Requirement: Excel export endpoint per catalog - proveedores portion - 2/2 in-scope scenarios PASS
+- Proveedores export reflects the active filter: PASS - Exportacion_Returns200_XlsxHeaders_WorkbookRows_HonorsQAndSort (3 seeded, q=EXPORT ACME gives workbook with 3 rows = 1 header + 2 filtered), Excel media type, attachment plus .xlsx Content-Disposition. Full set via ListarCatalogoCompletoAsync (no paging).
+- Unauthenticated export: PASS - Exportacion_WithoutACookie_Returns401_AndNoFile (401, body is not the xlsx media type).
+- Filename carries NO user input: PASS - Exportacion_HostileQuery_FilenameStaysConstantForm (hostile q with CRLF gives no injected token, no CR, no LF, matches filename proveedores-DATE.xlsx). Filename is a constant plus a date from the injected TimeProvider.
+- Exportacion_BadRequest_OnUnknownSort (orden=nombre gives 400) also passes.
+- TC export scenarios are out of scope for PR5 (slice 7/8).
+
+### Requirement: Read-only, partition-respecting access - 1/1 scenario PASS
+- No writes, no schema drift: PASS - source inspection: the two catalogo repo methods issue only SELECT over dbo.Proveedor; no fact tables touched; git diff adds no SQL script and no GRANT. Infrastructure partition/permission structural guards remain green (81/81). OrdenProveedor is pure - PurityScanTests green (41/41). NoCoreReferencesOpenXmlGuardTests green - export delegates from the API endpoint to SmartNet.Exportacion.Infrastructure, no Core project sees OpenXml.
+
+### Requirement: Contract-test coverage - 1/1 scenario PASS
+- Contract suite runs: PASS - every proveedores clause listed in the requirement is asserted in CatalogoEndpointsTests and passes (191/191). Harness re-run is slice 9.
+
+## Design / ADR compliance
+
+- ONE route, TWO modes selected by explicit modo (design D1): PASS.
+- PaginaBandeja-shaped envelope, field names mirror the inbox envelope, Catalogos.Core does not reference Inbox.Core (design D6): PASS.
+- COUNT(*) OVER() in the same pass, mirrors SqlBandejaRepository design D4, conditional fallback for the empty out-of-range page: PASS.
+- Sort key to compile-time constant column, user text never an identifier (design D7): PASS.
+- codpro ASC unique tiebreak on every ordering (design D7): PASS with one documented, behaviour-neutral deviation - the tiebreak is omitted when the primary sort column IS codpro (orden=codigo), because SQL Server rejects a column named twice in ORDER BY and codpro is already the unique key in that case. Verified safe: the codigo asc/desc sort theory passes.
+- Cross-page-boundary stability: VERIFIED as a real boundary test - CodproTiebreak_IsStableAcrossAPageBoundary_WhenNameRepeats seeds 10 rows ALL with the same proveedor name and rucpro NULL (both the sort column and the nullable non-unique column fully degenerate), pages size 4, concatenates pages 1+2+3 and asserts exactly T00000 through T00009 with a distinct count of 10 (no drop, no dup). RucproNullsSortFirst_Ascending additionally pins NULLs-first ASC.
+- No user input in Content-Disposition (ADR 0021 decision 4): PASS.
+- ExportadorXlsx.Escribir reused unchanged (PR1 D9): PASS.
+- Deviations from design: none material beyond the codpro-tiebreak omission above. Unspecified and not load-bearing: export column headers Codigo / Razon social / RUC.
+
+## TDD Compliance (Strict TDD active)
+
+| Check | Result | Details |
+|-------|--------|---------|
+| TDD Evidence reported | PASS | apply-progress #243 has a full TDD Cycle Evidence table for 5.1-5.10 with verbatim command results. |
+| All tasks have tests | PASS | OrdenProveedorTests 9, SqlProveedorRepositoryTests +11 ListarCatalogo cases, CatalogoEndpointsTests +15 cases / +208 lines. |
+| RED confirmed (test-only commit) | PASS | eaebb5b is test-only - git show --stat shows only the 3 test files, +387 insertions, no production file. New specs reference not-yet-existing OrdenProveedor (CS0103) and ListarCatalogoAsync / PaginaProveedores (CS1061), and expect items where the picker path returns resultados - genuine compile plus assertion RED. |
+| GREEN confirmed | PASS | 191 API + 41 Core + 81 Infra + 4 Exportacion on independent re-run this session, all exit 0. |
+| RED-before-GREEN ordering | PASS | eaebb5b test, then 0dc990c feat, then 273e6e0 checkboxes. |
+| Triangulation adequate | PASS | OrdenProveedor: exact set + true-per-key + false for null/empty/uppercase/unknown/injection. Infra: totalRegistros on page 1 and 3, out-of-range page, P00000 inclusion, blank q, 3x2 sort matrix, cross-page tiebreak, NULLs-first, tamanio whitelist, unpaged parity. Endpoint: envelope, 45-row pagination, filter, sort theory, 4-way 400 theory, 401, picker regression, export. Distinct expected values throughout. |
+| Safety net for modified files | PASS | CatalogoEndpointsTests.cs and SqlProveedorRepositoryTests.cs modified not new - full 191 and 81 suites green after. BuscarAsync and the picker constant byte-unchanged; the 13 pre-existing infra cases green. |
+
+## Assertion quality
+
+All assertions verify real behavior: exact HTTP status codes, exact codigo and nombre ordered arrays, envelope integer fields, JSON null for a null ruc, a check that the picker shape exposes no items property, Excel media-type string, regex on Content-Disposition, reopening the real workbook to count rows, distinct count for cross-page row identity. The empty-items assertions in the page-past-end tests are paired with totalRegistros companion assertions (not orphan empty checks). No tautologies, no ghost loops (theories iterate fixed inline data), no smoke-only tests, no CSS or implementation-detail coupling, no mocks. Assertion quality: 0 CRITICAL, 0 WARNING.
+
+## Test Layer Distribution
+
+| Layer | Tests (PR5) | Tools |
+|-------|-------------|-------|
+| Unit (pure) | 9 | xUnit |
+| Infra (real DB, TestDatabaseFixture) | 14 ListarCatalogo cases (81 file total) | xUnit + SQL Server |
+| API contract (WebApplicationFactory + real DB + cookie) | 19 theory-expanded (191 suite total) | xUnit + WebApplicationFactory |
+| E2E | 0 | not applicable |
+
+## Issues
+
+CRITICAL: none.
+
+WARNING (none blocking archive of slice 5):
+1. codpro tiebreak omitted for orden=codigo. Behaviour-neutral (codpro is already the unique key so the ordering is fully deterministic) and covered by the passing codigo asc/desc sort theory, but it deviates from the design wording that every ordering appends codpro ASC. apply-progress documents it; flagged so a reviewer confirms the reasoning.
+2. Export column headers Codigo / Razon social / RUC and the empty-string substitution for a null RUC are unspecified choices by apply. Not load-bearing, but the SPA proveedores export (PR6) should be checked against these labels for consistency.
+3. size:exception magnitude - PR5 is +632 insertions / 6 files vs the ~380-line slice estimate. Owner-accepted at feature level; production delta is only 245 LOC and the 5b split was deliberately declined. Reviewer load is real; no coverage was cut.
+
+SUGGESTION:
+1. direccion is validated case-sensitively (asc/desc Ordinal) at the endpoint but OrdenSql compares desc with OrdinalIgnoreCase - harmless (validation gates first) but the two could share one comparison.
+2. modo matching is case-sensitive (picker/catalogo Ordinal); modo=Catalogo yields 400. Consistent with the spec but worth an explicit note if the SPA ever sends a different case.
+3. No coverage tool wired into dotnet test; changed-file coverage not reported. Consider XPlat Code Coverage in CI for the catalogos feature.
+4. The catalogo-mode q is passed raw to the repository (trimmed internally). A shared trim helper across BuscarAsync and ListarCatalogoAsync would keep the two filter predicates aligned.
+
+## Verdict
+
+PASS WITH WARNINGS - slice 5 is correct and complete against its 10 tasks. All 6 in-scope requirements (14 scenarios) are runtime-proven by passing DB-backed tests: the dual-mode route keeps the BACKLOG #18 picker contract byte-frozen, catalogo mode returns the PaginaBandeja envelope with totalRegistros from COUNT(*) OVER() in a single pass (verified by source inspection), server-side sort maps through a closed compile-time switch with no user string reaching SQL text, the cross-page codpro tiebreak test genuinely seeds a fully degenerate sort key across 3 pages, and the exportacion route emits a real full-set xlsx with a user-input-free filename. Read-only and partition guardrails hold. Strict TDD genuinely followed: eaebb5b is a test-only RED commit with genuine compile failures that precedes GREEN 0dc990c. Build clean; API 191/191, Core 41/41, Infra 81/81, Exportacion 4/4 - nothing in the shared suite regressed. Warnings are a behaviour-neutral tiebreak deviation, unspecified export labels, and size-exception magnitude - none block archiving slice 5.
+
+Validator: gentle-ai sdd-verify-validate --input <report> --requirements 6 --scenarios 14.
+
+---
 
 # Verification Report - consultas-catalogos-spa
 
