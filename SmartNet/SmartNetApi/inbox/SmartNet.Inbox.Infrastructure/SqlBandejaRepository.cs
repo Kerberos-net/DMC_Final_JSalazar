@@ -9,16 +9,24 @@ namespace SmartNet.Inbox.Infrastructure;
 /// (BACKLOG #13, design.md D2-D5, D7) for <see cref="IBandejaRepository"/>. <c>BandejaEndpoints.cs</c>
 /// (Phase 4) is a thin delegator over this repository -- never a second query surface.
 ///
-/// One <see cref="SqlCommand"/> batch, three statements:
+/// One <see cref="SqlCommand"/> batch:
 /// 1. <c>INSERT @pagina</c> -- the filtered/ordered/paged key set (design D4: <c>OFFSET/FETCH</c> with
 ///    an <c>InboxEventId</c> tiebreaker, <c>COUNT(*) OVER()</c> captured per row before paging).
 /// 2. Result set 1 -- one row per key in <c>@pagina</c>, joined back to
-///    <c>fact.InboxEvent</c>/<c>fact.Factura</c>, plus the <see cref="ErrorProcesamiento"/>-window-derived
+///    <c>fact.InboxEvent</c>/<c>fact.Factura</c> plus <c>dbo.Proveedor</c> for the display name
+///    (BACKLOG #21, design D3: the join is on the page projection only, never on
+///    <c>FiltroWhere</c>), plus the <see cref="ErrorProcesamiento"/>-window-derived
 ///    <c>ReprocesarDisponibleEn</c> (design D5, from <c>fact.CommandQueue</c>).
 /// 3. Result set 2 -- the error rows for exactly those keys, from <c>fact.ProcesamientoError</c>
 ///    (ADR 0003 revision 6, asymmetric-read grant), keyed by <c>ProcesamientoId</c> (design D3: a
 ///    second result set, never a <c>LEFT JOIN</c>, so it cannot multiply/break the paging).
-/// A fourth, conditional statement (an <c>IF</c>, not always a result set) runs the design D4
+/// 4. Result set 3 -- the global estado aggregate feeding the dashboard cards (BACKLOG #21,
+///    design D2): one row, computed over ALL <c>fact.InboxEvent</c> rows with NO <c>WHERE</c>, so
+///    the counts are independent of the request's filter and paging parameters. Its <c>ERROR</c>
+///    bucket uses an unfiltered <c>EXISTS</c> on <c>fact.ProcesamientoError</c> to match the row
+///    Estado chip exactly (design D2b -- the <c>OBSOLETO</c> asymmetry: <c>FiltroWhere</c> filters
+///    <c>&lt;&gt; 'OBSOLETO'</c> but the chip does not; a future change to one must move both).
+/// A final, conditional statement (an <c>IF</c>, not always a result set) runs the design D4
 /// fallback <c>COUNT(*)</c> only when the page came back empty and <c>pagina &gt; 1</c>, so the
 /// envelope's <c>totalRegistros</c> is never a lie for an out-of-range page.
 /// </summary>
@@ -65,6 +73,7 @@ public sealed class SqlBandejaRepository : IBandejaRepository
 
              SELECT ie.InboxEventId, ie.EstadoConsumo, ie.ProcesamientoId, ie.CreadoEn, ie.FacturaId,
                     ie.MotivoDescarte, f.ProveedorCodigo, f.RucProveedor,
+                    pr.proveedor AS ProveedorNombre, f.TipoComprobante, f.Numero, f.TotalOrig, f.Moneda, f.FechaEmision,
                     f.EsProveedorGenerico, f.PosibleDuplicado, f.TieneCamposNoExtraidos, f.FechaEnDomingo, f.AfectacionMixta,
                     (
                         SELECT DATEADD(MINUTE, @ventanaMinutos, MAX(cq.CreadoEn))
@@ -77,12 +86,34 @@ public sealed class SqlBandejaRepository : IBandejaRepository
              FROM @pagina p
              JOIN fact.InboxEvent ie ON ie.InboxEventId = p.InboxEventId
              LEFT JOIN fact.Factura f ON f.FacturaId = ie.FacturaId
+             LEFT JOIN dbo.Proveedor pr ON pr.codpro = f.ProveedorCodigo
              ORDER BY ie.CreadoEn {direction}, ie.InboxEventId {direction};
 
              SELECT pe.ProcesamientoId, pe.ProcesamientoErrorId, pe.Integracion, pe.Mensaje, pe.Clasificacion, pe.OcurridoEn
              FROM fact.ProcesamientoError pe
              JOIN @pagina p ON p.ProcesamientoId = pe.ProcesamientoId
              ORDER BY pe.OcurridoEn DESC;
+
+             SELECT
+                 SUM(CASE WHEN b.Bucket = 'PENDIENTE'  THEN 1 ELSE 0 END) AS Pendientes,
+                 SUM(CASE WHEN b.Bucket = 'VALIDADA'   THEN 1 ELSE 0 END) AS Validadas,
+                 SUM(CASE WHEN b.Bucket = 'ERROR'      THEN 1 ELSE 0 END) AS ConError,
+                 SUM(CASE WHEN b.Bucket = 'ALERTA'     THEN 1 ELSE 0 END) AS Alertas,
+                 SUM(CASE WHEN b.Bucket = 'DESCARTADA' THEN 1 ELSE 0 END) AS Descartadas,
+                 COUNT(*) AS Total
+             FROM (
+                 SELECT CASE
+                     WHEN ie.EstadoConsumo = 'DESCARTADO' THEN 'DESCARTADA'
+                     WHEN EXISTS (
+                         SELECT 1 FROM fact.ProcesamientoError pe WHERE pe.ProcesamientoId = ie.ProcesamientoId
+                     ) THEN 'ERROR'
+                     WHEN f.FacturaId IS NOT NULL AND (f.EsProveedorGenerico = 1 OR f.PosibleDuplicado = 1) THEN 'ALERTA'
+                     WHEN ie.EstadoConsumo = 'PROMOVIDO' THEN 'VALIDADA'
+                     ELSE 'PENDIENTE'
+                 END AS Bucket
+                 FROM fact.InboxEvent ie
+                 LEFT JOIN fact.Factura f ON f.FacturaId = ie.FacturaId
+             ) b;
 
              IF NOT EXISTS (SELECT 1 FROM @pagina) AND @nroPagina > 1
              BEGIN
@@ -108,7 +139,7 @@ public sealed class SqlBandejaRepository : IBandejaRepository
         await using var reader = await command.ExecuteReaderAsync(ct);
         while (await reader.ReadAsync(ct))
         {
-            totalRegistrosDesdePagina = reader.GetInt32(14);
+            totalRegistrosDesdePagina = reader.GetInt32(20);
             filas.Add(new FilaCruda(
                 InboxEventId: reader.GetInt64(0),
                 EstadoConsumo: reader.GetString(1),
@@ -118,15 +149,21 @@ public sealed class SqlBandejaRepository : IBandejaRepository
                 MotivoDescarte: reader.IsDBNull(5) ? null : reader.GetString(5),
                 ProveedorCodigo: reader.IsDBNull(6) ? null : reader.GetString(6).TrimEnd(),
                 RucProveedor: reader.IsDBNull(7) ? null : reader.GetString(7),
-                Indicadores: reader.IsDBNull(8)
+                ProveedorNombre: reader.IsDBNull(8) ? null : reader.GetString(8),
+                TipoComprobante: reader.IsDBNull(9) ? null : reader.GetString(9).TrimEnd(),
+                Numero: reader.IsDBNull(10) ? null : reader.GetString(10),
+                TotalOrig: reader.IsDBNull(11) ? null : reader.GetDecimal(11),
+                Moneda: reader.IsDBNull(12) ? null : reader.GetString(12).TrimEnd(),
+                FechaEmision: reader.IsDBNull(13) ? null : DateOnly.FromDateTime(reader.GetDateTime(13)),
+                Indicadores: reader.IsDBNull(14)
                     ? null
                     : new IndicadoresFactura(
-                        EsProveedorGenerico: reader.GetBoolean(8),
-                        PosibleDuplicado: reader.GetBoolean(9),
-                        TieneCamposNoExtraidos: reader.GetBoolean(10),
-                        FechaEnDomingo: reader.GetBoolean(11),
-                        AfectacionMixta: reader.IsDBNull(12) ? null : reader.GetBoolean(12)),
-                ReprocesarDisponibleEn: reader.IsDBNull(13) ? null : reader.GetDateTime(13)));
+                        EsProveedorGenerico: reader.GetBoolean(14),
+                        PosibleDuplicado: reader.GetBoolean(15),
+                        TieneCamposNoExtraidos: reader.GetBoolean(16),
+                        FechaEnDomingo: reader.GetBoolean(17),
+                        AfectacionMixta: reader.IsDBNull(18) ? null : reader.GetBoolean(18)),
+                ReprocesarDisponibleEn: reader.IsDBNull(19) ? null : reader.GetDateTime(19)));
         }
 
         await reader.NextResultAsync(ct);
@@ -148,6 +185,19 @@ public sealed class SqlBandejaRepository : IBandejaRepository
                 OcurridoEn: reader.GetDateTime(5)));
         }
 
+        // Result set 3 -- the global estado aggregate (BACKLOG #21, design D2). Always exactly one
+        // row; unaffected by `@estado`/`@desde`/`@hasta`/`@proveedor`/paging (it has no WHERE).
+        await reader.NextResultAsync(ct);
+        var resumen = await reader.ReadAsync(ct)
+            ? new ResumenBandeja(
+                Pendientes: reader.GetInt32(0),
+                Validadas: reader.GetInt32(1),
+                ConError: reader.GetInt32(2),
+                Alertas: reader.GetInt32(3),
+                Descartadas: reader.GetInt32(4),
+                Total: reader.GetInt32(5))
+            : new ResumenBandeja(0, 0, 0, 0, 0, 0);
+
         var totalRegistros = totalRegistrosDesdePagina;
         if (filas.Count == 0)
         {
@@ -165,6 +215,12 @@ public sealed class SqlBandejaRepository : IBandejaRepository
                 FacturaId: fila.FacturaId,
                 ProveedorCodigo: fila.ProveedorCodigo,
                 RucProveedor: fila.RucProveedor,
+                ProveedorNombre: fila.ProveedorNombre,
+                TipoComprobante: fila.TipoComprobante,
+                Numero: fila.Numero,
+                TotalOrig: fila.TotalOrig,
+                Moneda: fila.Moneda,
+                FechaEmision: fila.FechaEmision,
                 Indicadores: fila.Indicadores,
                 MotivoDescarte: fila.MotivoDescarte,
                 Errores: erroresPorProcesamiento.TryGetValue(fila.ProcesamientoId, out var errores)
@@ -175,7 +231,8 @@ public sealed class SqlBandejaRepository : IBandejaRepository
 
         var totalPaginas = EnvelopeBandeja.CalcularTotalPaginas(totalRegistros, filtros.TamanioPagina);
 
-        return new PaginaBandeja<BandejaItem>(items, filtros.Pagina, filtros.TamanioPagina, totalRegistros, totalPaginas);
+        return new PaginaBandeja<BandejaItem>(
+            items, filtros.Pagina, filtros.TamanioPagina, totalRegistros, totalPaginas, resumen);
     }
 
     /// <summary>
@@ -226,6 +283,12 @@ public sealed class SqlBandejaRepository : IBandejaRepository
         string? MotivoDescarte,
         string? ProveedorCodigo,
         string? RucProveedor,
+        string? ProveedorNombre,
+        string? TipoComprobante,
+        string? Numero,
+        decimal? TotalOrig,
+        string? Moneda,
+        DateOnly? FechaEmision,
         IndicadoresFactura? Indicadores,
         DateTime? ReprocesarDisponibleEn);
 }

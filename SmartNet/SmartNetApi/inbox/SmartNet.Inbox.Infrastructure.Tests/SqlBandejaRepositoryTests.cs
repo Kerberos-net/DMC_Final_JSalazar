@@ -293,4 +293,188 @@ public sealed class SqlBandejaRepositoryTests : IAsyncLifetime
         Assert.Equal("denegado antes de 018", error.Mensaje);
         Assert.NotNull(item.ReprocesarDisponibleEn);
     }
+
+    // --- BACKLOG #21 task 2.1: enriched comprobante fields -----------------------------------
+
+    private async Task<long> PromoverFacturaAsync(
+        string gmailMessageId, string proveedorCodigo, string tipoComprobante = "01", string numero = "F001-9",
+        string rucProveedor = "20100000009", decimal totalOrig = 123.45m, string moneda = "PEN",
+        DateOnly? fechaEmision = null, bool esProveedorGenerico = false, bool posibleDuplicado = false)
+    {
+        var procesamientoId = await _db.InsertarProcesamientoAsync(gmailMessageId: gmailMessageId);
+        var inboxEventId = await _db.InsertarInboxEventAsync(procesamientoId, "{}");
+        var promocionRepo = new SqlPromocionRepository(_db.ConnectionString);
+        var factura = new Core.FacturaPromovida(
+            ProveedorCodigo: proveedorCodigo, TipoComprobante: tipoComprobante, Numero: numero, RucProveedor: rucProveedor,
+            TotalOrig: totalOrig, Moneda: moneda, FechaEmision: fechaEmision ?? new DateOnly(2026, 8, 9),
+            Indicadores: new Core.IndicadoresFactura(esProveedorGenerico, posibleDuplicado, false, false, false),
+            Extracciones: Array.Empty<Core.FacturaExtraccionPromovida>(), Estado: "PENDIENTE_VALIDACION");
+        var documento = new Core.DocumentoPromovido(
+            DocumentoRecibidoId: 1, NombreArchivo: "f.pdf", MimeType: "application/pdf", RutaRelativa: "/f.pdf", TamanoBytes: 10);
+        await promocionRepo.PromoverAsync(inboxEventId, procesamientoId, factura, documento, CancellationToken.None);
+        return inboxEventId;
+    }
+
+    private Task SeedProveedorAsync(string codpro, string nombre) =>
+        _db.ExecuteNonQueryAsync(
+            $"INSERT INTO dbo.Proveedor (codpro, proveedor, rucpro) VALUES ('{codpro}', N'{nombre}', NULL);");
+
+    [Fact]
+    public async Task ListarAsync_ProjectsEnrichedComprobanteFields_FromFacturaAndProveedor()
+    {
+        await SeedProveedorAsync("P00777", "Distribuidora del Sur SAC");
+        var inboxEventId = await PromoverFacturaAsync(
+            "msg-21-enriquecido", proveedorCodigo: "P00777", tipoComprobante: "07", numero: "F123-456",
+            totalOrig: 4200.50m, moneda: "USD", fechaEmision: new DateOnly(2026, 7, 15));
+
+        var sut = new SqlBandejaRepository(_db.ConnectionString);
+        var resultado = await sut.ListarAsync(Filtros(estado: "PROMOVIDO", orden: "asc"), CancellationToken.None);
+
+        var item = Assert.Single(resultado.Items, i => i.InboxEventId == inboxEventId);
+        Assert.Equal("Distribuidora del Sur SAC", item.ProveedorNombre);
+        Assert.Equal("07", item.TipoComprobante);
+        Assert.Equal("F123-456", item.Numero);
+        Assert.Equal(4200.50m, item.TotalOrig);
+        Assert.Equal("USD", item.Moneda);
+        Assert.Equal(new DateOnly(2026, 7, 15), item.FechaEmision);
+    }
+
+    [Fact]
+    public async Task ListarAsync_ProveedorNombreIsNull_WhenCodproIsAbsentFromCatalog()
+    {
+        var inboxEventId = await PromoverFacturaAsync(
+            "msg-21-sin-catalogo", proveedorCodigo: "P09999", numero: "F001-11");
+
+        var sut = new SqlBandejaRepository(_db.ConnectionString);
+        var resultado = await sut.ListarAsync(Filtros(estado: "PROMOVIDO", orden: "asc"), CancellationToken.None);
+
+        var item = Assert.Single(resultado.Items, i => i.InboxEventId == inboxEventId);
+        Assert.Null(item.ProveedorNombre);
+        Assert.Equal("P09999", item.ProveedorCodigo);
+    }
+
+    [Fact]
+    public async Task ListarAsync_EnrichedFieldsAreNull_ForIncidenciaRows()
+    {
+        var procesamientoId = await _db.InsertarProcesamientoAsync(gmailMessageId: "msg-21-incidencia");
+        var inboxEventId = await _db.InsertarInboxEventAsync(procesamientoId, "{}");
+        await _db.InsertarProcesamientoErrorAsync(procesamientoId, mensaje: "fallo");
+
+        var sut = new SqlBandejaRepository(_db.ConnectionString);
+        var resultado = await sut.ListarAsync(Filtros(estado: "PENDIENTE", orden: "asc"), CancellationToken.None);
+
+        var item = Assert.Single(resultado.Items, i => i.InboxEventId == inboxEventId);
+        Assert.Equal("INCIDENCIA", item.Origen);
+        Assert.Null(item.ProveedorNombre);
+        Assert.Null(item.TipoComprobante);
+        Assert.Null(item.Numero);
+        Assert.Null(item.TotalOrig);
+        Assert.Null(item.Moneda);
+        Assert.Null(item.FechaEmision);
+    }
+
+    // --- BACKLOG #21 task 2.2: the global estado aggregate ----------------------------------
+
+    [Fact]
+    public async Task Resumen_BucketsPartitionTheSet_AndCountPromotedRowsInValidadas()
+    {
+        // pendiente
+        var pendienteProc = await _db.InsertarProcesamientoAsync(gmailMessageId: "msg-21-agg-pendiente");
+        await _db.InsertarInboxEventAsync(pendienteProc, "{}");
+        // validada: promoted, no errors, no alert flags
+        await PromoverFacturaAsync("msg-21-agg-validada", proveedorCodigo: "P00001", numero: "F001-21");
+        // con error: pendiente + a ProcesamientoError row
+        var errorProc = await _db.InsertarProcesamientoAsync(gmailMessageId: "msg-21-agg-error");
+        await _db.InsertarInboxEventAsync(errorProc, "{}");
+        await _db.InsertarProcesamientoErrorAsync(errorProc, mensaje: "boom");
+        // alerta: promoted with esProveedorGenerico
+        await PromoverFacturaAsync("msg-21-agg-alerta", proveedorCodigo: "P00002", numero: "F001-22", esProveedorGenerico: true);
+        // descartada
+        var descartadaProc = await _db.InsertarProcesamientoAsync(gmailMessageId: "msg-21-agg-descartada");
+        var descartadaId = await _db.InsertarInboxEventAsync(descartadaProc, "{}");
+        await _db.ExecuteNonQueryAsync(
+            $"UPDATE fact.InboxEvent SET EstadoConsumo = 'DESCARTADO', MotivoDescarte = 'sin monto' WHERE InboxEventId = {descartadaId};");
+
+        var sut = new SqlBandejaRepository(_db.ConnectionString);
+        var r = (await sut.ListarAsync(Filtros(orden: "asc"), CancellationToken.None)).Resumen;
+
+        Assert.Equal(1, r.Pendientes);
+        Assert.Equal(1, r.Validadas);
+        Assert.Equal(1, r.ConError);
+        Assert.Equal(1, r.Alertas);
+        Assert.Equal(1, r.Descartadas);
+        Assert.Equal(r.Total, r.Pendientes + r.Validadas + r.ConError + r.Alertas + r.Descartadas);
+        Assert.Equal(5, r.Total);
+    }
+
+    [Fact]
+    public async Task Resumen_FirstMatchPrecedence_ErrorBeatsAlerta_DescartadoBeatsError()
+    {
+        // promoted, generic proveedor (alerta) AND has an error row -> must count as ConError, not Alertas
+        var inboxEventId = await PromoverFacturaAsync(
+            "msg-21-prec-error-alerta", proveedorCodigo: "P00003", numero: "F001-23", esProveedorGenerico: true);
+        var procId = await _db.ExecuteScalarAsync<long>(
+            $"SELECT ProcesamientoId FROM fact.InboxEvent WHERE InboxEventId = {inboxEventId};");
+        await _db.InsertarProcesamientoErrorAsync(procId, mensaje: "boom");
+
+        // discarded row that still carries error history -> must count as Descartadas, not ConError
+        var descProc = await _db.InsertarProcesamientoAsync(gmailMessageId: "msg-21-prec-descartado");
+        var descId = await _db.InsertarInboxEventAsync(descProc, "{}");
+        await _db.InsertarProcesamientoErrorAsync(descProc, mensaje: "historico");
+        await _db.ExecuteNonQueryAsync(
+            $"UPDATE fact.InboxEvent SET EstadoConsumo = 'DESCARTADO', MotivoDescarte = 'x' WHERE InboxEventId = {descId};");
+
+        var sut = new SqlBandejaRepository(_db.ConnectionString);
+        var r = (await sut.ListarAsync(Filtros(orden: "asc"), CancellationToken.None)).Resumen;
+
+        Assert.Equal(1, r.ConError);
+        Assert.Equal(0, r.Alertas);
+        Assert.Equal(1, r.Descartadas);
+    }
+
+    // --- BACKLOG #21 task 2.3: the aggregate ignores filters and pagination -----------------
+
+    [Fact]
+    public async Task Resumen_IsIdenticalAcrossFilterAndPaginationParameters()
+    {
+        await PromoverFacturaAsync("msg-21-inv-a", proveedorCodigo: "P00004", numero: "F001-24");
+        var pendProc = await _db.InsertarProcesamientoAsync(gmailMessageId: "msg-21-inv-b");
+        await _db.InsertarInboxEventAsync(pendProc, """{"comprobante":{"rucProveedor":"20555550000"}}""");
+
+        var sut = new SqlBandejaRepository(_db.ConnectionString);
+        var baseline = (await sut.ListarAsync(Filtros(orden: "asc"), CancellationToken.None)).Resumen;
+
+        var conEstado = (await sut.ListarAsync(Filtros(estado: "PENDIENTE"), CancellationToken.None)).Resumen;
+        var conProveedor = (await sut.ListarAsync(Filtros(proveedor: "20555550000"), CancellationToken.None)).Resumen;
+        var conFechas = (await sut.ListarAsync(
+            Filtros(desde: new DateOnly(2026, 1, 1), hasta: new DateOnly(2026, 1, 2)), CancellationToken.None)).Resumen;
+        var pagina2 = (await sut.ListarAsync(Filtros(pagina: 2, tamanioPagina: 1), CancellationToken.None)).Resumen;
+
+        Assert.Equal(baseline, conEstado);
+        Assert.Equal(baseline, conProveedor);
+        Assert.Equal(baseline, conFechas);
+        Assert.Equal(baseline, pagina2);
+    }
+
+    // --- BACKLOG #21 task 2.4: the whole widened batch runs as usr_api ---------------------
+
+    [Fact]
+    public async Task ListarAsync_WidenedBatch_RunsAsUsrApi_ProvingProveedorAndAggregateGrants()
+    {
+        await SeedProveedorAsync("P00555", "Comercial Andina EIRL");
+        var inboxEventId = await PromoverFacturaAsync(
+            "msg-21-usr-api", proveedorCodigo: "P00555", numero: "F001-25");
+
+        var resultado = await _db.ExecuteAsUserAsync(
+            "usr_api",
+            connection => SqlBandejaRepository.ListarConConexionAsync(
+                connection, Filtros(estado: "PROMOVIDO"), CancellationToken.None));
+
+        var item = Assert.Single(resultado.Items, i => i.InboxEventId == inboxEventId);
+        Assert.Equal("Comercial Andina EIRL", item.ProveedorNombre);
+        Assert.Equal(1, resultado.Resumen.Validadas);
+        Assert.Equal(resultado.Resumen.Total,
+            resultado.Resumen.Pendientes + resultado.Resumen.Validadas + resultado.Resumen.ConError
+            + resultado.Resumen.Alertas + resultado.Resumen.Descartadas);
+    }
 }

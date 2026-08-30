@@ -201,6 +201,44 @@ public sealed class BandejaEndpointsTests : SesionEndpointsTestBase
         Assert.Equal(400, problema!.Status);
     }
 
+    // --- BACKLOG #21 task 2.5: envelope carries the enriched fields + the global resumen --------
+
+    [Fact]
+    public async Task GetBandeja_CarriesEnrichedComprobanteFields_AndAGlobalResumen()
+    {
+        var procesamientoId = await Db.InsertarProcesamientoAsync(gmailMessageId: "msg-bandeja-21-enriquecido");
+        var inboxEventId = await Db.InsertarInboxEventAsync(procesamientoId, "{}");
+        var promocionRepository = new SqlPromocionRepository(Db.ConnectionString);
+        await promocionRepository.PromoverAsync(
+            inboxEventId, procesamientoId, MuestraFacturaPromovida(), MuestraDocumentoPromovido(), CancellationToken.None);
+
+        using var client = await ObtenerClienteAutenticadoAsync();
+
+        var sinFiltro = await client.GetAsync("/api/bandeja");
+        var conFiltro = await client.GetAsync("/api/bandeja?estado=PROMOVIDO&pagina=1");
+        Assert.Equal(HttpStatusCode.OK, sinFiltro.StatusCode);
+        Assert.Equal(HttpStatusCode.OK, conFiltro.StatusCode);
+
+        var paginaSinFiltro = await sinFiltro.Content.ReadFromJsonAsync<PaginaBandeja<BandejaItem>>(ResponseJsonOptions);
+        var paginaConFiltro = await conFiltro.Content.ReadFromJsonAsync<PaginaBandeja<BandejaItem>>(ResponseJsonOptions);
+
+        Assert.NotNull(paginaSinFiltro!.Resumen);
+        Assert.Equal(paginaSinFiltro.Resumen.Total,
+            paginaSinFiltro.Resumen.Pendientes + paginaSinFiltro.Resumen.Validadas + paginaSinFiltro.Resumen.ConError
+            + paginaSinFiltro.Resumen.Alertas + paginaSinFiltro.Resumen.Descartadas);
+        // The generic-proveedor promoted row lands in Alertas; the aggregate sees it even though the
+        // default list view does not return it.
+        Assert.Equal(1, paginaSinFiltro.Resumen.Alertas);
+        Assert.Equal(paginaSinFiltro.Resumen, paginaConFiltro!.Resumen);
+
+        var promovido = paginaConFiltro.Items.Single(i => i.InboxEventId == inboxEventId);
+        Assert.Equal("01", promovido.TipoComprobante);
+        Assert.Equal("F001-123", promovido.Numero);
+        Assert.Equal(1180.00m, promovido.TotalOrig);
+        Assert.Equal("PEN", promovido.Moneda);
+        Assert.Equal(new DateOnly(2026, 8, 10), promovido.FechaEmision);
+    }
+
     // Tracked so DisposeAsync can dispose every factory created via ObtenerClienteAutenticadoAsync --
     // a factory with no other live reference is eligible for GC mid-test, which disposes its
     // TestServer and turns in-flight requests into ObjectDisposedException.
