@@ -99,6 +99,12 @@ builder.Services.AddSingleton<IConfiguracionRepository>(sp =>
 builder.Services.AddSingleton<IProveedorRepository>(sp =>
     new SqlProveedorRepository(ApiConnectionOptions.Resolve(sp.GetRequiredService<IConfiguration>())));
 
+// BACKLOG #22 PR2 composition root: consultas-catalogos-spa — read-only plan contable over
+// dbo.CuentaContable (ADR 0003 external catalog). Same lazy-resolution pattern as every repo
+// above; a plain Singleton like the other read-only catalog repos.
+builder.Services.AddSingleton<ICuentaContableRepository>(sp =>
+    new SqlCuentaContableRepository(ApiConnectionOptions.Resolve(sp.GetRequiredService<IConfiguration>())));
+
 // design D7: PeriodicTimer(1 min) with the DI-registered TimeProvider.System above -- so a test
 // that substitutes a FakeTimeProvider via SmartNetApiFactory could drive it deterministically the
 // same way SmartNet.Inbox.Infrastructure.Tests.PromocionBackgroundServiceTests already does for
