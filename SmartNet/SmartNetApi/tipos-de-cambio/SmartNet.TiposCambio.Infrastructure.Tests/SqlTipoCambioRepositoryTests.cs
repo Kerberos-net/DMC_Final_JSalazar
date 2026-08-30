@@ -124,4 +124,62 @@ public sealed class SqlTipoCambioRepositoryTests : IAsyncLifetime
             $"SELECT COUNT(*) FROM fact.TipoCambio WHERE Fecha = '{fecha:yyyy-MM-dd}' AND Origen = 'MANUAL';");
         Assert.Equal(1, count);
     }
+
+    // BACKLOG #22 PR7 — catalog-queries-api spec req 5 / design D2: read-only history for the SPA
+    // tipo de cambio screen. Inclusive [desde, hasta] range, BOTH origins per date, ordered by
+    // Fecha then Origen; empty range -> []. The SQL keeps `AND Origen IN ('SBS','MANUAL')` because
+    // the private Map returns (OrigenTipoCambio)(-1) for any other origin — garbage on a display list.
+    [Fact]
+    public async Task ListarHistoricoAsync_ReturnsBothOrigins_WithinInclusiveBounds_OrderedByFechaThenOrigen()
+    {
+        await _db.ExecuteNonQueryAsync(
+            """
+            INSERT INTO fact.TipoCambio (Fecha, Origen, Compra, Venta, FechaConsulta) VALUES
+                ('2026-08-13', 'SBS', 3.79, 3.80, '2026-08-13T08:00:00'),
+                ('2026-08-14', 'SBS', 3.799, 3.802, '2026-08-14T08:00:00'),
+                ('2026-08-14', 'MANUAL', 3.700, 3.750, '2026-08-14T07:00:00'),
+                ('2026-08-15', 'SBS', 3.805, 3.808, '2026-08-15T08:00:00'),
+                ('2026-08-16', 'SBS', 3.81, 3.82, '2026-08-16T08:00:00');
+            """);
+        var sut = new SqlTipoCambioRepository(_db.ConnectionString);
+
+        var historico = await sut.ListarHistoricoAsync(
+            new DateOnly(2026, 8, 14), new DateOnly(2026, 8, 15), CancellationToken.None);
+
+        Assert.Collection(historico,
+            t => { Assert.Equal(new DateOnly(2026, 8, 14), t.Fecha); Assert.Equal(OrigenTipoCambio.Manual, t.Origen); },
+            t => { Assert.Equal(new DateOnly(2026, 8, 14), t.Fecha); Assert.Equal(OrigenTipoCambio.Sbs, t.Origen); },
+            t => { Assert.Equal(new DateOnly(2026, 8, 15), t.Fecha); Assert.Equal(OrigenTipoCambio.Sbs, t.Origen); });
+        Assert.Equal(3.700m, historico[0].Compra);
+        Assert.Equal(3.750m, historico[0].Venta);
+    }
+
+    [Fact]
+    public async Task ListarHistoricoAsync_ReturnsEmpty_WhenNoRowInRange()
+    {
+        var sut = new SqlTipoCambioRepository(_db.ConnectionString);
+
+        var historico = await sut.ListarHistoricoAsync(
+            new DateOnly(2026, 1, 1), new DateOnly(2026, 1, 31), CancellationToken.None);
+
+        Assert.Empty(historico);
+    }
+
+    [Fact]
+    public async Task ListarHistoricoAsync_ExcludesRowsWithAnUnknownOrigen()
+    {
+        await _db.ExecuteNonQueryAsync(
+            """
+            ALTER TABLE fact.TipoCambio NOCHECK CONSTRAINT CK_TipoCambio_Origen;
+            INSERT INTO fact.TipoCambio (Fecha, Origen, Compra, Venta, FechaConsulta) VALUES
+                ('2026-08-14', 'SBS', 3.799, 3.802, '2026-08-14T08:00:00'),
+                ('2026-08-14', 'BCP', 3.700, 3.750, '2026-08-14T07:00:00');
+            """);
+        var sut = new SqlTipoCambioRepository(_db.ConnectionString);
+
+        var historico = await sut.ListarHistoricoAsync(
+            new DateOnly(2026, 8, 14), new DateOnly(2026, 8, 14), CancellationToken.None);
+
+        Assert.Collection(historico, t => Assert.Equal(OrigenTipoCambio.Sbs, t.Origen));
+    }
 }
