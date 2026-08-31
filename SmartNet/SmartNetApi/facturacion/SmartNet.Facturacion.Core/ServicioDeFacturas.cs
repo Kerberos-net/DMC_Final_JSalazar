@@ -232,7 +232,7 @@ public sealed class ServicioDeFacturas
         // BACKLOG #18 PR5 (api-facturas delta) -- guarda pura ANTES de escribir: una corrección
         // inválida (numero en blanco / muy largo, tipo de comprobante desconocido) -> 422 sin tocar
         // ninguna fila ni hacer commit.
-        var invalida = ValidacionDeCorreccion.Validar(cambios);
+        var invalida = ValidacionDeCorreccion.Validar(persistida, cambios);
         if (invalida is not null)
         {
             return invalida;

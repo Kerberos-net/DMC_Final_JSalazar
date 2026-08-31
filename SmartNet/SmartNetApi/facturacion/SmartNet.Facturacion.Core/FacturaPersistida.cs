@@ -35,7 +35,13 @@ public sealed record FacturaPersistida(
     bool EsProveedorGenerico = false,
     bool PosibleDuplicado = false,
     bool TieneCamposNoExtraidos = false,
-    bool? AfectacionMixta = null)
+    bool? AfectacionMixta = null,
+    // BACKLOG #19 — IgvOrig es NULLABLE (una boleta / no gravada no lo desglosa); Glosa es texto
+    // libre (schema 021); CamposNoExtraidos es la lista por campo del OCR (schema 021, D8) —
+    // NULL para facturas promovidas antes de 021, y entonces la SPA cae al bool coarse.
+    decimal? IgvOrig = null,
+    string? Glosa = null,
+    IReadOnlyList<string>? CamposNoExtraidos = null)
 {
     public const string PendienteValidacion = "PENDIENTE_VALIDACION";
     public const string Validada = "VALIDADA";

@@ -202,10 +202,16 @@ internal sealed record CorreccionFacturaRequest(
     // BACKLOG #18 PR5 (api-facturas delta) -- 2 params TRAILING con default: los ~call sites
     // posicionales de 7 argumentos existentes (tests incluidos) siguen compilando.
     string? TipoComprobante = null,
-    string? Numero = null)
+    string? Numero = null,
+    // BACKLOG #19 -- base/IGV como par atomico (design D1) + glosa (schema 021). TRAILING con
+    // default: los call sites posicionales existentes (tests incluidos) siguen compilando.
+    decimal? BaseImponible = null,
+    decimal? Igv = null,
+    string? Glosa = null)
 {
     public CorreccionFactura ACorreccion() =>
-        new(ProveedorCodigo, RucProveedor, Moneda, TotalOrig, FechaEmision, Motivo, Afectacion, TipoComprobante, Numero);
+        new(ProveedorCodigo, RucProveedor, Moneda, TotalOrig, FechaEmision, Motivo, Afectacion, TipoComprobante, Numero,
+            BaseImponible, Igv, Glosa);
 }
 
 internal sealed record RegistrarAdjuntoRequest(string NombreArchivo, string RutaRelativa, string MimeType, long TamanoBytes);
@@ -223,12 +229,16 @@ internal sealed record ConfirmarAfectacionRequest(bool EsMixta);
 internal sealed record FacturaRespuesta(
     long FacturaId, string Estado, string ProveedorCodigo, string? RucProveedor, string TipoComprobante,
     string? Numero, decimal TotalOrig, string Moneda, DateOnly FechaEmision, int? Motivo, string? Afectacion,
-    bool EsProveedorGenerico, bool PosibleDuplicado, bool TieneCamposNoExtraidos, bool? AfectacionMixta)
+    bool EsProveedorGenerico, bool PosibleDuplicado, bool TieneCamposNoExtraidos, bool? AfectacionMixta,
+    // BACKLOG #19 (design D8/D9) -- lista por campo del OCR + glosa, AL FINAL, puramente aditivo.
+    // TieneCamposNoExtraidos se conserva: es el fallback coarse para facturas pre-021.
+    string[] CamposNoExtraidos, string? Glosa)
 {
     public static FacturaRespuesta De(FacturaPersistida factura) => new(
         factura.FacturaId, factura.Estado, factura.ProveedorCodigo, factura.RucProveedor, factura.TipoComprobante,
         factura.Numero, factura.TotalOrig, factura.Moneda, factura.FechaEmision, factura.Motivo, factura.Afectacion,
-        factura.EsProveedorGenerico, factura.PosibleDuplicado, factura.TieneCamposNoExtraidos, factura.AfectacionMixta);
+        factura.EsProveedorGenerico, factura.PosibleDuplicado, factura.TieneCamposNoExtraidos, factura.AfectacionMixta,
+        factura.CamposNoExtraidos?.ToArray() ?? Array.Empty<string>(), factura.Glosa);
 }
 
 /// <summary>Forma de respuesta de <c>GET /api/facturas/{id}/asiento</c> (design D3) --
