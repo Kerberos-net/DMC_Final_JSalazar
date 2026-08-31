@@ -29,11 +29,11 @@ Exceeds the 800-line budget (~1450 est.). Owner ACCEPTED the `size:exception` �
 
 ## Phase 1: SQL Foundation (Unit 1) — satisfies slice "glosa" + "per-field OCR highlight" storage
 
-- [ ] 1.1 RED: extend `PermissionMatrixTests` — no new GRANT on `fact.Factura`; `fact_api` UPDATE still scoped, `fact_worker` unchanged (ADR 0003)
-- [ ] 1.2 RED: `ChecksumManifestTests` + `RollbackAdvisoryTests` expect `021_glosa_y_campos_no_extraidos.sql` + `rollback/021_down.sql`
-- [ ] 1.3 GREEN: CREATE `SmartNet/SmartNetBD/schema/021_glosa_y_campos_no_extraidos.sql` — `ALTER TABLE fact.Factura ADD Glosa NVARCHAR(250) NULL, CamposNoExtraidos NVARCHAR(500) NULL` (own GO batch, no GRANT)
-- [ ] 1.4 GREEN: CREATE `rollback/021_down.sql` (drop both columns); regenerate `checksums.txt` via `generate-checksums.ps1` / `.sh`
-- [ ] 1.5 RED→GREEN: idempotency test — 021 re-run is a no-op
+- [x] 1.1 RED: extend `PermissionMatrixTests` — no new GRANT on `fact.Factura`; `fact_api` UPDATE still scoped, `fact_worker` unchanged (ADR 0003)
+- [x] 1.2 RED: `ChecksumManifestTests` + `RollbackAdvisoryTests` expect `021_glosa_y_campos_no_extraidos.sql` + `rollback/021_down.sql`
+- [x] 1.3 GREEN: CREATE `SmartNet/SmartNetBD/schema/021_glosa_y_campos_no_extraidos.sql` — `ALTER TABLE fact.Factura ADD Glosa NVARCHAR(250) NULL, CamposNoExtraidos NVARCHAR(500) NULL` (own GO batch, no GRANT)
+- [x] 1.4 GREEN: CREATE `rollback/021_down.sql` (drop both columns); regenerate `checksums.txt` via `generate-checksums.ps1` / `.sh`
+- [x] 1.5 RED→GREEN: idempotency test — 021 re-run is a no-op
 
 ## Phase 2: Promotion carries per-field list (Unit 2) — satisfies "promotion stops collapsing the worker list"
 
