@@ -52,6 +52,29 @@ public class CalculoDeIndicadoresTests
         Assert.False(CalculoDeIndicadores.Calcular(sinFaltantes, true, false).TieneCamposNoExtraidos);
     }
 
+    [Fact]
+    public void Calcular_CamposNoExtraidos_SeConservaLaLista_BesideDelBooleano()
+    {
+        var conFaltantes = EventoCon(new DateOnly(2026, 8, 10), false, new[] { "igv", "total" });
+
+        var indicadores = CalculoDeIndicadores.Calcular(conFaltantes, true, false);
+
+        Assert.Equal(new[] { "igv", "total" }, indicadores.CamposNoExtraidos);
+        // Consistency invariant: the boolean is true iff the list is non-empty.
+        Assert.True(indicadores.TieneCamposNoExtraidos);
+    }
+
+    [Fact]
+    public void Calcular_CamposNoExtraidos_ListaVacia_MantieneElBooleanoEnFalse()
+    {
+        var sinFaltantes = EventoCon(new DateOnly(2026, 8, 10), false, Array.Empty<string>());
+
+        var indicadores = CalculoDeIndicadores.Calcular(sinFaltantes, true, false);
+
+        Assert.Empty(indicadores.CamposNoExtraidos);
+        Assert.False(indicadores.TieneCamposNoExtraidos);
+    }
+
     [Theory]
     [InlineData(2026, 8, 9, true)]  // domingo
     [InlineData(2026, 8, 10, false)] // lunes

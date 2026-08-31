@@ -30,7 +30,8 @@ public sealed class SqlPromocionRepositoryTests : IAsyncLifetime
                 PosibleDuplicado: false,
                 TieneCamposNoExtraidos: true,
                 FechaEnDomingo: false,
-                AfectacionMixta: false),
+                AfectacionMixta: false,
+                CamposNoExtraidos: new[] { "igv", "fechaEmision" }),
             Extracciones: new[] { new FacturaExtraccionPromovida("total", "1180.00", "XML") },
             Estado: estado);
 
@@ -75,6 +76,53 @@ public sealed class SqlPromocionRepositoryTests : IAsyncLifetime
         var facturaIdEnEvento = await _db.ExecuteScalarAsync<long>(
             $"SELECT FacturaId FROM fact.InboxEvent WHERE InboxEventId = {inboxEventId};");
         Assert.Equal(resultado.FacturaId, facturaIdEnEvento);
+    }
+
+    /// <summary>BACKLOG #19 Phase 2 (task 2.3) -- promotion persists the worker's per-field
+    /// camposNoExtraidos list verbatim into <c>fact.Factura.CamposNoExtraidos</c> (D8: an immutable
+    /// extraction fact, no API-side derivation). A non-empty list alongside real extraction
+    /// evidence is valid, not a contradiction.</summary>
+    [Fact]
+    public async Task PromoverAsync_PersistsCamposNoExtraidos_FromIndicadores()
+    {
+        var procesamientoId = await _db.InsertarProcesamientoAsync();
+        var inboxEventId = await _db.InsertarInboxEventAsync(procesamientoId, "{}");
+        var documentoRecibidoId = await DocumentoRecibidoIdDeAsync(procesamientoId);
+        var sut = new SqlPromocionRepository(_db.ConnectionString);
+
+        var resultado = await sut.PromoverAsync(
+            inboxEventId, procesamientoId, MuestraFactura(), MuestraDocumento(documentoRecibidoId), CancellationToken.None);
+
+        var camposNoExtraidos = await _db.ExecuteScalarAsync<string>(
+            $"SELECT CamposNoExtraidos FROM fact.Factura WHERE FacturaId = {resultado.FacturaId};");
+        Assert.Equal("igv,fechaEmision", camposNoExtraidos);
+    }
+
+    /// <summary>BACKLOG #19 Phase 2 (task 2.3) -- an all-fields-extracted factura leaves the column
+    /// NULL (the SPA reads NULL as "pre-021, fall back to the coarse badge").</summary>
+    [Fact]
+    public async Task PromoverAsync_LeavesCamposNoExtraidosNull_WhenListIsEmpty()
+    {
+        var procesamientoId = await _db.InsertarProcesamientoAsync();
+        var inboxEventId = await _db.InsertarInboxEventAsync(procesamientoId, "{}");
+        var documentoRecibidoId = await DocumentoRecibidoIdDeAsync(procesamientoId);
+        var sut = new SqlPromocionRepository(_db.ConnectionString);
+
+        var factura = MuestraFactura() with
+        {
+            Indicadores = MuestraFactura().Indicadores with
+            {
+                TieneCamposNoExtraidos = false,
+                CamposNoExtraidos = Array.Empty<string>(),
+            },
+        };
+
+        var resultado = await sut.PromoverAsync(
+            inboxEventId, procesamientoId, factura, MuestraDocumento(documentoRecibidoId), CancellationToken.None);
+
+        var camposNoExtraidos = await _db.ExecuteScalarAsync<string>(
+            $"SELECT CamposNoExtraidos FROM fact.Factura WHERE FacturaId = {resultado.FacturaId};");
+        Assert.Null(camposNoExtraidos);
     }
 
     /// <summary>BACKLOG #12 task 2.1 -- proves the projection row lands with the metadata mapped

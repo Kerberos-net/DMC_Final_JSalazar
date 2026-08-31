@@ -20,7 +20,8 @@ public class ConstruccionDeFacturaTests
         PosibleDuplicado: false,
         TieneCamposNoExtraidos: true,
         FechaEnDomingo: false,
-        AfectacionMixta: false);
+        AfectacionMixta: false,
+        CamposNoExtraidos: new[] { "igv" });
 
     [Fact]
     public void Construir_CopiaLosCamposDelComprobanteAlaFacturaPromovida()

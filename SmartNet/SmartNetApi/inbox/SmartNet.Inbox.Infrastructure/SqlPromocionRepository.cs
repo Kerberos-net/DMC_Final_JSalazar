@@ -135,12 +135,12 @@ public sealed class SqlPromocionRepository : IPromocionRepository
             INSERT INTO fact.Factura
                 (ProcesamientoId, ProveedorCodigo, RucProveedor, TipoComprobante, Numero, TotalOrig,
                  Moneda, FechaEmision, AfectacionMixta, EsProveedorGenerico, PosibleDuplicado,
-                 TieneCamposNoExtraidos, FechaEnDomingo, Estado)
+                 TieneCamposNoExtraidos, CamposNoExtraidos, FechaEnDomingo, Estado)
             OUTPUT INSERTED.FacturaId
             VALUES
                 (@procesamientoId, @proveedorCodigo, @rucProveedor, @tipoComprobante, @numero, @totalOrig,
                  @moneda, @fechaEmision, @afectacionMixta, @esProveedorGenerico, @posibleDuplicado,
-                 @tieneCamposNoExtraidos, @fechaEnDomingo, @estado);
+                 @tieneCamposNoExtraidos, @camposNoExtraidos, @fechaEnDomingo, @estado);
             """;
         command.Parameters.AddWithValue("@procesamientoId", procesamientoId);
         command.Parameters.AddWithValue("@proveedorCodigo", factura.ProveedorCodigo);
@@ -154,6 +154,13 @@ public sealed class SqlPromocionRepository : IPromocionRepository
         command.Parameters.AddWithValue("@esProveedorGenerico", factura.Indicadores.EsProveedorGenerico);
         command.Parameters.AddWithValue("@posibleDuplicado", factura.Indicadores.PosibleDuplicado);
         command.Parameters.AddWithValue("@tieneCamposNoExtraidos", factura.Indicadores.TieneCamposNoExtraidos);
+        // BACKLOG #19 (D8): the worker's per-field list is persisted verbatim as a CSV, an immutable
+        // extraction fact. Empty list -> NULL (a factura whose every field came from the document);
+        // the SPA reads NULL as "pre-021, fall back to the coarse TieneCamposNoExtraidos badge".
+        command.Parameters.AddWithValue("@camposNoExtraidos",
+            factura.Indicadores.CamposNoExtraidos.Count > 0
+                ? string.Join(",", factura.Indicadores.CamposNoExtraidos)
+                : (object)DBNull.Value);
         command.Parameters.AddWithValue("@fechaEnDomingo", factura.Indicadores.FechaEnDomingo);
         command.Parameters.AddWithValue("@estado", factura.Estado);
 

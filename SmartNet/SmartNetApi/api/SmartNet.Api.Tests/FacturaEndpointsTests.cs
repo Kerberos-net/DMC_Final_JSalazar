@@ -472,7 +472,8 @@ public sealed class FacturaEndpointsTests : SesionEndpointsTestBase
                 PosibleDuplicado: true,
                 TieneCamposNoExtraidos: false,
                 FechaEnDomingo: false,
-                AfectacionMixta: false),
+                AfectacionMixta: false,
+                CamposNoExtraidos: Array.Empty<string>()),
             Extracciones: Array.Empty<FacturaExtraccionPromovida>(),
             Estado: "PENDIENTE_VALIDACION");
         var resultado = await promocionRepository.PromoverAsync(

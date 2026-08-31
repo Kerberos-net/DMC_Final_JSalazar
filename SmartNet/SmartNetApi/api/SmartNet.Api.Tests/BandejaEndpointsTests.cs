@@ -199,7 +199,7 @@ public sealed class BandejaEndpointsTests : SesionEndpointsTestBase
             new FacturaPromovida(
                 ProveedorCodigo: "P00001", TipoComprobante: "01", Numero: "F001-ED", RucProveedor: "20100000001",
                 TotalOrig: 100m, Moneda: "PEN", FechaEmision: new DateOnly(2026, 8, 10),
-                Indicadores: new IndicadoresFactura(false, false, false, false, false),
+                Indicadores: new IndicadoresFactura(false, false, false, false, false, Array.Empty<string>()),
                 Extracciones: Array.Empty<FacturaExtraccionPromovida>(), Estado: "PENDIENTE_VALIDACION"),
             MuestraDocumentoPromovido(), CancellationToken.None);
 
@@ -332,7 +332,8 @@ public sealed class BandejaEndpointsTests : SesionEndpointsTestBase
                 PosibleDuplicado: false,
                 TieneCamposNoExtraidos: true,
                 FechaEnDomingo: false,
-                AfectacionMixta: false),
+                AfectacionMixta: false,
+                CamposNoExtraidos: new[] { "igv" }),
             Extracciones: new[] { new FacturaExtraccionPromovida("total", "1180.00", "XML") },
             Estado: "PENDIENTE_VALIDACION");
 }

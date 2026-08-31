@@ -14,11 +14,17 @@ public static class CalculoDeIndicadores
         var fechaEmision = evento.Comprobante?.FechaEmision;
         var fechaEnDomingo = fechaEmision is { } fecha && fecha.DayOfWeek == DayOfWeek.Sunday;
 
+        // The per-field list and the derived boolean come from the SAME source, so the consistency
+        // invariant (bool true iff list non-empty) holds by construction here. The worker's list is
+        // copied defensively so a later mutation of `evento` cannot desync the two.
+        var camposNoExtraidos = evento.CamposNoExtraidos.ToArray();
+
         return new IndicadoresFactura(
             EsProveedorGenerico: !proveedorResuelto,
             PosibleDuplicado: existeIdentidadPrevia,
-            TieneCamposNoExtraidos: evento.CamposNoExtraidos.Count > 0,
+            TieneCamposNoExtraidos: camposNoExtraidos.Length > 0,
             FechaEnDomingo: fechaEnDomingo,
-            AfectacionMixta: evento.AfectacionMixta);
+            AfectacionMixta: evento.AfectacionMixta,
+            CamposNoExtraidos: camposNoExtraidos);
     }
 }

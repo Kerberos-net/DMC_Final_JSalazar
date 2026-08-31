@@ -37,10 +37,10 @@ Exceeds the 800-line budget (~1450 est.). Owner ACCEPTED the `size:exception` �
 
 ## Phase 2: Promotion carries per-field list (Unit 2) — satisfies "promotion stops collapsing the worker list"
 
-- [ ] 2.1 RED: `CalculoDeIndicadores` test — `IndicadoresFactura` exposes `CamposNoExtraidos` list beside derived `TieneCamposNoExtraidos`; consistency invariant (non-empty iff bool true)
-- [ ] 2.2 GREEN: MODIFY `Inbox.Core/IndicadoresFactura.cs` + `CalculoDeIndicadores.cs` — carry the list, no collapse
-- [ ] 2.3 RED: `SqlPromocionRepository` test — promotion persists `fact.Factura.CamposNoExtraidos` from `EventoInbox.CamposNoExtraidos`; UBL-XML-present + non-empty list is valid (D8)
-- [ ] 2.4 GREEN: MODIFY `PayloadInboxParser.cs` + `SqlPromocionRepository.cs` — parse + persist; no API-side derivation
+- [x] 2.1 RED: `CalculoDeIndicadores` test — `IndicadoresFactura` exposes `CamposNoExtraidos` list beside derived `TieneCamposNoExtraidos`; consistency invariant (non-empty iff bool true)
+- [x] 2.2 GREEN: MODIFY `Inbox.Core/IndicadoresFactura.cs` + `CalculoDeIndicadores.cs` — carry the list, no collapse
+- [x] 2.3 RED: `SqlPromocionRepository` test — promotion persists `fact.Factura.CamposNoExtraidos` from `EventoInbox.CamposNoExtraidos`; UBL-XML-present + non-empty list is valid (D8)
+- [x] 2.4 GREEN: MODIFY `PayloadInboxParser.cs` + `SqlPromocionRepository.cs` — parse + persist; no API-side derivation
 
 ## Phase 3: Accounting core + write pipeline (Unit 3)
 

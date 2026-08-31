@@ -56,7 +56,7 @@ public sealed class SqlBandejaRepositoryTests : IAsyncLifetime
         var factura = new Core.FacturaPromovida(
             ProveedorCodigo: "P00000", TipoComprobante: "01", Numero: "F001-1", RucProveedor: "20100000001",
             TotalOrig: 100m, Moneda: "PEN", FechaEmision: new DateOnly(2026, 8, 9),
-            Indicadores: new Core.IndicadoresFactura(true, false, false, false, false),
+            Indicadores: new Core.IndicadoresFactura(true, false, false, false, false, Array.Empty<string>()),
             Extracciones: Array.Empty<Core.FacturaExtraccionPromovida>(), Estado: "PENDIENTE_VALIDACION");
         var documento = new Core.DocumentoPromovido(
             DocumentoRecibidoId: 1, NombreArchivo: "f.pdf", MimeType: "application/pdf", RutaRelativa: "/f.pdf", TamanoBytes: 10);
@@ -148,7 +148,7 @@ public sealed class SqlBandejaRepositoryTests : IAsyncLifetime
         var factura = new Core.FacturaPromovida(
             ProveedorCodigo: "P00001", TipoComprobante: "01", Numero: "F001-2", RucProveedor: "20999999999",
             TotalOrig: 200m, Moneda: "PEN", FechaEmision: new DateOnly(2026, 8, 9),
-            Indicadores: new Core.IndicadoresFactura(false, false, false, false, false),
+            Indicadores: new Core.IndicadoresFactura(false, false, false, false, false, Array.Empty<string>()),
             Extracciones: Array.Empty<Core.FacturaExtraccionPromovida>(), Estado: "PENDIENTE_VALIDACION");
         var documento = new Core.DocumentoPromovido(
             DocumentoRecibidoId: 2, NombreArchivo: "g.pdf", MimeType: "application/pdf", RutaRelativa: "/g.pdf", TamanoBytes: 10);
@@ -260,7 +260,7 @@ public sealed class SqlBandejaRepositoryTests : IAsyncLifetime
         var factura = new Core.FacturaPromovida(
             ProveedorCodigo: "P00002", TipoComprobante: "01", Numero: "F001-3", RucProveedor: "20888888888",
             TotalOrig: 50m, Moneda: "PEN", FechaEmision: new DateOnly(2026, 8, 9),
-            Indicadores: new Core.IndicadoresFactura(false, false, false, false, false),
+            Indicadores: new Core.IndicadoresFactura(false, false, false, false, false, Array.Empty<string>()),
             Extracciones: Array.Empty<Core.FacturaExtraccionPromovida>(), Estado: "PENDIENTE_VALIDACION");
         var documento = new Core.DocumentoPromovido(
             DocumentoRecibidoId: 3, NombreArchivo: "h.pdf", MimeType: "application/pdf", RutaRelativa: "/h.pdf", TamanoBytes: 10);
@@ -307,7 +307,7 @@ public sealed class SqlBandejaRepositoryTests : IAsyncLifetime
         var factura = new Core.FacturaPromovida(
             ProveedorCodigo: proveedorCodigo, TipoComprobante: tipoComprobante, Numero: numero, RucProveedor: rucProveedor,
             TotalOrig: totalOrig, Moneda: moneda, FechaEmision: fechaEmision ?? new DateOnly(2026, 8, 9),
-            Indicadores: new Core.IndicadoresFactura(esProveedorGenerico, posibleDuplicado, false, false, false),
+            Indicadores: new Core.IndicadoresFactura(esProveedorGenerico, posibleDuplicado, false, false, false, Array.Empty<string>()),
             Extracciones: Array.Empty<Core.FacturaExtraccionPromovida>(), Estado: "PENDIENTE_VALIDACION");
         var documento = new Core.DocumentoPromovido(
             DocumentoRecibidoId: 1, NombreArchivo: "f.pdf", MimeType: "application/pdf", RutaRelativa: "/f.pdf", TamanoBytes: 10);

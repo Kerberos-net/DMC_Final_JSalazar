@@ -155,7 +155,11 @@ public sealed class SqlBandejaRepository : IBandejaRepository
                         PosibleDuplicado: reader.GetBoolean(15),
                         TieneCamposNoExtraidos: reader.GetBoolean(16),
                         FechaEnDomingo: reader.GetBoolean(17),
-                        AfectacionMixta: reader.IsDBNull(18) ? null : reader.GetBoolean(18)),
+                        AfectacionMixta: reader.IsDBNull(18) ? null : reader.GetBoolean(18),
+                        // BACKLOG #19: the bandeja projection carries only the coarse boolean badge;
+                        // the per-field OCR list is a detalle-screen concern read straight from
+                        // fact.Factura.CamposNoExtraidos by FacturaRespuesta, not reconstructed here.
+                        CamposNoExtraidos: Array.Empty<string>()),
                 ReprocesarDisponibleEn: reader.IsDBNull(19) ? null : reader.GetDateTime(19)));
         }
 
