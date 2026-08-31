@@ -1,4 +1,4 @@
-import { dosDecimales, fechaIso, importeOpcional, rangoMesActual } from './formato';
+import { dosDecimales, fechaIso, importeOpcional, mesActual, rangoMesActual } from './formato';
 
 describe('formato', () => {
   describe('dosDecimales', () => {
@@ -26,6 +26,25 @@ describe('formato', () => {
     it('formats a Date as LOCAL yyyy-MM-dd, never UTC', () => {
       expect(fechaIso(new Date(2026, 0, 5))).toBe('2026-01-05');
       expect(fechaIso(new Date(2026, 11, 31))).toBe('2026-12-31');
+    });
+  });
+
+  describe('mesActual', () => {
+    it('returns the given date month as LOCAL yyyy-MM', () => {
+      expect(mesActual(new Date(2026, 7, 17))).toBe('2026-08');
+      expect(mesActual(new Date(2026, 0, 1))).toBe('2026-01');
+    });
+
+    it('does not roll into the next month at a late-evening local boundary that UTC would shift', () => {
+      // 31 Dec 2026 23:00 LOCAL — toISOString() would report January (next year) in most TZs.
+      expect(mesActual(new Date(2026, 11, 31, 23, 0, 0))).toBe('2026-12');
+    });
+
+    it('defaults to today when no date is passed', () => {
+      const hoy = new Date();
+      expect(mesActual()).toBe(
+        `${hoy.getFullYear()}-${String(hoy.getMonth() + 1).padStart(2, '0')}`
+      );
     });
   });
 

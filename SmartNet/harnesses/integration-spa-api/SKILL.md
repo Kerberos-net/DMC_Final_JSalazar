@@ -93,6 +93,27 @@ llaman por HTTP (ver `SmartNet/CLAUDE.md`). Para esta costura:
      no parseable / invertido / span > 366d. Cliente HTTP: `TipoCambioService`
      (`tipo-cambio.service.ts`). `GET /api/tipos-cambio/exportacion?desde=&hasta=`
      → `.xlsx`.
+4. **Registro de compra (BACKLOG #23)** — con sesion valida, todo `GET`, solo
+   lectura, camelCase. Sin cookie en cualquiera de las tres rutas → `401` plano.
+   - `GET /api/registro-compra?periodo=YYYY-MM&pagina=&tamanioPagina=` → `200`,
+     envelope `{items,pagina,tamanioPagina,totalRegistros,totalPaginas}`. Solo
+     filas `fact.Factura.Estado='VALIDADA'` y asiento vigente `<> 'ANULADO'`;
+     `totalRegistros` via `COUNT(*) OVER()`. Periodo vacio → `200`, `items:[]`,
+     `totalRegistros:0` (nunca `404`). `periodo` mal formado / ausente
+     (`2026-13`, `agosto`, `2026-8`) → `400` RFC 9457; `tamanioPagina` fuera de
+     {6,10,20,50} → `400`. Cliente HTTP: `RegistroCompraService`
+     (`registro-compra/data-access/registro-compra.service.ts`).
+   - `GET /api/registro-compra/{asientoId}` → `200`, `{cabecera,lineas[]}`
+     (lineas por `orden`); asiento `ANULADO` / de factura no `VALIDADA` /
+     inexistente → `404` indistinguible (no es canal lateral). Asiento valido
+     sin lineas → `200`, `lineas:[]`. Cliente HTTP:
+     `RegistroCompraDetalleService` (memoizado por `asientoId`).
+   - `GET /api/registro-compra/export?periodo=YYYY-MM` → `.xlsx`
+     (`application/vnd.openxmlformats-officedocument.spreadsheetml.sheet`),
+     `Content-Disposition: attachment; filename=registro-compra-YYYY-MM.xlsx`
+     (nombre reconstruido de los enteros parseados, ADR 0021 decision 4).
+     `periodo=2026-08%0D%0AX` → `400`. El boton "Exportar" reusa
+     `catalogos/data-access/descarga-xlsx.ts`.
 
 ## Procedimiento de corrida
 

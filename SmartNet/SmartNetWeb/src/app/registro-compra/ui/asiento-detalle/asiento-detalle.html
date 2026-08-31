@@ -1,0 +1,30 @@
+@if (ordenadas(); as filas) {
+  @if (filas.length === 0) {
+    <p class="asiento-detalle__vacio" data-testid="sin-lineas">Este asiento no registra lineas contables.</p>
+  } @else {
+    <table class="asiento-detalle">
+      <thead>
+        <tr>
+          <th>Orden</th>
+          <th>Bloque</th>
+          <th>Cuenta</th>
+          <th>Descripcion</th>
+          <th class="asiento-detalle__num">Debe</th>
+          <th class="asiento-detalle__num">Haber</th>
+        </tr>
+      </thead>
+      <tbody>
+        @for (linea of filas; track linea.orden) {
+          <tr>
+            <td>{{ linea.orden }}</td>
+            <td>{{ linea.bloque }}</td>
+            <td>{{ linea.cuentaCodigo ?? '—' }}</td>
+            <td>{{ linea.cuentaDescripcion ?? '—' }}</td>
+            <td class="asiento-detalle__num">{{ fmt(linea.debe) }}</td>
+            <td class="asiento-detalle__num">{{ fmt(linea.haber) }}</td>
+          </tr>
+        }
+      </tbody>
+    </table>
+  }
+}

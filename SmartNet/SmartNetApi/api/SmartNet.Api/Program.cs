@@ -138,6 +138,14 @@ builder.Services.AddSingleton<ServicioDeSugerencia>(sp => new ServicioDeSugerenc
 // because ServicioDeFacturas is AddScoped.
 builder.Services.AddSingleton<ISembradorDeAsiento, SembradorDeAsientoAdapter>();
 
+// BACKLOG #23 composition root: registro-compra-api — read-only purchase register over
+// fact.AsientoContable + fact.Factura + LEFT JOIN dbo.Proveedor (design D1). Same lazy-resolution
+// pattern as every repo above; a plain Singleton (its only field is a readonly connection string,
+// connection-per-call), not Scoped like the *Servicio* facades.
+builder.Services.AddSingleton<SmartNet.Facturacion.Core.RegistroCompra.IRegistroCompraRepository>(sp =>
+    new SmartNet.Facturacion.Infrastructure.RegistroCompra.SqlRegistroCompraRepository(
+        ApiConnectionOptions.Resolve(sp.GetRequiredService<IConfiguration>())));
+
 // design D7: PeriodicTimer(1 min) with the DI-registered TimeProvider.System above -- so a test
 // that substitutes a FakeTimeProvider via SmartNetApiFactory could drive it deterministically the
 // same way SmartNet.Inbox.Infrastructure.Tests.PromocionBackgroundServiceTests already does for
@@ -213,6 +221,7 @@ app.MapDocumentoEndpoints();
 app.MapAuditoriaEndpoints();
 app.MapConfiguracionEndpoints();
 app.MapCatalogoEndpoints();
+app.MapRegistroCompraEndpoints();
 
 app.Run();
 

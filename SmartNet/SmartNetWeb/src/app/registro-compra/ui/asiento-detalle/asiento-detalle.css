@@ -1,0 +1,19 @@
+/* BACKLOG #23 -- read-only detail lines nested inside an expanded registro row. Frame + hairlines
+ * reuse the shared `.tabla-catalogo` primitive family via the `.asiento-detalle` class in
+ * src/styles.css; only the local layout lives here. */
+
+:host {
+  display: block;
+  overflow-x: auto;
+}
+
+.asiento-detalle__num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.asiento-detalle__vacio {
+  margin: 0;
+  padding: 0.5rem 0;
+  font-style: italic;
+}

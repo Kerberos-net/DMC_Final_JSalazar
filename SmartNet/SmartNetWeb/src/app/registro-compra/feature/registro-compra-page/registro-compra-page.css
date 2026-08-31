@@ -1,0 +1,30 @@
+/* BACKLOG #23 -- page scaffold mirrors the catalogos screens (design D8). Shared primitives
+ * (`.banner`, `.campo`, `.tabla-catalogo*`) live in src/styles.css; only layout is local. */
+
+.registro-page {
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+
+.registro-page__cabecera h1 {
+  margin: 0;
+}
+
+.registro-page__subtitulo {
+  margin: 0.25rem 0 0;
+}
+
+.registro-page__controles {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: flex-end;
+  gap: 1rem;
+  justify-content: space-between;
+}
+
+.registro-page__vacio {
+  margin: 0;
+  padding: 1rem 0;
+  font-style: italic;
+}

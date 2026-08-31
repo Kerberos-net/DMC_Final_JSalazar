@@ -25,6 +25,17 @@ export function fechaIso(d: Date): string {
 }
 
 /**
+ * LOCAL `yyyy-MM` for `hoy`'s calendar month (BACKLOG #23, spa spec req 2 — the registro de compra
+ * screen defaults its period filter to the current accounting month). Uses the LOCAL getters, never
+ * `toISOString()`, so a late-evening boundary (e.g. 31 Dec 23:00) does not roll into the next month
+ * the way UTC would. Mirrors `rangoMesActual`'s "LOCAL, never toISOString" rule.
+ */
+export function mesActual(hoy: Date = new Date()): string {
+  const mes = String(hoy.getMonth() + 1).padStart(2, '0');
+  return `${hoy.getFullYear()}-${mes}`;
+}
+
+/**
  * Default tipo de cambio range: the first day of `hoy`'s month .. `hoy`, formatted in LOCAL time
  * (spa spec req 4 -- "defaults 1st-of-month / today LOCAL not UTC").
  */

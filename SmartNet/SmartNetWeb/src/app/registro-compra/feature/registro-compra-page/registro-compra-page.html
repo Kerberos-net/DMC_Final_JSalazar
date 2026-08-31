@@ -1,0 +1,53 @@
+<section class="registro-page">
+  <header class="registro-page__cabecera">
+    <h1>Registro de compra</h1>
+    <p class="registro-page__subtitulo">
+      Consulta de solo lectura del libro de compras del periodo.
+    </p>
+  </header>
+
+  <div class="registro-page__controles">
+    <label class="campo registro-page__periodo">
+      Periodo
+      <input
+        type="month"
+        data-testid="registro-periodo"
+        [value]="periodo()"
+        (change)="onPeriodo($any($event.target).value)"
+      />
+    </label>
+
+    <app-boton-exportar [descargando]="descargando()" (exportar)="exportar()" />
+  </div>
+
+  @if (cargando()) {
+    <p data-testid="registro-cargando">Cargando…</p>
+  }
+
+  @if (error()) {
+    <p class="banner banner--error" data-testid="registro-error" role="alert">{{ error() }}</p>
+  }
+
+  @if (!cargando() && !error() && totalRegistros() === 0) {
+    <p class="registro-page__vacio" data-testid="registro-vacio">
+      No hay asientos en el registro de compra para este periodo.
+    </p>
+  }
+
+  @if (totalRegistros() > 0) {
+    <app-registro-compra-tabla
+      [filas]="items()"
+      [expandido]="expandido()"
+      [lineasPorAsiento]="lineasPorAsiento()"
+      (alternar)="onAlternar($event)"
+    />
+
+    <app-tabla-paginador
+      [pagina]="pagina()"
+      [totalPaginas]="totalPaginas() || 1"
+      [tamanio]="tamanioPagina()"
+      (paginaChange)="onPagina($event)"
+      (tamanioChange)="onTamanio($event)"
+    />
+  }
+</section>

@@ -32,6 +32,15 @@ export const routes: Routes = [
           ),
       },
       {
+        // BACKLOG #23 (spa spec req 1) — top-level fiscal report, NOT under catalogos/ (design D8).
+        path: 'registro-compra',
+        canActivate: [authGuard],
+        loadComponent: () =>
+          import('./registro-compra/feature/registro-compra-page/registro-compra-page').then(
+            (m) => m.RegistroCompraPage
+          ),
+      },
+      {
         path: 'catalogos/proveedores',
         canActivate: [authGuard],
         loadComponent: () =>

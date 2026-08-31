@@ -99,4 +99,58 @@ internal static class FacturaTestDataHelper
 
     public static Task<byte[]> ObtenerVersionAsientoAsync(this TestDatabaseFixture db, long asientoId) =>
         db.ExecuteScalarAsync<byte[]>($"SELECT Version FROM fact.AsientoContable WHERE AsientoContableId = {asientoId};")!;
+
+    /// <summary>
+    /// BACKLOG #23 (registro-compra-api) — inserts an <c>fact.AsientoContable</c> row in a chosen
+    /// <paramref name="estado"/> with caller-controlled <c>FechaContable</c>, <c>OrigenLibro</c>,
+    /// <c>NumeroAsiento</c> and the three PEN amounts, plus optional detail lines. RAW SQL bypasses
+    /// the domain, so an INCONSISTENT asiento (<c>base + igv &lt;&gt; neto</c>, or debe &lt;&gt;
+    /// haber) IS persistable — that is deliberate: the contract tests prove the API echoes the
+    /// stored amounts verbatim without "fixing" them (the inconsistency badge is a pure SPA concern,
+    /// design D6).
+    /// </summary>
+    public static async Task<long> InsertarAsientoConfirmadoAsync(
+        this TestDatabaseFixture db,
+        long facturaId,
+        string fechaContable = "2026-08-10",
+        string estado = "CONFIRMADO",
+        string origenLibro = "02",
+        string? numeroAsiento = "02-2026-08-000001",
+        string? numeroComprobante = "F001-1",
+        decimal? basePEN = 100.00m,
+        decimal? igvPEN = 18.00m,
+        decimal? netoPEN = 118.00m,
+        string proveedorCodigo = "P00123",
+        string? glosa = "Compra de prueba",
+        decimal? tipoCambioVenta = null,
+        (short Orden, string Bloque, string Tipo, decimal Debe, decimal Haber, string? Cuenta, string? CuentaDescripcion)[]? lineas = null)
+    {
+        static string Money(decimal? v) =>
+            v is null ? "NULL" : v.Value.ToString(CultureInfo.InvariantCulture);
+        static string Texto(string? v) => v is null ? "NULL" : $"N'{v.Replace("'", "''")}'";
+
+        await db.ExecuteNonQueryAsync(
+            $"""
+             INSERT INTO fact.AsientoContable
+                 (FacturaId, NumeroComprobante, NumeroAsiento, OrigenLibro, ProveedorCodigo, Glosa,
+                  FechaContable, TipoCambioVenta, BasePEN, IgvPEN, NetoPEN, Estado)
+             VALUES
+                 ({facturaId}, {Texto(numeroComprobante)}, {Texto(numeroAsiento)}, '{origenLibro}',
+                  '{proveedorCodigo}', {Texto(glosa)}, '{fechaContable}', {Money(tipoCambioVenta)},
+                  {Money(basePEN)}, {Money(igvPEN)}, {Money(netoPEN)}, '{estado}');
+             """);
+        var asientoId = await db.ExecuteScalarAsync<long>("SELECT MAX(AsientoContableId) FROM fact.AsientoContable;");
+
+        if (lineas is { Length: > 0 })
+        {
+            var valores = string.Join(",\n", lineas.Select(l =>
+                $"({asientoId}, {l.Orden}, '{l.Bloque}', '{l.Tipo}', {Money(l.Debe)}, {Money(l.Haber)}, {Texto(l.Cuenta)}, {Texto(l.CuentaDescripcion)})"));
+            await db.ExecuteNonQueryAsync(
+                "INSERT INTO fact.AsientoContableDetalle " +
+                "(AsientoContableId, Orden, Bloque, Tipo, Debe, Haber, CuentaCodigo, CuentaDescripcion) VALUES\n" +
+                valores + ";");
+        }
+
+        return asientoId;
+    }
 }

@@ -10,9 +10,11 @@ import { Sidebar } from './sidebar';
  * Sincronización, Configuración). `Bandeja`, `Proveedores` (BACKLOG #22 PR6 →
  * `/catalogos/proveedores`), `Plan contable` (BACKLOG #22 PR4 → `/catalogos/plan-contable`),
  * `Tipo de cambio` (BACKLOG #22 PR8 → `/catalogos/tipo-cambio`) and `Configuración` resolve to a
- * route; the rest render as inert entries (`aria-disabled`, not links) marked "disponible
- * próximamente". Glyphs are `<div>`/`<span>` only (no `<svg>`, no icon font). Below the nav: an
- * "Apariencia" theme card and a profile row.
+ * route; `Registro de compra` (BACKLOG #23 → `/registro-compra`, a top-level fiscal report, NOT
+ * under `catalogos/`) now resolves too. The rest — `Errores y notificaciones`, `Sincronización` —
+ * render as inert entries (`aria-disabled`, not links) marked "disponible próximamente". Glyphs are
+ * `<div>`/`<span>` only (no `<svg>`, no icon font). Below the nav: an "Apariencia" theme card and a
+ * profile row.
  *
  * NOTE (BACKLOG #22 PR8, memory `shell-nav-canvas-replica`): the canvas has NO `Tipo de cambio`
  * entry. Adding it as the 8th destination is a ratified owner decision (design D5 / spec decision
@@ -60,11 +62,16 @@ describe('Sidebar', () => {
     const planContable = root.querySelector('[data-testid="nav-plan-contable"]')!;
     const proveedores = root.querySelector('[data-testid="nav-proveedores"]')!;
     const tipoCambio = root.querySelector('[data-testid="nav-tipo-cambio"]')!;
+    const registro = root.querySelector('[data-testid="nav-registro"]')!;
     expect(bandeja.tagName).toBe('A');
     expect(configuracion.tagName).toBe('A');
     expect(planContable.tagName).toBe('A');
     expect(proveedores.tagName).toBe('A');
     expect(tipoCambio.tagName).toBe('A');
+    expect(registro.tagName).toBe('A');
+    expect(
+      registro.getAttribute('ng-reflect-router-link') ?? registro.getAttribute('href')
+    ).toContain('registro-compra');
     expect(
       tipoCambio.getAttribute('ng-reflect-router-link') ?? tipoCambio.getAttribute('href')
     ).toContain('catalogos/tipo-cambio');
@@ -81,7 +88,7 @@ describe('Sidebar', () => {
       proveedores.getAttribute('ng-reflect-router-link') ?? proveedores.getAttribute('href')
     ).toContain('catalogos/proveedores');
 
-    for (const testid of ['nav-registro', 'nav-errores', 'nav-sincronizacion']) {
+    for (const testid of ['nav-errores', 'nav-sincronizacion']) {
       const inerte = root.querySelector(`[data-testid="${testid}"]`)!;
       expect(inerte.tagName).not.toBe('A');
       expect(inerte.getAttribute('aria-disabled')).toBe('true');

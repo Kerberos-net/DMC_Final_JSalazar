@@ -44,7 +44,15 @@ export class Sidebar {
 
   protected readonly primarios: readonly DestinoNav[] = [
     { testid: 'nav-bandeja', etiqueta: 'Bandeja principal', glifo: 'bandeja', ruta: '/bandeja' },
-    { testid: 'nav-registro', etiqueta: 'Registro de compra', glifo: 'registro' },
+    // BACKLOG #23 (spec `spa-shell-nav` delta): "Registro de compra" is now routed. It sits in the
+    // PRIMARY group and points at a TOP-LEVEL path (`/registro-compra`, not under `catalogos/`) —
+    // it is a fiscal report, not a catalog (design D8).
+    {
+      testid: 'nav-registro',
+      etiqueta: 'Registro de compra',
+      glifo: 'registro',
+      ruta: '/registro-compra',
+    },
     {
       testid: 'nav-proveedores',
       etiqueta: 'Proveedores',

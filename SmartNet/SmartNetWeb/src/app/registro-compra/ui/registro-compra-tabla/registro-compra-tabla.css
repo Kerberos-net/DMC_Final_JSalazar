@@ -1,0 +1,35 @@
+/* BACKLOG #23 -- frame, header and hairlines reuse the shared `.tabla-catalogo*` primitives
+ * (src/styles.css, design D8). Only the numeric alignment, the expand toggle and the descuadre
+ * badge are local. */
+
+:host {
+  display: block;
+  overflow-x: auto;
+}
+
+.registro-tabla__num {
+  text-align: right;
+  font-variant-numeric: tabular-nums;
+}
+
+.registro-tabla__expand {
+  width: 2rem;
+}
+
+.registro-tabla__toggle {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  font: inherit;
+  padding: 0.25rem 0.5rem;
+  color: inherit;
+}
+
+.registro-tabla__badge {
+  display: inline-block;
+  padding: 0.1rem 0.5rem;
+  border-radius: 999px;
+  border: 1px solid currentColor;
+  font-size: 0.8125rem;
+  font-weight: 600;
+}

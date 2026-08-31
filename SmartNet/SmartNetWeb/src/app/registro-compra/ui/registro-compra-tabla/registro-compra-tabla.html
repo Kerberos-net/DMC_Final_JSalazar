@@ -1,0 +1,65 @@
+<table class="tabla-catalogo">
+  <thead>
+    <tr>
+      <th class="registro-tabla__expand" aria-hidden="true"></th>
+      <th>N.º comprobante</th>
+      <th>Origen libro</th>
+      <th>N.º asiento</th>
+      <th>Proveedor</th>
+      <th>Fecha contable</th>
+      <th class="registro-tabla__num">Base PEN</th>
+      <th class="registro-tabla__num">IGV PEN</th>
+      <th class="registro-tabla__num">Neto PEN</th>
+      <th>Consistencia</th>
+    </tr>
+  </thead>
+  <tbody>
+    @for (fila of filas(); track fila.asientoContableId) {
+      <tr [attr.data-testid]="'registro-fila-' + fila.asientoContableId">
+        <td>
+          <button
+            type="button"
+            class="registro-tabla__toggle"
+            [attr.data-testid]="'toggle-' + fila.asientoContableId"
+            [attr.aria-expanded]="expandido() === fila.asientoContableId"
+            [attr.aria-label]="
+              expandido() === fila.asientoContableId ? 'Ocultar lineas' : 'Ver lineas'
+            "
+            (click)="alternar.emit(fila.asientoContableId)"
+          >
+            {{ expandido() === fila.asientoContableId ? '▾' : '▸' }}
+          </button>
+        </td>
+        <td>{{ fila.numeroComprobante ?? '—' }}</td>
+        <td>{{ fila.origenLibro }}</td>
+        <td>{{ fila.numeroAsiento ?? '—' }}</td>
+        <td>{{ proveedor(fila) }}</td>
+        <td>{{ fila.fechaContable }}</td>
+        <td class="registro-tabla__num">{{ importe(fila.basePEN) }}</td>
+        <td class="registro-tabla__num">{{ importe(fila.igvPEN) }}</td>
+        <td class="registro-tabla__num">{{ importe(fila.netoPEN) }}</td>
+        <td>
+          @if (inconsistencias().get(fila.asientoContableId)) {
+            <span
+              class="registro-tabla__badge"
+              [attr.data-testid]="'badge-' + fila.asientoContableId"
+              title="Los importes de este asiento no cuadran (base + IGV ≠ neto, o debe ≠ haber)."
+              >Descuadre</span
+            >
+          } @else {
+            <span aria-hidden="true">—</span>
+          }
+        </td>
+      </tr>
+      @if (expandido() === fila.asientoContableId) {
+        <tr [attr.data-testid]="'detalle-fila-' + fila.asientoContableId">
+          <td colspan="10">
+            <app-asiento-detalle
+              [lineas]="lineasPorAsiento().get(fila.asientoContableId) ?? null"
+            />
+          </td>
+        </tr>
+      }
+    }
+  </tbody>
+</table>

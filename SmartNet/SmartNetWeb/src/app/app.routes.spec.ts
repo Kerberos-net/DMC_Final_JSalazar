@@ -65,4 +65,14 @@ describe('app.routes', () => {
     expect((ruta?.canActivate?.length ?? 0) > 0).toBe(true);
     expect(typeof ruta?.loadComponent).toBe('function');
   });
+
+  // BACKLOG #23 (spa spec req 1) -- registro de compra is a TOP-LEVEL guarded lazy child of the
+  // shell (path `registro-compra`, not under `catalogos/` -- it is a fiscal report). Additive: the
+  // `arrayContaining` assertions above still hold.
+  it('registers registro-compra as a guarded lazy child of the shell', () => {
+    const ruta = (shellParent?.children ?? []).find((c: Route) => c.path === 'registro-compra');
+    expect(ruta).toBeDefined();
+    expect((ruta?.canActivate?.length ?? 0) > 0).toBe(true);
+    expect(typeof ruta?.loadComponent).toBe('function');
+  });
 });

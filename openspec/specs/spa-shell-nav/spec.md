@@ -23,19 +23,20 @@ The sidebar MUST render the navigation in two groups. Primary group, in order:
 `Tipo de cambio`. Utility group, in order: `Errores y notificaciones`,
 `Sincronización`, `Configuración` — eight destinations total.
 
-The following five destinations resolve to a route and MUST render as `<a>`
-links: `Bandeja principal` (`/bandeja`), `Proveedores` (`/catalogos/proveedores`),
+The following six destinations resolve to a route and MUST render as `<a>`
+links: `Bandeja principal` (`/bandeja`), `Registro de compra`
+(`/registro-compra`), `Proveedores` (`/catalogos/proveedores`),
 `Plan contable` (`/catalogos/plan-contable`), `Tipo de cambio`
 (`/catalogos/tipo-cambio`), and `Configuración` (`/configuracion`).
 
-The remaining three destinations — `Registro de compra`, `Errores y
-notificaciones`, `Sincronización` — MUST render as inert entries: not a link,
+The remaining two destinations — `Errores y notificaciones` and
+`Sincronización` — MUST render as inert entries: not a link,
 `aria-disabled="true"`, `title` "Disponible próximamente" — so the navigation
 matches the canvas without offering a dead click.
 
-(Previously: seven destinations; only `Bandeja principal` and `Configuración`
-were links and the other five, including `Proveedores` and `Plan contable`, were
-inert. `Tipo de cambio` did not exist.)
+(Previously: five destinations were links; `Registro de compra` was inert.
+BACKLOG #23 routes `Registro de compra` to `/registro-compra`, leaving two
+inert entries.)
 
 #### Scenario: Handoff destinations appear in order
 
@@ -48,9 +49,9 @@ inert. `Tipo de cambio` did not exist.)
 
 - GIVEN the sidebar renders
 - WHEN its entries are inspected
-- THEN `Bandeja principal`, `Proveedores`, `Plan contable`, `Tipo de cambio`, and
-  `Configuración` are `<a>` links to their routes, and `Registro de compra`,
-  `Errores y notificaciones`, and `Sincronización` are `aria-disabled` non-link entries
+- THEN `Bandeja principal`, `Registro de compra`, `Proveedores`, `Plan contable`,
+  `Tipo de cambio`, and `Configuración` are `<a>` links to their routes, and
+  `Errores y notificaciones` and `Sincronización` are `aria-disabled` non-link entries
 
 #### Scenario: Active destination is indicated
 
@@ -63,8 +64,11 @@ inert. `Tipo de cambio` did not exist.)
 
 - GIVEN `sidebar.spec.ts`
 - WHEN it runs
-- THEN it asserts the exact ordered eight-entry list above, that exactly the five
-  routed destinations are `<a>` links, and that eight hand-built glyphs render
+- THEN it asserts the exact ordered eight-entry list above, that exactly the six
+  routed destinations (`Bandeja principal`, `Registro de compra`, `Proveedores`,
+  `Plan contable`, `Tipo de cambio`, `Configuración`) are `<a>` links, that
+  `Errores y notificaciones` and `Sincronización` are the only inert entries,
+  and that eight hand-built glyphs render
 
 ### Requirement: Navigation is grouped with a single hairline divider
 
