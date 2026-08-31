@@ -57,10 +57,40 @@ export class FacturaForm {
 
   readonly montoTexto = computed(() => dosDecimales(this.factura().totalOrig));
 
-  /** Coarsest correct OCR-missing signal: `FacturaRespuesta` only exposes the invoice-wide
-   * `tieneCamposNoExtraidos` boolean (no per-field granularity server-side yet), so every
-   * OCR-sourced field carries the highlight together. */
-  readonly campoResaltado = computed(() => this.factura().tieneCamposNoExtraidos);
+  /** Per-field OCR-missing highlight (BACKLOG #19): `.campo--resaltado` only on the fields listed
+   * in `FacturaRespuesta.camposNoExtraidos`. Facturas pre-021 carry an empty list, so the coarse
+   * `tieneCamposNoExtraidos` boolean stays the fallback (every OCR field highlighted together). */
+  campoResaltado(campo: string): boolean {
+    const lista = this.factura().camposNoExtraidos;
+    if (lista.length > 0) return lista.includes(campo);
+    return this.factura().tieneCamposNoExtraidos;
+  }
+
+  /** REGLAS: los campos contables (`base imponible` / `IGV` / `glosa`) solo son editables mientras
+   * la factura esta `PENDIENTE_VALIDACION`; ya validada o descartada se muestran de solo lectura. */
+  readonly contableEditable = computed(() => this.factura().estado === 'PENDIENTE_VALIDACION');
+
+  /** REGLAS §5: una boleta `03` o una operacion no gravada (EXONERADA/INAFECTA) no lleva IGV — el
+   * input se fuerza a 0 y se deshabilita. Excepcion (REGLAS §6, decision del owner): una nota de
+   * credito `07` con referencia interna hereda su regla y mantiene el IGV editable. */
+  readonly igvBloqueado = computed(() => {
+    const f = this.factura();
+    if (f.tipoComprobante === '07') return false;
+    return f.tipoComprobante === '03' || f.afectacion === 'EXONERADA' || f.afectacion === 'INAFECTA';
+  });
+
+  readonly baseImponibleInput = computed(() => {
+    const b = this.basePEN();
+    return b === null ? '' : dosDecimales(b);
+  });
+
+  readonly igvInput = computed(() => {
+    if (this.igvBloqueado()) return '0';
+    const v = this.igvPEN();
+    return v === null ? '' : dosDecimales(v);
+  });
+
+  readonly glosaTexto = computed(() => this.factura().glosa ?? '');
 
   readonly afectacionNoVerificada = computed(() => this.factura().afectacionMixta === null);
 
@@ -88,5 +118,27 @@ export class FacturaForm {
 
   onMonto(valor: string): void {
     this.cambios.emit({ totalOrig: valor === '' ? null : Number(valor) });
+  }
+
+  /** design D1 — `base imponible` / `IGV` viajan como par atomico en moneda de origen. Cada edicion
+   * emite AMBOS: el editado y el valor vigente del otro (0 si el IGV esta bloqueado). El contenedor
+   * quita `totalOrig` del borrador para no incurrir en el 422 "par + totalOrig". */
+  onBaseImponible(valor: string): void {
+    const base = valor === '' ? null : Number(valor);
+    this.cambios.emit({ baseImponible: base, igv: this.igvActual() });
+  }
+
+  onIgv(valor: string): void {
+    if (this.igvBloqueado()) return;
+    const igv = valor === '' ? null : Number(valor);
+    this.cambios.emit({ baseImponible: this.basePEN(), igv });
+  }
+
+  onGlosa(valor: string): void {
+    this.cambios.emit({ glosa: valor === '' ? null : valor });
+  }
+
+  private igvActual(): number | null {
+    return this.igvBloqueado() ? 0 : this.igvPEN();
   }
 }

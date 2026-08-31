@@ -1,6 +1,6 @@
 <form class="factura-form">
   <div class="factura-form__grid">
-    <div class="campo" [class.campo--resaltado]="campoResaltado()">
+    <div class="campo" [class.campo--resaltado]="campoResaltado('total')">
       <span class="campo__etiqueta">Monto</span>
       <input
         data-testid="campo-monto"
@@ -12,7 +12,7 @@
       />
     </div>
 
-    <div class="campo" [class.campo--resaltado]="campoResaltado()">
+    <div class="campo" [class.campo--resaltado]="campoResaltado('moneda')">
       <span class="campo__etiqueta">Moneda</span>
       <input
         data-testid="campo-moneda"
@@ -22,7 +22,7 @@
       />
     </div>
 
-    <div class="campo" [class.campo--resaltado]="campoResaltado()">
+    <div class="campo" [class.campo--resaltado]="campoResaltado('fechaEmision')">
       <span class="campo__etiqueta">Fecha de emisión</span>
       <input
         data-testid="campo-fechaEmision"
@@ -33,7 +33,7 @@
       />
     </div>
 
-    <div class="campo campo--con-accion" [class.campo--resaltado]="campoResaltado()">
+    <div class="campo campo--con-accion" [class.campo--resaltado]="campoResaltado('nombreProveedor')">
       <span class="campo__etiqueta">Proveedor</span>
       <div class="campo__fila">
         <input
@@ -54,7 +54,7 @@
       </div>
     </div>
 
-    <div class="campo" [class.campo--resaltado]="campoResaltado()">
+    <div class="campo" [class.campo--resaltado]="campoResaltado('ruc')">
       <span class="campo__etiqueta">RUC proveedor</span>
       <input
         data-testid="campo-rucProveedor"
@@ -64,7 +64,7 @@
       />
     </div>
 
-    <div class="campo" [class.campo--resaltado]="campoResaltado()">
+    <div class="campo" [class.campo--resaltado]="campoResaltado('tipoComprobante')">
       <span class="campo__etiqueta">Tipo de comprobante</span>
       <select
         data-testid="campo-tipoComprobante"
@@ -78,7 +78,7 @@
       </select>
     </div>
 
-    <div class="campo" [class.campo--resaltado]="campoResaltado()">
+    <div class="campo" [class.campo--resaltado]="campoResaltado('numero')">
       <span class="campo__etiqueta">Número</span>
       <input
         data-testid="campo-numero"
@@ -88,14 +88,50 @@
       />
     </div>
 
-    <div class="campo campo--lectura">
+    <div class="campo" [class.campo--lectura]="!contableEditable()">
       <span class="campo__etiqueta">Base imponible</span>
-      <output class="campo__valor tabular-nums" data-testid="valor-base">{{ baseImponibleTexto() }}</output>
+      @if (contableEditable()) {
+        <input
+          data-testid="campo-baseImponible"
+          class="tabular-nums"
+          inputmode="decimal"
+          [value]="baseImponibleInput()"
+          (input)="onBaseImponible($any($event.target).value)"
+        />
+      } @else {
+        <output class="campo__valor tabular-nums" data-testid="valor-base">{{ baseImponibleTexto() }}</output>
+      }
     </div>
 
-    <div class="campo campo--lectura">
+    <div class="campo" [class.campo--lectura]="!contableEditable()" [class.campo--resaltado]="campoResaltado('igv')">
       <span class="campo__etiqueta">IGV</span>
-      <output class="campo__valor tabular-nums" data-testid="valor-igv">{{ igvTexto() }}</output>
+      @if (contableEditable()) {
+        <input
+          data-testid="campo-igv"
+          class="tabular-nums"
+          inputmode="decimal"
+          [value]="igvInput()"
+          [disabled]="igvBloqueado()"
+          (input)="onIgv($any($event.target).value)"
+        />
+      } @else {
+        <output class="campo__valor tabular-nums" data-testid="valor-igv">{{ igvTexto() }}</output>
+      }
+    </div>
+
+    <div class="campo campo--glosa">
+      <span class="campo__etiqueta">Glosa</span>
+      @if (contableEditable()) {
+        <textarea
+          data-testid="campo-glosa"
+          rows="2"
+          maxlength="250"
+          [value]="glosaTexto()"
+          (input)="onGlosa($any($event.target).value)"
+        ></textarea>
+      } @else {
+        <output class="campo__valor" data-testid="valor-glosa">{{ glosaTexto() || '—' }}</output>
+      }
     </div>
 
     <div class="campo campo--lectura">

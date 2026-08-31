@@ -33,6 +33,8 @@ describe('DetallePage', () => {
     posibleDuplicado: false,
     tieneCamposNoExtraidos: false,
     afectacionMixta: false,
+    camposNoExtraidos: [],
+    glosa: null,
   };
 
   const asiento: AsientoRespuesta = {
@@ -293,7 +295,99 @@ describe('DetallePage', () => {
       expect(req.request.method).toBe('PATCH');
       expect(req.request.body).toEqual({ proveedorCodigo: 'P00999' });
       req.flush({ ...factura, proveedorCodigo: 'P00999' }, { headers: { ETag: '"f9"' } });
+      await Promise.resolve();
+      await Promise.resolve();
+      // design D5: guardarAvance refetches everything after the PATCH
+      httpMock.expectOne('/api/facturas/42').flush({ ...factura, proveedorCodigo: 'P00999' }, { headers: { ETag: '"f9"' } });
+      httpMock
+        .expectOne('/api/facturas/42/asiento')
+        .flush({ asientoContableId: 7, asiento } as FacturaAsientoRespuesta, { headers: { ETag: '"a1"' } });
+      httpMock.expectOne('/api/facturas/42/documentos').flush([]);
+      httpMock.expectOne('/api/facturas/42/historial').flush([]);
       await guardar;
+    });
+  });
+
+  /* tasks.md 4.5 / 4.6 (RED first), pantalla-detalle-validacion "Guardar avance ... refetch". */
+  describe('guardar avance refetch (design D5)', () => {
+    it('refetches the factura after the PATCH so a server-recomputed posibleDuplicado clears without reload', async () => {
+      const fixture = await crearPagina({ posibleDuplicado: true });
+      expect(fixture.componentInstance.puedeValidar()).toBe(false);
+
+      fixture.componentInstance.onCambiosFactura({ numero: 'F001-999' });
+      const guardar = fixture.componentInstance.guardarAvance();
+
+      const patch = httpMock.expectOne('/api/facturas/42');
+      expect(patch.request.method).toBe('PATCH');
+      expect(patch.request.body).toEqual({ numero: 'F001-999' });
+      patch.flush({ ...factura, numero: 'F001-999', posibleDuplicado: true }, { headers: { ETag: '"f2"' } });
+      await Promise.resolve();
+      await Promise.resolve();
+
+      httpMock
+        .expectOne('/api/facturas/42')
+        .flush({ ...factura, numero: 'F001-999', posibleDuplicado: false }, { headers: { ETag: '"f3"' } });
+      httpMock
+        .expectOne('/api/facturas/42/asiento')
+        .flush({ asientoContableId: 7, asiento } as FacturaAsientoRespuesta, { headers: { ETag: '"a2"' } });
+      httpMock.expectOne('/api/facturas/42/documentos').flush([]);
+      httpMock.expectOne('/api/facturas/42/historial').flush([]);
+      await guardar;
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.factura()?.posibleDuplicado).toBe(false);
+      expect(fixture.componentInstance.puedeValidar()).toBe(true);
+      expect(fixture.componentInstance.borradorFactura()).toEqual({});
+    });
+
+    it('strips totalOrig from the draft when the base/IGV pair is edited (design D1)', async () => {
+      const fixture = await crearPagina({ estado: 'PENDIENTE_VALIDACION' });
+      fixture.componentInstance.onCambiosFactura({ totalOrig: 500 });
+      fixture.componentInstance.onCambiosFactura({ baseImponible: 400, igv: 72 });
+      expect(fixture.componentInstance.borradorFactura()).toEqual({ baseImponible: 400, igv: 72 });
+
+      fixture.componentInstance.onCambiosFactura({ totalOrig: 600 });
+      expect(fixture.componentInstance.borradorFactura()).toEqual({ totalOrig: 600 });
+    });
+  });
+
+  /* tasks.md 4.6 (RED first): missing-TC 409 and the newly-live §7 422 are surfaced distinctly
+   * from a 412, local edits are kept, and "Guardar avance" still works. */
+  describe('validar conflict routing keeps edits (design D5/D6)', () => {
+    it('routes a missing-tipo-de-cambio 409 to the negocio bucket, distinct from a 412, keeping the draft', async () => {
+      const fixture = await crearPagina({ moneda: 'USD' }, { tipoCambioVenta: null });
+      fixture.componentInstance.onCambiosFactura({ glosa: 'pendiente de TC' });
+
+      const validar = fixture.componentInstance.validar('2026-08-23');
+      httpMock
+        .expectOne((r) => r.url === '/api/facturas/42/validar')
+        .flush(
+          { type: 'https://smartnet.local/problemas/conflicto', title: 'Falta tipo de cambio', status: 409, detail: 'd' },
+          { status: 409, statusText: 'Conflict' }
+        );
+      await validar;
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.categoriaProblema()).toBe('negocio');
+      expect(fixture.componentInstance.borradorFactura()).toEqual({ glosa: 'pendiente de TC' });
+    });
+
+    it('routes a §7 "cargos = base imponible" 422 to the invariante bucket, distinct from a 412, keeping the draft', async () => {
+      const fixture = await crearPagina({ estado: 'PENDIENTE_VALIDACION' });
+      fixture.componentInstance.onCambiosFactura({ baseImponible: 400, igv: 72 });
+
+      const validar = fixture.componentInstance.validar('2026-08-23');
+      httpMock
+        .expectOne((r) => r.url === '/api/facturas/42/validar')
+        .flush(
+          { type: 'https://smartnet.local/problemas/invariante-contable', title: '§7', status: 422, detail: 'cargos != base' },
+          { status: 422, statusText: 'Unprocessable Entity' }
+        );
+      await validar;
+      fixture.detectChanges();
+
+      expect(fixture.componentInstance.categoriaProblema()).toBe('invariante');
+      expect(fixture.componentInstance.borradorFactura()).toEqual({ baseImponible: 400, igv: 72 });
     });
   });
 });

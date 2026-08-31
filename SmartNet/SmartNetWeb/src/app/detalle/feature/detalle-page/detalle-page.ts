@@ -123,7 +123,17 @@ export class DetallePage {
   }
 
   onCambiosFactura(cambio: CorreccionFacturaRequest): void {
-    this.borradorFactura.set({ ...this.borradorFactura(), ...cambio });
+    // design D1: el par {baseImponible, igv} y `totalOrig` son mutuamente excluyentes en un PATCH
+    // (enviarlos juntos es 422). El ultimo campo editado gana; se descarta el otro del borrador.
+    const draft: Record<string, unknown> = { ...this.borradorFactura(), ...cambio };
+    if ('baseImponible' in cambio || 'igv' in cambio) {
+      delete draft['totalOrig'];
+    }
+    if ('totalOrig' in cambio) {
+      delete draft['baseImponible'];
+      delete draft['igv'];
+    }
+    this.borradorFactura.set(draft as CorreccionFacturaRequest);
   }
 
   /** BACKLOG #18 PR8 — the proveedor picker's selection goes through the SAME draft path as every
@@ -147,6 +157,10 @@ export class DetallePage {
       await this.facturaService.guardar(this.facturaId, cambios);
       this.borradorFactura.set({});
       this.problema.set(null);
+      // design D5: refetch COMPLETO tras el PATCH. El PATCH puede recomputar PosibleDuplicado y
+      // reproyectar BasePEN/IgvPEN/NetoPEN sobre el asiento (bump de Version); un refetch solo de
+      // factura dejaria el ETag del asiento obsoleto y la siguiente edicion de linea daria 412.
+      await this.cargarTodo();
     } catch (err) {
       this.manejarError(err);
     }

@@ -19,6 +19,8 @@ describe('FacturaForm', () => {
     posibleDuplicado: false,
     tieneCamposNoExtraidos: false,
     afectacionMixta: false,
+    camposNoExtraidos: [],
+    glosa: null,
   };
 
   const createComponent = (
@@ -197,23 +199,108 @@ describe('FacturaForm', () => {
       expect(fixture.nativeElement.querySelector('[data-testid="valor-mes"]').textContent.trim()).toBe('—');
     });
 
-    it('has no glosa field', () => {
-      const fixture = createComponent(factura);
-      expect(fixture.nativeElement.textContent.toLowerCase()).not.toContain('glosa');
+    it('renders glosa read-only (em dash) when the factura is not PENDIENTE_VALIDACION', () => {
+      const fixture = createComponent({ ...factura, estado: 'VALIDADA', glosa: null });
+      const glosa = fixture.nativeElement.querySelector('[data-testid="valor-glosa"]');
+      expect(glosa.textContent.trim()).toBe('—');
+      expect(fixture.nativeElement.querySelector('[data-testid="campo-glosa"]')).toBeNull();
     });
   });
 
-  describe('per-field OCR-missing highlight', () => {
-    it('applies .campo--resaltado to multiple fields (not one generic sentence) when tieneCamposNoExtraidos', () => {
-      const fixture = createComponent({ ...factura, tieneCamposNoExtraidos: true });
+  describe('per-field OCR-missing highlight (BACKLOG #19)', () => {
+    it('applies .campo--resaltado only to the fields named in camposNoExtraidos', () => {
+      const fixture = createComponent({ ...factura, camposNoExtraidos: ['numero', 'total'] });
+      const resaltado = (id: string): boolean =>
+        fixture.nativeElement.querySelector(`[data-testid="${id}"]`).closest('.campo').classList.contains('campo--resaltado');
+      expect(resaltado('campo-numero')).toBe(true);
+      expect(resaltado('campo-monto')).toBe(true);
+      expect(resaltado('campo-moneda')).toBe(false);
+      expect(resaltado('campo-fechaEmision')).toBe(false);
+      expect(fixture.nativeElement.querySelectorAll('.campo--resaltado').length).toBe(2);
+    });
+
+    it('applies no highlight when camposNoExtraidos is empty and tieneCamposNoExtraidos is false', () => {
+      const fixture = createComponent(factura);
+      expect(fixture.nativeElement.querySelector('.campo--resaltado')).toBeNull();
+    });
+
+    it('falls back to the coarse boolean (highlights multiple fields) for a pre-021 factura', () => {
+      const fixture = createComponent({ ...factura, camposNoExtraidos: [], tieneCamposNoExtraidos: true });
       const resaltados = fixture.nativeElement.querySelectorAll('.campo--resaltado');
       expect(resaltados.length).toBeGreaterThan(1);
       expect(fixture.nativeElement.querySelector('.alerta--informativa')).toBeNull();
     });
+  });
 
-    it('applies no highlight when every field was extracted', () => {
-      const fixture = createComponent(factura);
-      expect(fixture.nativeElement.querySelector('.campo--resaltado')).toBeNull();
+  describe('editable contable fields gated on PENDIENTE_VALIDACION (BACKLOG #19)', () => {
+    const pendiente = (over: Partial<FacturaRespuesta> = {}): FacturaRespuesta => ({
+      ...factura,
+      estado: 'PENDIENTE_VALIDACION',
+      ...over,
+    });
+
+    it('renders base imponible / IGV / glosa as editable inputs while PENDIENTE_VALIDACION', () => {
+      const fixture = createComponent(pendiente(), null, null, true, 400, 72);
+      const base: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="campo-baseImponible"]');
+      const igv: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="campo-igv"]');
+      const glosa: HTMLTextAreaElement = fixture.nativeElement.querySelector('[data-testid="campo-glosa"]');
+      expect(base.value).toBe('400.00');
+      expect(igv.value).toBe('72.00');
+      expect(igv.disabled).toBe(false);
+      expect(glosa).toBeTruthy();
+      expect(fixture.nativeElement.querySelector('[data-testid="valor-base"]')).toBeNull();
+    });
+
+    it('renders base imponible / IGV as read-only outputs once VALIDADA', () => {
+      const fixture = createComponent({ ...factura, estado: 'VALIDADA' }, null, null, false, 400, 72);
+      expect(fixture.nativeElement.querySelector('[data-testid="campo-baseImponible"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="valor-base"]').textContent.trim()).toBe('400.00');
+    });
+
+    it('emits the atomic { baseImponible, igv } pair when base imponible changes', () => {
+      const fixture = createComponent(pendiente(), null, null, true, 400, 72);
+      let emitido: unknown = null;
+      fixture.componentInstance.cambios.subscribe((c) => (emitido = c));
+      const base: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="campo-baseImponible"]');
+      base.value = '450';
+      base.dispatchEvent(new Event('input'));
+      expect(emitido).toEqual({ baseImponible: 450, igv: 72 });
+    });
+
+    it('emits { glosa } when the glosa textarea changes', () => {
+      const fixture = createComponent(pendiente(), null, null, true, 400, 72);
+      let emitido: unknown = null;
+      fixture.componentInstance.cambios.subscribe((c) => (emitido = c));
+      const glosa: HTMLTextAreaElement = fixture.nativeElement.querySelector('[data-testid="campo-glosa"]');
+      glosa.value = 'compra de insumos';
+      glosa.dispatchEvent(new Event('input'));
+      expect(emitido).toEqual({ glosa: 'compra de insumos' });
+    });
+
+    it('forces IGV to 0 and disables it for a boleta 03', () => {
+      const fixture = createComponent(pendiente({ tipoComprobante: '03' }), null, null, true, 400, 72);
+      const igv: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="campo-igv"]');
+      expect(igv.value).toBe('0');
+      expect(igv.disabled).toBe(true);
+    });
+
+    it('forces IGV to 0 and disables it for an EXONERADA operation', () => {
+      const fixture = createComponent(pendiente({ afectacion: 'EXONERADA' }), null, null, true, 400, 0);
+      const igv: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="campo-igv"]');
+      expect(igv.disabled).toBe(true);
+      expect(igv.value).toBe('0');
+    });
+
+    it('keeps IGV editable for a nota de crédito 07 even when non-gravada', () => {
+      const fixture = createComponent(pendiente({ tipoComprobante: '07', afectacion: 'EXONERADA' }), null, null, true, 400, 18);
+      const igv: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="campo-igv"]');
+      expect(igv.disabled).toBe(false);
+      expect(igv.value).toBe('18.00');
+      let emitido: unknown = null;
+      fixture.componentInstance.cambios.subscribe((c) => (emitido = c));
+      igv.value = '20';
+      igv.dispatchEvent(new Event('input'));
+      expect(emitido).toEqual({ baseImponible: 400, igv: 20 });
     });
   });
 

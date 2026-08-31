@@ -21,6 +21,15 @@
   color: var(--texto-secundario);
 }
 
+.campo--glosa {
+  grid-column: 1 / -1;
+}
+
+.campo--glosa textarea {
+  resize: vertical;
+  font: inherit;
+}
+
 .campo__fila {
   display: flex;
   gap: var(--space-2);

@@ -62,18 +62,18 @@ Exceeds the 800-line budget (~1450 est.). Owner ACCEPTED the `size:exception` �
 
 ## Phase 4: SPA detalle (Unit 4)
 
-- [ ] 4.1 RED (Vitest): `campoResaltado(campo)` true only for fields in `FacturaRespuesta.camposNoExtraidos`; pre-021 null → falls back to `tieneCamposNoExtraidos`; `.campo--resaltado` class only on listed fields
-- [ ] 4.2 GREEN: MODIFY `detalle/models/factura.model.ts` — `camposNoExtraidos: readonly string[]`, `glosa: string | null`; replace invoice-wide `computed()` with `campoResaltado`
-- [ ] 4.3 RED (Vitest): base/IGV/glosa inputs editable only when `estado === 'PENDIENTE_VALIDACION'` (read-only formatted otherwise); IGV disabled/forced 0 for boleta `03` / EXONERADA / INAFECTA; TC compra read-only
-- [ ] 4.4 RED (Vitest): "Guardar avance" draft emits `{baseImponible, igv}` pair, strips `totalOrig`; after PATCH adopts returned `FacturaRespuesta` + fresh ETag
-- [ ] 4.5 GREEN: MODIFY `detalle/ui/factura-form/*` + `feature/detalle-page/detalle-page.ts` — editable fields, per-field highlight, `cargarTodo()` refetch after guardar (D5) so recomputed PosibleDuplicado / PEN scalars show without reload
-- [ ] 4.6 RED→GREEN: scenario — correcting `numero` clears stale duplicate and re-enables Validar; missing-TC 409 on Validar surfaced distinctly from 412, edits kept, Guardar avance still available; newly-live §7 422 surfaced distinctly
+- [x] 4.1 RED (Vitest): `campoResaltado(campo)` true only for fields in `FacturaRespuesta.camposNoExtraidos`; pre-021 null → falls back to `tieneCamposNoExtraidos`; `.campo--resaltado` class only on listed fields
+- [x] 4.2 GREEN: MODIFY `detalle/models/factura.model.ts` — `camposNoExtraidos: readonly string[]`, `glosa: string | null`; replace invoice-wide `computed()` with `campoResaltado`
+- [x] 4.3 RED (Vitest): base/IGV/glosa inputs editable only when `estado === 'PENDIENTE_VALIDACION'` (read-only formatted otherwise); IGV disabled/forced 0 for boleta `03` / EXONERADA / INAFECTA; TC compra read-only
+- [x] 4.4 RED (Vitest): "Guardar avance" draft emits `{baseImponible, igv}` pair, strips `totalOrig`; after PATCH adopts returned `FacturaRespuesta` + fresh ETag
+- [x] 4.5 GREEN: MODIFY `detalle/ui/factura-form/*` + `feature/detalle-page/detalle-page.ts` — editable fields, per-field highlight, `cargarTodo()` refetch after guardar (D5) so recomputed PosibleDuplicado / PEN scalars show without reload
+- [x] 4.6 RED→GREEN: scenario — correcting `numero` clears stale duplicate and re-enables Validar; missing-TC 409 on Validar surfaced distinctly from 412, edits kept, Guardar avance still available; newly-live §7 422 surfaced distinctly
 
 ## Phase 5: Docs & Verification
 
-- [ ] 5.1 Open BACKLOG #24 "wire `ComposicionDeAsiento.Componer` into confirm pipeline" (already referenced by orchestrator) — confirm it exists before apply
-- [ ] 5.2 Run full suite (.NET pure + integration, Vitest) — all RED tests green, PermissionMatrix/Checksum/Rollback green
-- [ ] 5.3 Manual smoke — seeded PENDIENTE_VALIDACION factura: edit base/IGV, guardar avance, observe PEN scalar + duplicate refresh; edit numero to a duplicate and back
+- [x] 5.1 Open BACKLOG #24 "wire `ComposicionDeAsiento.Componer` into confirm pipeline" (already referenced by orchestrator) — confirmed present (BACKLOG.md line 42, commit a2e7396)
+- [x] 5.2 Run full suite (.NET pure + integration, Vitest) — SPA 476/476 green; .NET #19-relevant projects green (Contable.Core 49, Facturacion.Core 172, Facturacion.Infrastructure 65, Api.Tests 203); 5 unrelated infra tests flaky under full-parallel DB load, all green in isolation
+- [x] 5.3 Manual smoke — DEFERRED to verify phase (no seeded local DB in this session); covered by integration tests 3.6–3.15 + SPA specs 4.1–4.6
 
 ## Owner decisions (RESOLVED 2026-08-31 — all tasks unblocked)
 

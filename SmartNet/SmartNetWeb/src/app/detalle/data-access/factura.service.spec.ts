@@ -27,6 +27,8 @@ describe('FacturaService', () => {
     posibleDuplicado: false,
     tieneCamposNoExtraidos: false,
     afectacionMixta: false,
+    camposNoExtraidos: [],
+    glosa: null,
   };
 
   beforeEach(() => {
