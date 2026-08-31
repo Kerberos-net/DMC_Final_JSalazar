@@ -252,6 +252,55 @@ public sealed class ServicioDeFacturas
             await uow.RegistrarAuditoriaAsync(entrada, ct);
         }
 
+        // BACKLOG #19 (design D6) -- si la tripleta de identidad (RucProveedor, TipoComprobante,
+        // Numero -- IX_Factura_Identidad) cambió, recomputar fact.Factura.PosibleDuplicado DENTRO de
+        // esta transacción (excluye la propia factura y las DESCARTADA). Sin fila de auditoría: es un
+        // indicador derivado, no una corrección del usuario.
+        var identidadCambio =
+            actualizada.RucProveedor != persistida.RucProveedor
+            || actualizada.TipoComprobante != persistida.TipoComprobante
+            || actualizada.Numero != persistida.Numero;
+        if (identidadCambio)
+        {
+            var hayDuplicado = await uow.ExisteIdentidadPreviaAsync(
+                facturaId, actualizada.RucProveedor, actualizada.TipoComprobante, actualizada.Numero, ct);
+            await uow.ActualizarPosibleDuplicadoAsync(facturaId, hayDuplicado, ct);
+        }
+
+        // BACKLOG #19 (design D4) -- si cambió el par original (TotalOrig / IgvOrig) o la moneda,
+        // re-derivar los tres escalares (BasePEN / IgvPEN / NetoPEN, REGLAS.md §5/§6 vía
+        // ProyeccionDeImportes) y escribirlos sobre el asiento BORRADOR vigente en la MISMA
+        // transacción. Sin tipo de cambio aplicable (moneda extranjera, asiento sin TipoCambioVenta
+        // congelado) -> se omite la escritura, el PATCH igual responde 200 y el gate SinTipoCambio ya
+        // existente bloqueará validar.
+        var importesCambiaron =
+            actualizada.TotalOrig != persistida.TotalOrig
+            || actualizada.IgvOrig != persistida.IgvOrig
+            || actualizada.Moneda != persistida.Moneda;
+        if (importesCambiaron)
+        {
+            var asientoId = await uow.ObtenerAsientoVigenteIdAsync(facturaId, ct);
+            if (asientoId is not null)
+            {
+                var asiento = await uow.CargarAsientoAsync(asientoId.Value, ct);
+                if (asiento is not null && asiento.Estado == AsientoPersistido.Borrador)
+                {
+                    var tcVenta = actualizada.Moneda == MonedaLocal ? 1m : asiento.Asiento.TipoCambioVenta;
+                    if (tcVenta is not null)
+                    {
+                        var igvOrig = actualizada.IgvOrig ?? 0m;
+                        var baseOrig = actualizada.TotalOrig - igvOrig;
+                        var proyeccion = ProyeccionDeImportes.Derivar(
+                            CodigoComprobante.Convertir(actualizada.TipoComprobante),
+                            MapearAfectacion(actualizada.Afectacion),
+                            baseOrig, igvOrig, tcVenta.Value);
+                        await uow.ActualizarProyeccionEscalarAsync(
+                            asientoId.Value, proyeccion.BasePEN, proyeccion.IgvPEN, proyeccion.NetoPEN, ct);
+                    }
+                }
+            }
+        }
+
         // outbox-mensajeria (BACKLOG #14, design D8) -- FACTURA_CORREGIDA iff algo cambió de verdad
         // (entradas.Count > 0 -- Auditar ya descarta reenvíos del mismo valor) y la factura ya está
         // VALIDADA (spec.md: "update to a non-validated invoice emits no FACTURA_CORREGIDA").
@@ -550,8 +599,45 @@ public sealed class ServicioDeFacturas
             actualizada = actualizada with { Numero = cambios.Numero };
         }
 
+        // BACKLOG #19 (design D1/D7) -- base imponible + IGV son un PAR ATOMICO; la base es DERIVADA
+        // (REGLAS.md §6), no una columna. El ladder escribe TotalOrig = base + IGV e IgvOrig = IGV, y
+        // audita UNA fila por columna persistida que de verdad cambio (TotalOrig, IgvOrig) -- NUNCA
+        // una fila sintetica "BaseImponible" (D7). La atomicidad del par y el choque con totalOrig
+        // ya los rechazo ValidacionDeCorreccion (422) antes de llegar aca.
+        var inv = System.Globalization.CultureInfo.InvariantCulture;
+        if (cambios.BaseImponible is not null && cambios.Igv is not null)
+        {
+            var nuevoTotal = cambios.BaseImponible.Value + cambios.Igv.Value;
+            Auditar(
+                nameof(FacturaPersistida.TotalOrig),
+                original.TotalOrig.ToString(inv),
+                nuevoTotal.ToString(inv));
+            Auditar(
+                nameof(FacturaPersistida.IgvOrig),
+                original.IgvOrig?.ToString(inv),
+                cambios.Igv.Value.ToString(inv));
+            actualizada = actualizada with { TotalOrig = nuevoTotal, IgvOrig = cambios.Igv.Value };
+        }
+
+        if (cambios.Glosa is not null)
+        {
+            Auditar(nameof(FacturaPersistida.Glosa), original.Glosa, cambios.Glosa);
+            actualizada = actualizada with { Glosa = cambios.Glosa };
+        }
+
         return (actualizada, entradas);
     }
+
+    /// <summary>BACKLOG #19 (design D4) -- mapeo del codigo textual de <c>fact.Factura.Afectacion</c>
+    /// (<c>GRAVADA</c> / <c>EXONERADA</c> / <c>INAFECTA</c>, o <c>null</c>) al enum de dominio. Mismo
+    /// criterio que <c>SqlUnidadDeTrabajo.MapearAfectacion</c>: un valor ausente o desconocido cae a
+    /// GRAVADA (el asiento se compone como gravado salvo prueba en contrario).</summary>
+    private static Afectacion MapearAfectacion(string? codigo) => codigo switch
+    {
+        "EXONERADA" => Afectacion.Exonerada,
+        "INAFECTA" => Afectacion.Inafecta,
+        _ => Afectacion.Gravada,
+    };
 
     // CK_OutboxEvent_Tipo (006_contratos.sql) -- el quinto valor válido, para adjuntos post-validar.
     private const string TipoEventoDocumentacionActualizada = "DOCUMENTACION_ACTUALIZADA";

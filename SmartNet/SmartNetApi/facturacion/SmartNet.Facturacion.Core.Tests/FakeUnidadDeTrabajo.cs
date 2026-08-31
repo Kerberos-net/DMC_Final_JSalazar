@@ -254,6 +254,35 @@ public sealed class FakeUnidadDeTrabajo : IUnidadDeTrabajo
         return Task.FromResult(ResultadoDeConfirmarAfectacion);
     }
 
+    // --- BACKLOG #19 (design D4/D6) additions ---
+
+    public bool ExisteIdentidadPrevia { get; set; }
+    public bool? UltimoPosibleDuplicadoEscrito { get; private set; }
+    public (decimal BasePen, decimal IgvPen, decimal NetoPen)? UltimaProyeccionEscalar { get; private set; }
+    public ResultadoEscritura ResultadoDeProyeccionEscalar { get; set; } = ResultadoEscritura.Aplicado;
+
+    public Task<bool> ExisteIdentidadPreviaAsync(
+        long facturaId, string? rucProveedor, string tipoComprobante, string? numero, CancellationToken ct)
+    {
+        Llamadas.Add(nameof(ExisteIdentidadPreviaAsync));
+        return Task.FromResult(ExisteIdentidadPrevia);
+    }
+
+    public Task ActualizarPosibleDuplicadoAsync(long facturaId, bool posibleDuplicado, CancellationToken ct)
+    {
+        Llamadas.Add(nameof(ActualizarPosibleDuplicadoAsync));
+        UltimoPosibleDuplicadoEscrito = posibleDuplicado;
+        return Task.CompletedTask;
+    }
+
+    public Task<ResultadoEscritura> ActualizarProyeccionEscalarAsync(
+        long asientoContableId, decimal basePen, decimal igvPen, decimal netoPen, CancellationToken ct)
+    {
+        Llamadas.Add(nameof(ActualizarProyeccionEscalarAsync));
+        UltimaProyeccionEscalar = (basePen, igvPen, netoPen);
+        return Task.FromResult(ResultadoDeProyeccionEscalar);
+    }
+
     // --- outbox-mensajeria (BACKLOG #14, design D10) addition ---
 
     public Task<TransicionEstadoFactura> MarcarFacturaValidadaAsync(long facturaId, CancellationToken ct)

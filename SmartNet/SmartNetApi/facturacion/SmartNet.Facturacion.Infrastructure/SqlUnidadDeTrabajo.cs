@@ -58,7 +58,8 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
             SELECT a.AsientoContableId, a.FacturaId, a.Estado, a.NumeroAsiento, a.Version,
                    a.ProveedorCodigo, a.FechaContable, a.MotivoDescripcion, a.TipoCambioVenta,
                    a.BasePEN, a.IgvPEN, a.NetoPEN,
-                   f.Afectacion, f.TipoComprobante, f.RucProveedor, f.Numero, f.Moneda, f.FechaEmision
+                   f.Afectacion, f.TipoComprobante, f.RucProveedor, f.Numero, f.Moneda, f.FechaEmision,
+                   f.EsReferenciaExterna, f.FacturaReferenciaId
             FROM fact.AsientoContable a
             JOIN fact.Factura f ON f.FacturaId = a.FacturaId
             WHERE a.AsientoContableId = @asientoId;
@@ -71,6 +72,8 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
         decimal? tipoCambioVenta, basePen, igvPen, netoPen;
         DateOnly fechaContable, fechaEmision;
         byte[] version;
+        bool esReferenciaExterna;
+        long? facturaReferenciaId;
 
         await using (var reader = await command.ExecuteReaderAsync(ct))
         {
@@ -96,6 +99,8 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
             numero = reader.IsDBNull(15) ? null : reader.GetString(15).TrimEnd();
             moneda = reader.GetString(16).TrimEnd();
             fechaEmision = DateOnly.FromDateTime(reader.GetDateTime(17));
+            esReferenciaExterna = reader.GetBoolean(18);
+            facturaReferenciaId = reader.IsDBNull(19) ? null : reader.GetInt64(19);
         }
 
         var lineas = await CargarLineasAsync(asientoId, ct);
@@ -104,7 +109,17 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
         // PR 5 -- mismo criterio que ServicioDeFacturas.AbrirAsync: moneda extranjera sin tipo de
         // cambio vigente para la FechaEmision de la factura. Solo se consulta ITipoCambioRepository
         // cuando hace falta (moneda local nunca dispara este 409, ADR 0018 pt. 3).
-        var sinTipoCambio = moneda != MonedaLocal && !await ExisteTipoCambioVigenteAsync(fechaEmision, ct);
+        //
+        // BACKLOG #19 (design D, correction 2 / REGLAS.md §6) -- NARROWING: una NC 07 con referencia
+        // INTERNA (EsReferenciaExterna = 0 AND FacturaReferenciaId IS NOT NULL) hereda el tipo de
+        // cambio congelado del comprobante que rectifica, asi que NO necesita un TC vigente propio.
+        // La NC 07 con referencia EXTERNA si lo necesita. Rama DORMIDA hoy: FacturaReferenciaId no
+        // se puebla hasta el flujo de asociacion de NC (#10/#11).
+        var esNc07ReferenciaInterna =
+            tipoComprobanteCodigo == "07" && !esReferenciaExterna && facturaReferenciaId is not null;
+        var sinTipoCambio = moneda != MonedaLocal
+            && !esNc07ReferenciaInterna
+            && !await ExisteTipoCambioVigenteAsync(fechaEmision, ct);
 
         var asiento = new AsientoContable(
             ProveedorCodigo: proveedorCodigo,
@@ -329,7 +344,8 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
             """
             SELECT FacturaId, Estado, ProveedorCodigo, RucProveedor, TipoComprobante, Numero, TotalOrig,
                    Moneda, FechaEmision, Motivo, Afectacion, Version,
-                   EsProveedorGenerico, PosibleDuplicado, TieneCamposNoExtraidos, AfectacionMixta
+                   EsProveedorGenerico, PosibleDuplicado, TieneCamposNoExtraidos, AfectacionMixta,
+                   IgvOrig, Glosa, CamposNoExtraidos
             FROM fact.Factura
             WHERE FacturaId = @facturaId;
             """);
@@ -357,8 +373,18 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
             EsProveedorGenerico: reader.GetBoolean(12),
             PosibleDuplicado: reader.GetBoolean(13),
             TieneCamposNoExtraidos: reader.GetBoolean(14),
-            AfectacionMixta: reader.IsDBNull(15) ? null : reader.GetBoolean(15));
+            AfectacionMixta: reader.IsDBNull(15) ? null : reader.GetBoolean(15),
+            // BACKLOG #19 (design D1/D8) -- IgvOrig nullable; Glosa (schema 021); CamposNoExtraidos
+            // CSV promovido tal cual (D8: NULL = factura pre-021 -> la SPA cae al bool coarse).
+            IgvOrig: reader.IsDBNull(16) ? null : reader.GetDecimal(16),
+            Glosa: reader.IsDBNull(17) ? null : reader.GetString(17),
+            CamposNoExtraidos: reader.IsDBNull(18) ? null : PartirCamposNoExtraidos(reader.GetString(18)));
     }
+
+    // BACKLOG #19 (design D8) -- fact.Factura.CamposNoExtraidos es un CSV promovido tal cual desde
+    // fact.InboxEvent.CamposNoExtraidos (SqlPromocionRepository escribe string.Join(",", ...)).
+    private static IReadOnlyList<string> PartirCamposNoExtraidos(string csv) =>
+        csv.Split(',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries);
 
     public async Task<ResultadoEscritura> GuardarFacturaAsync(
         long id, byte[] versionEsperada, FacturaPersistida factura, CancellationToken ct)
@@ -368,7 +394,8 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
             UPDATE fact.Factura
             SET Estado = @estado, ProveedorCodigo = @proveedorCodigo, RucProveedor = @rucProveedor,
                 TotalOrig = @totalOrig, Moneda = @moneda, FechaEmision = @fechaEmision, Motivo = @motivo,
-                Afectacion = @afectacion, TipoComprobante = @tipoComprobante, Numero = @numero
+                Afectacion = @afectacion, TipoComprobante = @tipoComprobante, Numero = @numero,
+                IgvOrig = @igvOrig, Glosa = @glosa
             WHERE FacturaId = @id AND Version = @versionEsperada;
             """);
         command.Parameters.AddWithValue("@estado", factura.Estado);
@@ -379,6 +406,11 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
         command.Parameters.AddWithValue("@fechaEmision", factura.FechaEmision.ToDateTime(TimeOnly.MinValue));
         command.Parameters.AddWithValue("@motivo", (object?)factura.Motivo ?? DBNull.Value);
         command.Parameters.AddWithValue("@afectacion", (object?)factura.Afectacion ?? DBNull.Value);
+        // BACKLOG #19 (design D1/D7) -- IgvOrig es parte del par atomico base/IGV; Glosa (schema 021)
+        // solo editable en PENDIENTE_VALIDACION (D2, ya validado por ValidacionDeCorreccion).
+        // CamposNoExtraidos NO va aqui: es un hecho de extraccion inmutable (D8).
+        command.Parameters.AddWithValue("@igvOrig", (object?)factura.IgvOrig ?? DBNull.Value);
+        command.Parameters.AddWithValue("@glosa", (object?)factura.Glosa ?? DBNull.Value);
         // BACKLOG #18 PR5 (api-facturas delta) -- el SET de arriba OMITIA ambas columnas: un PATCH de
         // tipoComprobante/numero devolvia 200 y NO persistia nada. Numero NULL nunca llega aqui via
         // PATCH (CorreccionFactura.Numero == null => "no se toca", AplicarCorreccion no lo copia).
@@ -464,6 +496,44 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
         return estadoActual?.TrimEnd() == FacturaPersistida.Validada
             ? TransicionEstadoFactura.YaValidada
             : TransicionEstadoFactura.NoTransicionable;
+    }
+
+    // --- BACKLOG #19 (design D4/D6) additions ---
+
+    public async Task<bool> ExisteIdentidadPreviaAsync(
+        long facturaId, string? rucProveedor, string tipoComprobante, string? numero, CancellationToken ct) =>
+        await ExisteDuplicadoNoResueltoAsync(facturaId, rucProveedor, tipoComprobante, numero, ct);
+
+    public async Task ActualizarPosibleDuplicadoAsync(long facturaId, bool posibleDuplicado, CancellationToken ct)
+    {
+        // design D6 -- sin CAS: GuardarFacturaAsync ya hizo el CAS de Version en esta misma
+        // transaccion. Recomputacion derivada de un indicador, no una correccion del usuario (D6:
+        // sin fila de AuditoriaCorreccion).
+        await using var command = CrearComando(
+            "UPDATE fact.Factura SET PosibleDuplicado = @valor WHERE FacturaId = @id;");
+        command.Parameters.AddWithValue("@valor", posibleDuplicado);
+        command.Parameters.AddWithValue("@id", facturaId);
+        await command.ExecuteNonQueryAsync(ct);
+    }
+
+    public async Task<ResultadoEscritura> ActualizarProyeccionEscalarAsync(
+        long asientoContableId, decimal basePen, decimal igvPen, decimal netoPen, CancellationToken ct)
+    {
+        // design D4 -- escribe los tres escalares sobre el asiento BORRADOR vigente en la misma
+        // transaccion del PATCH. Solo si sigue en BORRADOR; ROWVERSION se incrementa por el UPDATE.
+        await using var command = CrearComando(
+            """
+            UPDATE fact.AsientoContable
+            SET BasePEN = @basePen, IgvPEN = @igvPen, NetoPEN = @netoPen
+            WHERE AsientoContableId = @id AND Estado = 'BORRADOR';
+            """);
+        command.Parameters.AddWithValue("@basePen", basePen);
+        command.Parameters.AddWithValue("@igvPen", igvPen);
+        command.Parameters.AddWithValue("@netoPen", netoPen);
+        command.Parameters.AddWithValue("@id", asientoContableId);
+
+        var filasAfectadas = await command.ExecuteNonQueryAsync(ct);
+        return filasAfectadas > 0 ? ResultadoEscritura.Aplicado : ResultadoEscritura.NoEncontrado;
     }
 
     public async Task<long?> ObtenerAsientoVigenteIdAsync(long facturaId, CancellationToken ct)

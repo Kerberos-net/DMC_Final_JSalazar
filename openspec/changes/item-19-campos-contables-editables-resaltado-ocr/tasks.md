@@ -49,16 +49,16 @@ Exceeds the 800-line budget (~1450 est.). Owner ACCEPTED the `size:exception` �
 - [x] 3.3 RED: purity scan test — Contable.Core / Facturacion.Core stay DB/HTTP/clock-free (ADR 0019)
 - [x] 3.4 RED: `ValidacionDeCorreccion.Validar(original, cambios)` guards on MERGED values — 422 on base<0, IgvOrig>TotalOrig, blank numero, unknown tipoComprobante; edit of base/igv/glosa rejected unless `Estado == PENDIENTE_VALIDACION` (D2). Non-zero IGV → hard 422 ONLY for boleta `03` and non-NC no-gravada (EXONERADA/INAFECTA on `01`/`03`) — owner decision (a). The guard does NOT fire for NC `07` (§6 TC-inheritance / boleta-mirror path) — owner decision (b): NC `07` con referencia interna follows §6, no IGV rejection
 - [x] 3.5 GREEN: MODIFY `CorreccionFactura.cs` (trailing `BaseImponible`/`Igv`/`Glosa`), `ValidacionDeCorreccion.cs` (new arg), `FacturaPersistida.cs` (+`IgvOrig`/`Glosa`/`CamposNoExtraidos`)
-- [ ] 3.6 RED: integration — `PatchAsync` trio ladder writes `TotalOrig=base+igv`, `IgvOrig=igv` only; `{base,igv}`+`totalOrig` same PATCH → 422; one `AuditoriaCorreccion` row per changed persisted column (TotalOrig, IgvOrig, Glosa), no synthetic BaseImponible row (D1/D7)
-- [ ] 3.7 RED: integration — scalar `BasePEN`/`IgvPEN`/`NetoPEN` written onto vigente BORRADOR asiento in same tx, ONLY when TotalOrig/IgvOrig/Moneda changed, Version bumps; missing applicable rate → skip write, PATCH still 200 (D4)
-- [ ] 3.8 RED: integration — `PosibleDuplicado` recomputed in `PatchAsync` iff identity triple (RucProveedor, TipoComprobante, Numero) changed; excludes self + DESCARTADA; in same PATCH response; no AuditoriaCorreccion row (D6)
-- [ ] 3.9 RED: integration — edit on `VALIDADA` → 409 zero rows; DESCARTADA not editable; tipo/numero keep audited-Correccion post-validation behavior
-- [ ] 3.10 GREEN: MODIFY `IUnidadDeTrabajo.cs` (+`ExisteIdentidadPreviaAsync`, +`ActualizarProyeccionEscalarAsync`), `ServicioDeFacturas.cs` (ladder + D4/D6/D7)
-- [ ] 3.11 GREEN: MODIFY `SqlUnidadDeTrabajo.cs` — SELECT/UPDATE column lists, `ExisteIdentidadPreviaAsync`, scalar projection write
-- [ ] 3.12 RED: `SqlUnidadDeTrabajo.EvaluarHechosDeConflicto` — `SinTipoCambio` narrowed: foreign-currency still 409; PEN unaffected; NC `07` `EsReferenciaExterna=0 AND FacturaReferenciaId IS NOT NULL` NOT blocked; NC `07` referencia externa still 409; PATCH path unaffected (dormant branch, §6 TC-inheritance)
-- [ ] 3.13 GREEN: MODIFY `SqlUnidadDeTrabajo.cs:107` predicate
+- [x] 3.6 RED: integration — `PatchAsync` trio ladder writes `TotalOrig=base+igv`, `IgvOrig=igv` only; `{base,igv}`+`totalOrig` same PATCH → 422; one `AuditoriaCorreccion` row per changed persisted column (TotalOrig, IgvOrig, Glosa), no synthetic BaseImponible row (D1/D7)
+- [x] 3.7 RED: integration — scalar `BasePEN`/`IgvPEN`/`NetoPEN` written onto vigente BORRADOR asiento in same tx, ONLY when TotalOrig/IgvOrig/Moneda changed, Version bumps; missing applicable rate → skip write, PATCH still 200 (D4)
+- [x] 3.8 RED: integration — `PosibleDuplicado` recomputed in `PatchAsync` iff identity triple (RucProveedor, TipoComprobante, Numero) changed; excludes self + DESCARTADA; in same PATCH response; no AuditoriaCorreccion row (D6)
+- [x] 3.9 RED: edit on `VALIDADA` → `CorreccionInvalida` 422 (pure guard, task 3.4 — RESOLVED from 409); DESCARTADA not editable; tipo/numero keep audited-Correccion post-validation behavior
+- [x] 3.10 GREEN: MODIFY `IUnidadDeTrabajo.cs` (+`ExisteIdentidadPreviaAsync`, +`ActualizarProyeccionEscalarAsync`, +`ActualizarPosibleDuplicadoAsync`), `ServicioDeFacturas.cs` (ladder + D4/D6/D7)
+- [x] 3.11 GREEN: MODIFY `SqlUnidadDeTrabajo.cs` — SELECT/UPDATE column lists (IgvOrig/Glosa/CamposNoExtraidos), `ExisteIdentidadPreviaAsync`, `ActualizarPosibleDuplicadoAsync`, scalar projection write
+- [x] 3.12 RED: `SqlUnidadDeTrabajo.CargarAsientoAsync` — `SinTipoCambio` narrowed: foreign-currency still flags; PEN unaffected; NC `07` `EsReferenciaExterna=0 AND FacturaReferenciaId IS NOT NULL` NOT flagged; NC `07` referencia externa still flags
+- [x] 3.13 GREEN: MODIFY `SqlUnidadDeTrabajo.CargarAsientoAsync` SELECT + `sinTipoCambio` predicate
 - [x] 3.14 RED→GREEN: MODIFY `Api/FacturaEndpoints.cs` — `CorreccionFacturaRequest` (+`baseImponible`/`igv`/`glosa`), `FacturaRespuesta` (+`CamposNoExtraidos: string[]`, +`Glosa`), trailing additive; `TieneCamposNoExtraidos` retained. NOTE: repository population of `CamposNoExtraidos`/`Glosa` in `SqlUnidadDeTrabajo.CargarFacturaAsync` is task 3.11 (still pending) — `De()` defaults to empty array / null until then
-- [ ] 3.15 RED→GREEN: integration — accepted §7 consequence: populating asiento `BasePEN` makes `validar` reject an invoice whose hand-built líneas ≠ edited base; surfaced distinctly
+- [x] 3.15 RED→GREEN: integration — accepted §7 consequence: populating asiento `BasePEN` makes `validar` reject an invoice whose hand-built líneas ≠ edited base (`PatchThenValidar_PopulatingBasePen_MakesValidarRejectAnInvoiceWhoseHandBuiltLineasNoLongerMatch`)
 
 ## Phase 4: SPA detalle (Unit 4)
 

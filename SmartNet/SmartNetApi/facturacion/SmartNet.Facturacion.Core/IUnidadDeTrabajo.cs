@@ -146,6 +146,29 @@ public interface IUnidadDeTrabajo : IAsyncDisposable
     /// recibe versión ni estado destino -- una columna, un valor literal, un único estado de origen
     /// legal (design D10).</summary>
     Task<TransicionEstadoFactura> MarcarFacturaValidadaAsync(long facturaId, CancellationToken ct);
+
+    // --- BACKLOG #19 (design D4/D6) additions: el PATCH contable necesita recomputar la proyección
+    // escalar del asiento y el indicador PosibleDuplicado DENTRO de la misma transacción. ---
+
+    /// <summary>design D6 — <c>true</c> si existe OTRA <c>fact.Factura</c> (no la misma, no
+    /// DESCARTADA) con la misma tripleta de identidad (<c>RucProveedor</c>, <c>TipoComprobante</c>,
+    /// <c>Numero</c>, <c>IX_Factura_Identidad</c>). Lo que <see cref="ServicioDeFacturas.PatchAsync"/>
+    /// usa para recomputar <c>fact.Factura.PosibleDuplicado</c> cuando la tripleta cambia.</summary>
+    Task<bool> ExisteIdentidadPreviaAsync(
+        long facturaId, string? rucProveedor, string tipoComprobante, string? numero, CancellationToken ct);
+
+    /// <summary>design D6 — escritura DIRECTA (sin CAS: el CAS de <c>fact.Factura.Version</c> ya lo
+    /// hizo <see cref="GuardarFacturaAsync"/> en esta misma transacción) de <c>PosibleDuplicado</c>
+    /// únicamente. <c>GuardarFacturaAsync</c>'s UPDATE deliberadamente no toca las columnas
+    /// indicadoras (design D9); esta recomputación derivada es la única excepción.</summary>
+    Task ActualizarPosibleDuplicadoAsync(long facturaId, bool posibleDuplicado, CancellationToken ct);
+
+    /// <summary>design D4 — escritura de los tres escalares (<c>BasePEN</c>, <c>IgvPEN</c>,
+    /// <c>NetoPEN</c>) sobre el asiento BORRADOR vigente, en la misma transacción del PATCH. Solo
+    /// aplica si el asiento sigue en BORRADOR; <see cref="ResultadoEscritura.NoEncontrado"/> si no
+    /// existe o ya no está en BORRADOR. <c>ROWVERSION</c> se incrementa por el propio UPDATE.</summary>
+    Task<ResultadoEscritura> ActualizarProyeccionEscalarAsync(
+        long asientoContableId, decimal basePen, decimal igvPen, decimal netoPen, CancellationToken ct);
 }
 
 /// <summary>design D10 — resultado de <see cref="IUnidadDeTrabajo.MarcarFacturaValidadaAsync"/>.</summary>

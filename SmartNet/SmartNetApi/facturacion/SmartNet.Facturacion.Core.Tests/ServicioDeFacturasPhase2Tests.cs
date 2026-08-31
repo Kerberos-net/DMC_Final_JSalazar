@@ -586,4 +586,176 @@ public class ServicioDeFacturasPhase2Tests
         Assert.Equal(EntradaAuditoria.EntidadTipos.Adjunto, entrada.EntidadTipo);
         Assert.Equal("Motivo requerido", entrada.Motivo);
     }
+
+    // --- BACKLOG #19 (design D1/D4/D6/D7, tasks 3.6/3.7/3.8) — PATCH contable ---
+
+    private static AsientoPersistido AsientoBorrador(
+        Afectacion afectacion = Afectacion.Gravada,
+        TipoComprobante comprobante = TipoComprobante.Factura,
+        decimal? tipoCambioVenta = null) => new(
+        AsientoContableId: 501,
+        FacturaId: 100,
+        Estado: AsientoPersistido.Borrador,
+        NumeroAsiento: null,
+        Version: VersionInicial,
+        Asiento: new AsientoContable(
+            ProveedorCodigo: "P00123", FechaContable: new DateOnly(2026, 8, 10), MotivoDescripcion: "Compra",
+            TipoCambioVenta: tipoCambioVenta, BasePEN: 100m, IgvPEN: 18m, NetoPEN: 118m,
+            AfectacionCongelada: afectacion, Comprobante: comprobante,
+            Lineas: Array.Empty<LineaAsiento>()),
+        Hechos: HechosDeConflicto.Ninguno);
+
+    [Fact]
+    public async Task PatchAsync_ChangingBaseAndIgv_AuditsTotalOrigAndIgvOrig_NeverASyntheticBaseImponibleRow()
+    {
+        var store = new FakeFacturacionStore();
+        store.UnidadDeTrabajo.FacturaACargar = FacturaPendiente(); // TotalOrig 118, IgvOrig null
+        var sut = new ServicioDeFacturas(store);
+
+        var resultado = await sut.PatchAsync(
+            100, VersionInicial, new CorreccionFactura(BaseImponible: 200m, Igv: 36m),
+            usuarioId: 7, Ahora, CancellationToken.None);
+
+        Assert.IsType<ResultadoComando.Aplicado>(resultado);
+        Assert.Equal(2, store.UnidadDeTrabajo.AuditoriasRegistradas.Count);
+        Assert.Contains(store.UnidadDeTrabajo.AuditoriasRegistradas, e => e.Campo == nameof(FacturaPersistida.TotalOrig) && e.ValorNuevo == "236");
+        Assert.Contains(store.UnidadDeTrabajo.AuditoriasRegistradas, e => e.Campo == nameof(FacturaPersistida.IgvOrig) && e.ValorNuevo == "36");
+        Assert.DoesNotContain(store.UnidadDeTrabajo.AuditoriasRegistradas, e => e.Campo == "BaseImponible");
+        Assert.Equal(236m, store.UnidadDeTrabajo.UltimaFacturaGuardada!.TotalOrig);
+        Assert.Equal(36m, store.UnidadDeTrabajo.UltimaFacturaGuardada.IgvOrig);
+    }
+
+    [Fact]
+    public async Task PatchAsync_ChangingGlosa_WritesOneGlosaAuditRow_AndPersistsIt()
+    {
+        var store = new FakeFacturacionStore();
+        store.UnidadDeTrabajo.FacturaACargar = FacturaPendiente();
+        var sut = new ServicioDeFacturas(store);
+
+        var resultado = await sut.PatchAsync(
+            100, VersionInicial, new CorreccionFactura(Glosa: "Compra de utiles de oficina"),
+            usuarioId: 7, Ahora, CancellationToken.None);
+
+        Assert.IsType<ResultadoComando.Aplicado>(resultado);
+        var entrada = Assert.Single(store.UnidadDeTrabajo.AuditoriasRegistradas);
+        Assert.Equal(nameof(FacturaPersistida.Glosa), entrada.Campo);
+        Assert.Equal("Compra de utiles de oficina", store.UnidadDeTrabajo.UltimaFacturaGuardada!.Glosa);
+    }
+
+    [Fact]
+    public async Task PatchAsync_ChangingBaseIgv_RederivesScalarProjectionOntoTheBorradorAsiento_InPen()
+    {
+        var store = new FakeFacturacionStore();
+        store.UnidadDeTrabajo.FacturaACargar = FacturaPendiente(); // PEN, GRAVADA, "01"
+        store.UnidadDeTrabajo.AsientoVigenteId = 501;
+        store.UnidadDeTrabajo.AsientoACargar = AsientoBorrador();
+        var sut = new ServicioDeFacturas(store);
+
+        var resultado = await sut.PatchAsync(
+            100, VersionInicial, new CorreccionFactura(BaseImponible: 1000m, Igv: 180m),
+            usuarioId: 7, Ahora, CancellationToken.None);
+
+        Assert.IsType<ResultadoComando.Aplicado>(resultado);
+        Assert.Equal((1000m, 180m, 1180m), store.UnidadDeTrabajo.UltimaProyeccionEscalar);
+    }
+
+    [Fact]
+    public async Task PatchAsync_ChangingBaseIgv_OnABoleta_CollapsesIgvToCost_InTheProjection()
+    {
+        // Una boleta 03 con IGV != 0 es 422 (owner decision a); aca el IGV va en 0 y la proyeccion
+        // colapsa igual porque una boleta nunca otorga credito fiscal (REGLAS.md §5).
+        var store = new FakeFacturacionStore();
+        store.UnidadDeTrabajo.FacturaACargar = FacturaPendiente() with { TipoComprobante = "03", Afectacion = "GRAVADA" };
+        store.UnidadDeTrabajo.AsientoVigenteId = 501;
+        store.UnidadDeTrabajo.AsientoACargar = AsientoBorrador(comprobante: TipoComprobante.Boleta);
+        var sut = new ServicioDeFacturas(store);
+
+        var resultado = await sut.PatchAsync(
+            100, VersionInicial, new CorreccionFactura(BaseImponible: 1180m, Igv: 0m),
+            usuarioId: 7, Ahora, CancellationToken.None);
+
+        Assert.IsType<ResultadoComando.Aplicado>(resultado);
+        Assert.Equal((1180m, 0m, 1180m), store.UnidadDeTrabajo.UltimaProyeccionEscalar);
+    }
+
+    [Fact]
+    public async Task PatchAsync_ChangingBaseIgv_ForeignCurrencyWithNoFrozenRate_SkipsTheProjection_ButStillReturns200()
+    {
+        var store = new FakeFacturacionStore();
+        store.UnidadDeTrabajo.FacturaACargar = FacturaPendiente() with { Moneda = "USD" };
+        store.UnidadDeTrabajo.AsientoVigenteId = 501;
+        store.UnidadDeTrabajo.AsientoACargar = AsientoBorrador(tipoCambioVenta: null);
+        var sut = new ServicioDeFacturas(store);
+
+        var resultado = await sut.PatchAsync(
+            100, VersionInicial, new CorreccionFactura(BaseImponible: 1000m, Igv: 180m),
+            usuarioId: 7, Ahora, CancellationToken.None);
+
+        Assert.IsType<ResultadoComando.Aplicado>(resultado);
+        Assert.Null(store.UnidadDeTrabajo.UltimaProyeccionEscalar);
+        Assert.True(store.UnidadDeTrabajo.Committed);
+    }
+
+    [Fact]
+    public async Task PatchAsync_NotTouchingImportesOrMoneda_NeverRederivesTheProjection()
+    {
+        var store = new FakeFacturacionStore();
+        store.UnidadDeTrabajo.FacturaACargar = FacturaPendiente();
+        store.UnidadDeTrabajo.AsientoVigenteId = 501;
+        store.UnidadDeTrabajo.AsientoACargar = AsientoBorrador();
+        var sut = new ServicioDeFacturas(store);
+
+        var resultado = await sut.PatchAsync(
+            100, VersionInicial, new CorreccionFactura(Glosa: "solo glosa"), usuarioId: 7, Ahora, CancellationToken.None);
+
+        Assert.IsType<ResultadoComando.Aplicado>(resultado);
+        Assert.Null(store.UnidadDeTrabajo.UltimaProyeccionEscalar);
+        Assert.DoesNotContain(nameof(IUnidadDeTrabajo.ActualizarProyeccionEscalarAsync), store.UnidadDeTrabajo.Llamadas);
+    }
+
+    [Fact]
+    public async Task PatchAsync_ChangingTheIdentityTriple_RecomputesPosibleDuplicado_WithNoAuditRow()
+    {
+        var store = new FakeFacturacionStore();
+        store.UnidadDeTrabajo.FacturaACargar = FacturaPendiente();
+        store.UnidadDeTrabajo.ExisteIdentidadPrevia = true;
+        var sut = new ServicioDeFacturas(store);
+
+        var resultado = await sut.PatchAsync(
+            100, VersionInicial, new CorreccionFactura(Numero: "F001-999"), usuarioId: 7, Ahora, CancellationToken.None);
+
+        Assert.IsType<ResultadoComando.Aplicado>(resultado);
+        Assert.True(store.UnidadDeTrabajo.UltimoPosibleDuplicadoEscrito);
+        Assert.DoesNotContain(store.UnidadDeTrabajo.AuditoriasRegistradas, e => e.Campo == nameof(FacturaPersistida.PosibleDuplicado));
+    }
+
+    [Fact]
+    public async Task PatchAsync_ChangingTheIdentityTriple_ClearsPosibleDuplicado_WhenNoPriorIdentityExists()
+    {
+        var store = new FakeFacturacionStore();
+        store.UnidadDeTrabajo.FacturaACargar = FacturaPendiente() with { PosibleDuplicado = true };
+        store.UnidadDeTrabajo.ExisteIdentidadPrevia = false;
+        var sut = new ServicioDeFacturas(store);
+
+        var resultado = await sut.PatchAsync(
+            100, VersionInicial, new CorreccionFactura(Numero: "F001-UNICO"), usuarioId: 7, Ahora, CancellationToken.None);
+
+        Assert.IsType<ResultadoComando.Aplicado>(resultado);
+        Assert.False(store.UnidadDeTrabajo.UltimoPosibleDuplicadoEscrito);
+    }
+
+    [Fact]
+    public async Task PatchAsync_NotTouchingTheIdentityTriple_NeverRecomputesPosibleDuplicado()
+    {
+        var store = new FakeFacturacionStore();
+        store.UnidadDeTrabajo.FacturaACargar = FacturaPendiente();
+        var sut = new ServicioDeFacturas(store);
+
+        var resultado = await sut.PatchAsync(
+            100, VersionInicial, new CorreccionFactura(Glosa: "sin cambio de identidad"), usuarioId: 7, Ahora, CancellationToken.None);
+
+        Assert.IsType<ResultadoComando.Aplicado>(resultado);
+        Assert.Null(store.UnidadDeTrabajo.UltimoPosibleDuplicadoEscrito);
+        Assert.DoesNotContain(nameof(IUnidadDeTrabajo.ExisteIdentidadPreviaAsync), store.UnidadDeTrabajo.Llamadas);
+    }
 }
