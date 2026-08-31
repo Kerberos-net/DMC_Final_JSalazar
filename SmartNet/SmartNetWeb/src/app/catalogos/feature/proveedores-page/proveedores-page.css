@@ -25,3 +25,11 @@
   flex: 1 1 20rem;
   margin: 0;
 }
+
+/* Match the "Bandeja principal" filter controls: compact height (fs-12, 6px/10px padding). */
+.proveedores-page__controles .campo input,
+.proveedores-page__controles .campo select,
+.proveedores-page__controles .btn {
+  font-size: var(--fs-12);
+  padding: 6px 10px;
+}

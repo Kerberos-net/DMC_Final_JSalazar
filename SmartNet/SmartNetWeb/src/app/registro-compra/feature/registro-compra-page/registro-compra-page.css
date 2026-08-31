@@ -23,6 +23,14 @@
   justify-content: space-between;
 }
 
+/* Match the "Bandeja principal" filter controls: compact height (fs-12, 6px/10px padding). */
+.registro-page__controles .campo input,
+.registro-page__controles .campo select,
+.registro-page__controles .btn {
+  font-size: var(--fs-12);
+  padding: 6px 10px;
+}
+
 .registro-page__vacio {
   margin: 0;
   padding: 1rem 0;

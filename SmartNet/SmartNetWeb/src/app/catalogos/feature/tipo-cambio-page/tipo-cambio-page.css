@@ -23,3 +23,11 @@
 .tipo-cambio-page__fecha {
   margin: 0;
 }
+
+/* Match the "Bandeja principal" filter controls: compact height (fs-12, 6px/10px padding). */
+.tipo-cambio-page__controles .campo input,
+.tipo-cambio-page__controles .campo select,
+.tipo-cambio-page__controles .btn {
+  font-size: var(--fs-12);
+  padding: 6px 10px;
+}
