@@ -33,7 +33,7 @@ as existing editable fields.
 - `glosa` is free text, nullable, maximum 250 characters.
 - `baseImponible` / `igv` / `glosa` edits MUST be applied only when the factura's
   `Estado` is `PENDIENTE_VALIDACION` (`FacturaPersistida.PendienteValidacion`). A
-  request carrying any of them for a `VALIDADA` factura MUST be rejected `409`
+  request carrying any of them for a `VALIDADA` factura MUST be rejected `422`
   with zero rows updated (REGLAS §9 — `reabrir` returns the factura to
   `PENDIENTE_VALIDACION` first). A `DESCARTADA` factura is not editable.
 - Pure domain validation in `ValidacionDeCorreccion` MUST reject with `422`:
@@ -61,7 +61,7 @@ No existing request field changes name, type, or meaning.
 #### Scenario: Contable edit on a validated factura is rejected
 - GIVEN a factura with `Estado = VALIDADA`
 - WHEN `PATCH` carries `baseImponible`, `igv` or `glosa`
-- THEN the response is `409 Conflict` (`application/problem+json`) and zero rows update
+- THEN the response is `422 Unprocessable Content` (`application/problem+json`) and zero rows update
 
 #### Scenario: Negative base or IGV over total is rejected
 - GIVEN a `PATCH` body with `baseImponible` < 0, or `igv` making `IgvOrig` > `TotalOrig`
