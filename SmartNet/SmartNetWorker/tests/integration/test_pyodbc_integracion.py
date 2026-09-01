@@ -17,15 +17,22 @@ from decimal import Decimal
 import pyodbc
 import pytest
 
+from smartnet_worker.comprobante import asociar_por_nombre_archivo
 from smartnet_worker.documento_repo import insertar_documento, insertar_email
 from smartnet_worker.estado_integracion import registrar_exito
 from smartnet_worker.gmail import AdjuntoGmail, MensajeGmail
-from smartnet_worker.inbox_event_repo import insertar_evento, listar_no_notificados
+from smartnet_worker.inbox_event_repo import (
+    insertar_evento,
+    insertar_evento_asociacion,
+    listar_asociacion_no_notificada,
+    listar_no_notificados,
+)
 from smartnet_worker.payload_inbox import construir_payload
 from smartnet_worker.procesamiento_repo import (
     DatosExtraidos,
     asociar_documentos,
     insertar_datos_extraidos,
+    listar_huerfanos,
     upsert_procesamiento,
 )
 from smartnet_worker.sbs import TipoCambioSbs
@@ -388,6 +395,147 @@ def test_reintentar_el_scan_no_duplica_eventos(worker_db):
         ).fetchone()
 
     assert fila[0] == 1
+
+
+def _datos_extraidos_clave(*, ruc, tipo, numero) -> DatosExtraidos:
+    return DatosExtraidos(
+        tipo_comprobante=tipo,
+        numero=numero,
+        ruc_proveedor=ruc,
+        nombre_proveedor="Proveedor SAC",
+        monto=Decimal("118.00"),
+        moneda="PEN",
+        fecha_emision=date(2026, 8, 15),
+        campos_no_extraidos=None,
+        afectacion_mixta=None,
+    )
+
+
+def _datos_extraidos_vacios() -> DatosExtraidos:
+    return DatosExtraidos(
+        tipo_comprobante=None,
+        numero=None,
+        ruc_proveedor=None,
+        nombre_proveedor=None,
+        monto=None,
+        moneda=None,
+        fecha_emision=None,
+        campos_no_extraidos="Clave,Monto,Moneda,FechaEmision",
+        afectacion_mixta=None,
+    )
+
+
+def test_segunda_pasada_containment_toca_solo_procesamiento_y_documentorecibido(worker_db):
+    """ADR 0017 rev. 3: `listar_huerfanos` expone `dr.NombreArchivo`; el XML huerfano reclama al
+    PDF sin clave por containment; `asociar_documentos` escribe el FK en ambos lados. Todas las
+    escrituras caen en tablas de `usr_worker` (particion de datos, ADR 0003)."""
+    instante = datetime.now(UTC)
+    with pyodbc.connect(worker_db["worker_connection_string"]) as conexion:
+        cursor = conexion.cursor()
+        doc_xml = _email_y_documento_reales(cursor, "18d2f0a1b2c30001", "factura.xml")
+        doc_pdf = _email_y_documento_reales(
+            cursor, "18d2f0a1b2c30002", "85877-20127765279-fa-f96x-00001230.pdf"
+        )
+        proc_xml = upsert_procesamiento(cursor, doc_xml, "COMPLETADO", instante, instante)
+        proc_pdf = upsert_procesamiento(cursor, doc_pdf, "COMPLETADO", instante, instante)
+        insertar_datos_extraidos(
+            cursor,
+            proc_xml,
+            _datos_extraidos_clave(ruc="20127765279", tipo="01", numero="F96X-00001230"),
+        )
+        insertar_datos_extraidos(cursor, proc_pdf, _datos_extraidos_vacios())
+        conexion.commit()
+
+        huerfanos = listar_huerfanos(cursor)
+        residuo = [h for h in huerfanos if h.documento_recibido_id in (doc_xml, doc_pdf)]
+        pares = asociar_por_nombre_archivo(residuo)
+        assert pares == tuple(pares) and len(pares) == 1
+        par = pares[0]
+        assert par.xml_documento_id == doc_xml
+        assert par.pdf_documento_id == doc_pdf
+        asociar_documentos(cursor, proc_xml, doc_pdf, proc_pdf, doc_xml)
+        conexion.commit()
+
+    with pyodbc.connect(worker_db["worker_connection_string"]) as conexion:
+        filas = conexion.cursor().execute(
+            "SELECT DocumentoRecibidoId, DocumentoAsociadoId FROM fact.Procesamiento "
+            "WHERE ProcesamientoId IN (?, ?)",
+            proc_xml,
+            proc_pdf,
+        ).fetchall()
+
+    asociado = {f[0]: f[1] for f in filas}
+    assert asociado[doc_xml] == doc_pdf
+    assert asociado[doc_pdf] == doc_xml
+
+
+def test_reemision_pdf_only_candidate_query_y_no_repeticion(worker_db):
+    """design.md D5/D6: `listar_asociacion_no_notificada` devuelve solo el lado PDF de una
+    asociacion tardia sin evento que la refleje; `insertar_evento_asociacion` inserta una fila y
+    una segunda llamada es no-op (NOT EXISTS payload-aware). Solo toca `fact.InboxEvent` (insert) y
+    lee `fact.Procesamiento`/`fact.DocumentoRecibido`."""
+    instante = datetime.now(UTC)
+    with pyodbc.connect(worker_db["worker_connection_string"]) as conexion:
+        cursor = conexion.cursor()
+        doc_xml = _email_y_documento_reales(cursor, "18d2f0a1b2c30003", "tardio.xml")
+        doc_pdf = _email_y_documento_reales(cursor, "18d2f0a1b2c30004", "tardio.pdf")
+        proc_xml = upsert_procesamiento(cursor, doc_xml, "COMPLETADO", instante, instante)
+        proc_pdf = upsert_procesamiento(cursor, doc_pdf, "COMPLETADO", instante, instante)
+        insertar_datos_extraidos(
+            cursor, proc_xml, _datos_extraidos_minimos(afectacion_mixta=False)
+        )
+        insertar_datos_extraidos(cursor, proc_pdf, _datos_extraidos_vacios())
+        # Un primer evento del PDF SIN asociacion (como lo emitio #6 antes de la pareja tardia).
+        fila = next(
+            f for f in listar_no_notificados(cursor) if f.procesamiento_id == proc_pdf
+        )
+        payload_sin_pareja = construir_payload(
+            estado_procesamiento=fila.estado,
+            documento_recibido_id=fila.documento_recibido_id,
+            tipo_documento=fila.tipo_documento,
+            documento_asociado_id=None,
+            nombre_archivo=fila.nombre_archivo,
+            mime_type=fila.mime_type,
+            ruta_relativa=fila.ruta_relativa,
+            tamano_bytes=fila.tamano_bytes,
+            comprobante=None,
+        )
+        insertar_evento(cursor, proc_pdf, payload_sin_pareja)
+        # Asociacion tardia.
+        asociar_documentos(cursor, proc_xml, doc_pdf, proc_pdf, doc_xml)
+        conexion.commit()
+
+        candidatos = listar_asociacion_no_notificada(cursor)
+        ids = {c.procesamiento_id for c in candidatos}
+        assert proc_pdf in ids
+        assert proc_xml not in ids  # D5: lado XML nunca se re-emite
+        candidato = next(c for c in candidatos if c.procesamiento_id == proc_pdf)
+        payload_asociado = construir_payload(
+            estado_procesamiento=candidato.estado,
+            documento_recibido_id=candidato.documento_recibido_id,
+            tipo_documento=candidato.tipo_documento,
+            documento_asociado_id=candidato.documento_asociado_id,
+            nombre_archivo=candidato.nombre_archivo,
+            mime_type=candidato.mime_type,
+            ruta_relativa=candidato.ruta_relativa,
+            tamano_bytes=candidato.tamano_bytes,
+            comprobante=None,
+        )
+        insertar_evento_asociacion(cursor, proc_pdf, payload_asociado)
+        conexion.commit()
+        # Segunda llamada: no-op.
+        insertar_evento_asociacion(cursor, proc_pdf, payload_asociado)
+        conexion.commit()
+        assert listar_asociacion_no_notificada(cursor) == () or proc_pdf not in {
+            c.procesamiento_id for c in listar_asociacion_no_notificada(cursor)
+        }
+
+    with pyodbc.connect(worker_db["worker_connection_string"]) as conexion:
+        total = conexion.cursor().execute(
+            "SELECT COUNT(*) FROM fact.InboxEvent WHERE ProcesamientoId = ?", proc_pdf
+        ).fetchone()
+
+    assert total[0] == 2  # el evento sin-pareja original + exactamente una re-emision
 
 
 def test_usr_worker_no_puede_escribir_en_factura(worker_db):

@@ -2,7 +2,11 @@
 
 ## Estado
 
-Aceptado. Revisión 2. Añade la detección de la factura mixta desde el XML, parte la métrica de
+Aceptado. Revisión 3. Añade la segunda pasada de asociación por containment del nombre de archivo
+contra la clave autoritativa del XML y la re-emisión de `InboxEvent` restringida al lado PDF para
+asociaciones tardías (BACKLOG `asociacion-pdf-clave-desde-xml`).
+
+Revisión 2. Añade la detección de la factura mixta desde el XML, parte la métrica de
 precisión por fuente y la traslada a una tabla que quien la calcula sí puede leer, y escribe la
 consulta de sondeo de Gmail (revisión adversarial v2: C11, A9, S3, y el hallazgo N1 detectado al
 construir la matriz de permisos).
@@ -65,7 +69,22 @@ serie y número—.
 3. El PDF se asocia **únicamente si los cuatro componentes normalizados coinciden de forma exacta**.
 
 **Recuperación:** si no es posible extraer los datos del contenido del PDF, el nombre del archivo
-puede usarse como respaldo, siempre que la coincidencia sea **inequívoca**.
+puede usarse como respaldo, siempre que la coincidencia sea **inequívoca**. Dos formas, ambas
+verificadas y ninguna inferida:
+
+1. **Clave propia desde el nombre**, cuando el nombre respeta la convención SUNAT completa y
+   produce los cuatro componentes; se asocia entonces por la regla exacta del punto 3.
+2. **Containment contra la clave autoritativa del XML** (revisión 3): cuando el PDF no produce
+   clave propia, un XML huérfano con clave completa puede reclamarlo si su **RUC de emisor, serie
+   y número** normalizados aparecen los tres como **tokens delimitados y distintos** del nombre de
+   archivo del PDF. El tipo de comprobante **no** se exige del nombre: es el componente que los
+   emisores mutilan. La comparación va del XML **hacia** el nombre —se verifica una clave que ya
+   existe, no se adivina una—, y la autoridad sigue siendo el XML.
+
+La exclusividad es **1:1 bilateral sobre todo el conjunto sin pareja**: si más de un XML califica
+para un PDF, o más de un PDF para un XML, **ninguno** se asocia. Un huérfano antiguo no
+relacionado puede así suprimir una asociación válida; se acepta el costo, porque el modo de fallo
+es "queda sin asociar", nunca "asociado al comprobante equivocado".
 
 **Evidencia insuficiente, explícitamente:** el asunto, el remitente, la fecha del correo y la
 posición del archivo entre los adjuntos **no establecen asociación en ningún caso**.
@@ -180,7 +199,8 @@ procesamiento. `FacturaExtraccion` es igualmente inmutable.
   Gmail ya hacen mejor, y un falso positivo se corrige más rápido reetiquetando en Gmail.
 - **Asociar PDF y XML por convención de nombre SUNAT únicamente.** Determinista y trivial. Se
   descartó porque un proveedor que renombre el archivo rompe la asociación y deja el PDF huérfano,
-  perdiendo la evidencia visual que alimenta el visor.
+  perdiendo la evidencia visual que alimenta el visor. *(Sigue descartada como mecanismo **único**;
+  la revisión 3 la admite solo como verificación contra una clave XML ya existente.)*
 - **Bandeja de candidatos con confirmación humana antes de procesar.** Eliminaría los falsos
   positivos de raíz. Se descartó porque añade un paso manual diario y hace que el criterio de
   visibilidad en 15 minutos dependa de que el usuario esté mirando.
@@ -197,6 +217,11 @@ procesamiento. `FacturaExtraccion` es igualmente inmutable.
 - **Costo:** el PDF pasa por extracción **aunque el XML ya aportara el dato exacto**. Se gasta
   presupuesto de extracción a cambio de que la asociación sea verificada y no inferida. Es una
   decisión consciente.
+- **Revisión 3:** una **segunda pasada acotada** corre sobre el residuo de la pasada exacta —un
+  XML huérfano con clave completa puede reclamar un PDF sin clave por containment del nombre de
+  archivo, con exclusividad 1:1 bilateral y el XML como única autoridad— y una **re-emisión de
+  `InboxEvent` restringida al lado PDF** reporta a .NET las asociaciones que se completan después
+  de que ya se emitieron todos los eventos del `Procesamiento` (el lado XML nunca se re-emite).
 - **Costo:** los PDF sin asociar necesitan una superficie de revisión en el panel de errores y una
   acción manual de resolución.
 - **Riesgo abierto:** no se ha seleccionado ni evaluado el motor de extracción. Debería validarse

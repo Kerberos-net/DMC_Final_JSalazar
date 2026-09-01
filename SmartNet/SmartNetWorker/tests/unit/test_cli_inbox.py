@@ -14,20 +14,30 @@ from smartnet_worker.cli_inbox import ejecutar
 
 class _FakeCursor:
     def __init__(
-        self, *, pendientes_filas: list[tuple] | None = None, eventos: list[str] | None = None
+        self,
+        *,
+        pendientes_filas: list[tuple] | None = None,
+        asociacion_filas: list[tuple] | None = None,
+        eventos: list[str] | None = None,
     ):
         self._pendientes_filas = pendientes_filas or []
+        self._asociacion_filas = asociacion_filas or []
         self.eventos = eventos if eventos is not None else []
 
     def execute(self, sentencia: str, *parametros):
         sql = sentencia.lower()
+        if "from fact.procesamiento p" in sql and "documentoasociadoid is not null" in sql:
+            self.eventos.append("listar_asociacion_no_notificada")
+            self._ultimo_fetchall = list(self._asociacion_filas)
+            return
         if "from fact.procesamiento p" in sql and "not exists" in sql:
             self.eventos.append("listar_no_notificados")
             self._ultimo_fetchall = list(self._pendientes_filas)
             return
         if "insert into fact.inboxevent" in sql:
             tipo, procesamiento_id, payload, _ = parametros
-            self.eventos.append(f"insertar_evento:{procesamiento_id}:{tipo}:{payload}")
+            etiqueta = "insertar_evento_asociacion" if "json_value" in sql else "insertar_evento"
+            self.eventos.append(f"{etiqueta}:{procesamiento_id}:{tipo}:{payload}")
             return
         raise AssertionError(f"SQL no reconocido por el fake: {sentencia}")
 
@@ -155,6 +165,43 @@ def test_fallo_de_una_fila_no_aborta_el_batch(monkeypatch):
     assert len(inserciones) == 1
     assert inserciones[0].startswith("insertar_evento:11:")
     assert "rollback" in eventos
+
+
+def test_asociacion_tardia_de_pdf_reemite_un_evento_con_la_asociacion(monkeypatch):
+    _preparar_entorno(monkeypatch)
+    eventos: list[str] = []
+    # PDF cuyo DocumentoAsociadoId ya transiciono NULL->non-null; ningun evento lo refleja.
+    asociacion_filas = [
+        (
+            20, "COMPLETADO", 15, "PDF", 16, "escaneo.pdf", "application/pdf",
+            "2026/09/escaneo.pdf", 4096, None, None, None, None, None, None, None, None, None,
+        )
+    ]
+    cursor = _FakeCursor(
+        pendientes_filas=[], asociacion_filas=asociacion_filas, eventos=eventos
+    )
+
+    resultado = ejecutar(conectar=_conectar_fabrica(cursor, eventos))
+
+    assert resultado == 0
+    reemision = next(e for e in eventos if e.startswith("insertar_evento_asociacion:"))
+    assert reemision.startswith("insertar_evento_asociacion:20:PROCESAMIENTO_FINALIZADO:")
+    assert '"documentoAsociadoId": 16' in reemision
+    assert '"advertenciasAsociacion": []' in reemision
+    assert "SIN_PAREJA" not in reemision
+
+
+def test_reemision_no_toca_el_lado_xml(monkeypatch):
+    # D5: el conjunto candidato filtra dr.TipoDocumento='PDF'; el XML de la misma asociacion nunca
+    # llega aca -- lo garantiza la query, este fake solo lo documenta al no proveer filas XML.
+    _preparar_entorno(monkeypatch)
+    eventos: list[str] = []
+    cursor = _FakeCursor(pendientes_filas=[], asociacion_filas=[], eventos=eventos)
+
+    ejecutar(conectar=_conectar_fabrica(cursor, eventos))
+
+    assert "listar_asociacion_no_notificada" in eventos
+    assert not any(e.startswith("insertar_evento") for e in eventos)
 
 
 def test_ningun_pendiente_devuelve_exito_sin_inserciones(monkeypatch):

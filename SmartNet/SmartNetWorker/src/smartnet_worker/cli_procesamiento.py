@@ -28,7 +28,7 @@ from pathlib import Path
 import pyodbc
 
 from smartnet_worker import afectacion, config, errores, pdf_texto, ubl
-from smartnet_worker.comprobante import asociar
+from smartnet_worker.comprobante import asociar, asociar_por_nombre_archivo
 from smartnet_worker.config import ConfiguracionError
 from smartnet_worker.documento_repo import (
     DocumentoPendiente,
@@ -232,7 +232,17 @@ def _asociar_pendientes(conectar: Callable[[str], object], connection_string: st
     try:
         cursor = conexion.cursor()
         huerfanos = listar_huerfanos(cursor)
-        pares = asociar((), huerfanos)
+        pares_exactos = asociar((), huerfanos)
+        # Segunda pasada acotada (ADR 0017 rev. 3): corre sobre el RESIDUO -- los huerfanos que la
+        # pasada exacta de 4 componentes no emparejo -- verificando la clave del XML contra el
+        # nombre de archivo del PDF. La pasada exacta queda byte-intacta.
+        emparejados = {
+            id_documento
+            for par in pares_exactos
+            for id_documento in (par.xml_documento_id, par.pdf_documento_id)
+        }
+        residuo = [d for d in huerfanos if d.documento_recibido_id not in emparejados]
+        pares = (*pares_exactos, *asociar_por_nombre_archivo(residuo))
         for par in pares:
             procesamiento_xml = obtener_procesamiento_id(cursor, par.xml_documento_id)
             procesamiento_pdf = obtener_procesamiento_id(cursor, par.pdf_documento_id)

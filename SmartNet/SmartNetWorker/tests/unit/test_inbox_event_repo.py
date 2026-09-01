@@ -8,7 +8,12 @@ from __future__ import annotations
 from datetime import date
 from decimal import Decimal
 
-from smartnet_worker.inbox_event_repo import insertar_evento, listar_no_notificados
+from smartnet_worker.inbox_event_repo import (
+    insertar_evento,
+    insertar_evento_asociacion,
+    listar_asociacion_no_notificada,
+    listar_no_notificados,
+)
 
 
 class _FakeCursor:
@@ -107,3 +112,42 @@ def test_insertar_evento_es_insert_select_where_not_exists_atomico():
     assert "where not exists" in sql
     assert "dbo." not in sql
     assert parametros == ("PROCESAMIENTO_FINALIZADO", 10, '{"version":1}', 10)
+
+
+# --- listar_asociacion_no_notificada / insertar_evento_asociacion (D5/D6) ----------------------
+
+
+def test_listar_asociacion_no_notificada_es_pdf_only_con_guarda_payload_aware():
+    filas = [
+        (
+            20, "COMPLETADO", 15, "PDF", 16, "escaneo.pdf", "application/pdf",
+            "2026/09/escaneo.pdf", 4096, None, None, None, None, None, None, None, None, None,
+        )
+    ]
+    cursor = _FakeCursor(filas=filas)
+
+    resultado = listar_asociacion_no_notificada(cursor)
+
+    sql = cursor.llamadas[0][0].lower()
+    assert "dr.tipodocumento = 'pdf'" in sql
+    assert "documentoasociadoid is not null" in sql
+    assert "json_value(ie.payload, '$.documento.documentoasociadoid') is not null" in sql
+    assert "not exists" in sql
+    assert "dbo." not in sql
+    assert resultado[0].procesamiento_id == 20
+    assert resultado[0].documento_asociado_id == 16
+
+
+def test_insertar_evento_asociacion_repite_el_not_exists_payload_aware():
+    cursor = _FakeCursor()
+
+    insertar_evento_asociacion(cursor, 20, '{"version":1}')
+
+    assert len(cursor.llamadas) == 1
+    sentencia, parametros = cursor.llamadas[0]
+    sql = sentencia.lower()
+    assert "insert into fact.inboxevent" in sql
+    assert "where not exists" in sql
+    assert "json_value" in sql
+    assert "dbo." not in sql
+    assert parametros == ("PROCESAMIENTO_FINALIZADO", 20, '{"version":1}', 20)

@@ -24,6 +24,8 @@ from smartnet_worker import config
 from smartnet_worker.inbox_event_repo import (
     ProcesamientoNoNotificado,
     insertar_evento,
+    insertar_evento_asociacion,
+    listar_asociacion_no_notificada,
     listar_no_notificados,
 )
 from smartnet_worker.payload_inbox import ComprobanteParaEvento, construir_payload
@@ -47,7 +49,23 @@ def ejecutar(*, conectar: Callable[[str], object] = pyodbc.connect) -> int:
     errores_run: list[str] = []
     for fila in pendientes:
         try:
-            _publicar_evento(fila, conectar, connection_string)
+            _publicar_evento(fila, conectar, connection_string, insertar_evento)
+        except Exception as error:  # noqa: BLE001 — aislamiento por fila (design.md).
+            errores_run.append(f"{fila.procesamiento_id}: {error}")
+
+    # Segunda pasada (design.md D5/D6): re-emision PDF-only para asociaciones tardias. Disjunta de
+    # la primera por construccion (aquella filtra NOT EXISTS cualquier evento; esta, NOT EXISTS un
+    # evento que ya refleje la asociacion).
+    conexion_asociacion = conectar(connection_string)
+    try:
+        cursor_asociacion = conexion_asociacion.cursor()
+        asociaciones = listar_asociacion_no_notificada(cursor_asociacion)
+    finally:
+        conexion_asociacion.close()
+
+    for fila in asociaciones:
+        try:
+            _publicar_evento(fila, conectar, connection_string, insertar_evento_asociacion)
         except Exception as error:  # noqa: BLE001 — aislamiento por fila (design.md).
             errores_run.append(f"{fila.procesamiento_id}: {error}")
 
@@ -58,6 +76,7 @@ def _publicar_evento(
     fila: ProcesamientoNoNotificado,
     conectar: Callable[[str], object],
     connection_string: str,
+    insertar: Callable[[object, int, str], None],
 ) -> None:
     payload = construir_payload(
         estado_procesamiento=fila.estado,
@@ -73,7 +92,7 @@ def _publicar_evento(
     conexion = conectar(connection_string)
     try:
         cursor = conexion.cursor()
-        insertar_evento(cursor, fila.procesamiento_id, payload)
+        insertar(cursor, fila.procesamiento_id, payload)
         conexion.commit()
     except Exception:
         conexion.rollback()

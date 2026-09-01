@@ -171,6 +171,35 @@ def test_monto_moneda_y_fecha_se_extraen_del_texto():
     assert resultado.campos_no_extraidos == ()
 
 
+def test_serie_alfanumerica_sunat_f96x_produce_clave():
+    # D8: serie SUNAT alfanumerica (letra + 3 alfanumericos), no solo letra + 3 digitos.
+    texto = f"RUC: {_RUC_PROVEEDOR}\nF96X-00001230\nFACTURA ELECTRONICA\n"
+
+    resultado = extraer(texto, "cualquier_nombre.pdf")
+
+    assert resultado.clave is not None
+    assert resultado.clave.serie == "F96X"
+    assert resultado.clave.numero == "1230"
+
+
+def test_serie_electronica_clasica_sigue_funcionando():
+    texto = f"RUC: {_RUC_PROVEEDOR}\nF001-1\nFACTURA ELECTRONICA\n"
+
+    resultado = extraer(texto, "cualquier_nombre.pdf")
+
+    assert resultado.clave is not None
+    assert resultado.clave.serie == "F001"
+    assert resultado.clave.numero == "1"
+
+
+def test_colocaciones_de_prosa_no_se_toman_como_serie():
+    # El lookahead negativo rechaza tokens de solo letras: NOTA-, FACT- no son series.
+    for prosa in ("NOTA-123", "FACT-123", "ABCDE-123", "AB-123"):
+        texto = f"RUC: {_RUC_PROVEEDOR}\n{prosa}\nFACTURA ELECTRONICA\n"
+        resultado = extraer(texto, "nombre_no_sunat.pdf")
+        assert resultado.clave is None, prosa
+
+
 def test_campos_no_extraidos_registra_ausencias_sin_ser_fatal():
     texto = f"RUC: {_RUC_PROVEEDOR}\nF001-00000123\nFACTURA ELECTRONICA\n"
 

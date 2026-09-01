@@ -122,6 +122,9 @@ class _FakeCursor:
             self._ultimo_fetchone = (procesamiento_id,)
             self.eventos.append(f"upsert_procesamiento_insert:{documento_id}")
             return
+        if "update fact.procesamiento" in sql and "documentoasociadoid" in sql:
+            self.eventos.append(f"asociar_documentos:{parametros}")
+            return
         if "update fact.procesamiento" in sql and "output inserted.procesamientoid" in sql:
             documento_id = parametros[-1]
             procesamiento_id = self._procesamiento_id_por_documento.get(
@@ -365,9 +368,9 @@ def test_coincidencia_ambigua_deja_ambos_documentos_sin_asociar(monkeypatch, tmp
     eventos: list[str] = []
 
     huerfanos_filas = [
-        (1, "XML", "20123456789", "01", "F001-00000123"),
-        (2, "PDF", "20123456789", "01", "F001-00000123"),
-        (3, "PDF", "20123456789", "01", "F001-00000123"),
+        (1, "XML", "factura.xml", "20123456789", "01", "F001-00000123"),
+        (2, "PDF", "a.pdf", "20123456789", "01", "F001-00000123"),
+        (3, "PDF", "b.pdf", "20123456789", "01", "F001-00000123"),
     ]
     cursor = _FakeCursor(huerfanos_filas=huerfanos_filas, eventos=eventos)
     lector = _LectorPdfFalso()
@@ -381,6 +384,70 @@ def test_coincidencia_ambigua_deja_ambos_documentos_sin_asociar(monkeypatch, tmp
 
     assert resultado == 0
     assert not any("documentoasociadoid" in e for e in eventos)
+
+
+def test_segunda_pasada_asocia_pdf_sin_clave_por_containment_del_nombre(
+    monkeypatch, tmp_path: Path
+):
+    """El PDF huerfano no produjo clave propia; un XML huerfano con clave completa lo reclama
+    porque su RUC + serie + numero aparecen como tokens distintos del nombre de archivo del PDF.
+    La pasada exacta de 4 componentes no los empareja (el PDF no tiene clave)."""
+    _preparar_entorno(monkeypatch, tmp_path)
+    eventos: list[str] = []
+
+    huerfanos_filas = [
+        (1, "XML", "factura.xml", "20127765279", "01", "F96X-00001230"),
+        (2, "PDF", "85877-20127765279-fa-f96x-00001230.pdf", None, None, None),
+    ]
+    cursor = _FakeCursor(
+        huerfanos_filas=huerfanos_filas,
+        eventos=eventos,
+        procesamiento_id_por_documento={1: 501, 2: 502},
+    )
+    lector = _LectorPdfFalso()
+
+    resultado = ejecutar(
+        lector=lector,
+        conectar=_conectar_fabrica(cursor, eventos),
+        verificar_tesseract=_verificar_tesseract_ok,
+        instante=_INSTANTE,
+    )
+
+    assert resultado == 0
+    # asociar_documentos emite dos UPDATE ... DocumentoAsociadoId, uno por lado.
+    updates_asociacion = [e for e in eventos if e.startswith("asociar_documentos:")]
+    assert len(updates_asociacion) == 2
+
+
+def test_pasada_exacta_de_cuatro_componentes_no_cambia_con_la_segunda_pasada(
+    monkeypatch, tmp_path: Path
+):
+    """Regresion: un PDF que SI produjo su propia clave completa se empareja por la pasada exacta,
+    nunca entra al residuo de la segunda pasada."""
+    _preparar_entorno(monkeypatch, tmp_path)
+    eventos: list[str] = []
+
+    huerfanos_filas = [
+        (1, "XML", "factura.xml", "20127765279", "01", "F96X-00001230"),
+        (2, "PDF", "cualquier-nombre.pdf", "20127765279", "01", "F96X-00001230"),
+    ]
+    cursor = _FakeCursor(
+        huerfanos_filas=huerfanos_filas,
+        eventos=eventos,
+        procesamiento_id_por_documento={1: 501, 2: 502},
+    )
+    lector = _LectorPdfFalso()
+
+    resultado = ejecutar(
+        lector=lector,
+        conectar=_conectar_fabrica(cursor, eventos),
+        verificar_tesseract=_verificar_tesseract_ok,
+        instante=_INSTANTE,
+    )
+
+    assert resultado == 0
+    updates_asociacion = [e for e in eventos if e.startswith("asociar_documentos:")]
+    assert len(updates_asociacion) == 2
 
 
 def test_base64_import_no_usado_sanity(monkeypatch, tmp_path: Path):

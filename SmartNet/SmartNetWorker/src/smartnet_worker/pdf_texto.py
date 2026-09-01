@@ -2,7 +2,9 @@
 Open Question 1, BACKLOG #6, WU2).
 
 Ni red, ni disco, ni DB, ni reloj (ADR 0019): recibe el texto que `pdf_lectura.py` (IO) ya extrajo
--- de la capa embebida o de OCR -- mas el nombre de archivo que #5 ya sanitizo, y decide via regex
+-- de la capa embebida o de OCR -- mas el nombre de archivo del adjunto (el nombre crudo de Gmail,
+solo truncado -- `gmail.sanitizar_nombre_archivo` se aplica unicamente al stem de `RutaRelativa`,
+no a `NombreArchivo`), y decide via regex
 la clave del comprobante (RUC emisor, tipo, serie, numero) mas los campos no-identidad (monto,
 moneda, fecha de emision) que REGLAS.md exige persistir junto al resto de los datos extraidos.
 
@@ -39,9 +41,13 @@ _LONGITUD_RUC = 11
 # valida que queden exactamente 11 digitos.
 _RUC_RE = _compile_regex(r"R\.?U\.?C\.?[^\d\n]{0,20}?(\d[\d\-\s]{9,25}\d)", IGNORECASE)
 
-# Serie 'F001' (electronica, letra + 3 digitos) o '001' (impresa, solo 3 digitos) — numero de 1 a 20
-# digitos (VARCHAR(20), 003's DDL). Con o sin espacios alrededor del guion.
-_SERIE_NUMERO_RE = _compile_regex(r"\b([A-Za-z]\d{3}|\d{3})\s*-\s*(\d{1,20})\b")
+# Serie SUNAT alfanumerica: letra + 3 alfanumericos ('F001', 'F96X', 'E001') o '001' (impresa, solo
+# 3 digitos) — numero de 1 a 20 digitos (VARCHAR(20), 003's DDL). Con o sin espacios alrededor del
+# guion. El lookahead negativo `(?![A-Za-z]{3}\b)` descarta tokens de solo letras, para que
+# colocaciones de prosa ('NOTA-123', 'FACT-123') no se tomen como serie (design.md D8).
+_SERIE_NUMERO_RE = _compile_regex(
+    r"\b([A-Za-z](?![A-Za-z]{3}\b)[A-Za-z0-9]{3}|\d{3})\s*-\s*(\d{1,20})\b"
+)
 
 _MONTO_RE = _compile_regex(
     r"(?:TOTAL\s+A\s+PAGAR|IMPORTE\s+TOTAL|TOTAL)\s*:?\s*(?:S/\.?|US\$|USD)?\s*([\d,]+\.\d{2})",

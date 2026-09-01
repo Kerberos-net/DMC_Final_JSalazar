@@ -71,7 +71,8 @@ VALUES (?, ?, ?, ?, ?, ?)
 # construir_clave() rehace la ClaveComprobante normalizada desde los tres, igual que ubl.py/
 # pdf_texto.py hicieron al escribirlos.
 _LISTAR_HUERFANOS = """
-SELECT p.DocumentoRecibidoId, dr.TipoDocumento, de.RucProveedor, de.TipoComprobante, de.Numero
+SELECT p.DocumentoRecibidoId, dr.TipoDocumento, dr.NombreArchivo,
+       de.RucProveedor, de.TipoComprobante, de.Numero
 FROM fact.Procesamiento p
 JOIN fact.DocumentoRecibido dr ON dr.DocumentoRecibidoId = p.DocumentoRecibidoId
 JOIN fact.DatosExtraidos de ON de.ProcesamientoId = p.ProcesamientoId
@@ -183,7 +184,9 @@ def insertar_intento(
 def listar_huerfanos(cursor) -> tuple[Documento, ...]:
     cursor.execute(_LISTAR_HUERFANOS)
     huerfanos: list[Documento] = []
-    for documento_recibido_id, tipo_documento, ruc, tipo, numero in cursor.fetchall():
+    for documento_recibido_id, tipo_documento, nombre_archivo, ruc, tipo, numero in (
+        cursor.fetchall()
+    ):
         clave = None
         if ruc and tipo and numero:
             clave = construir_clave(ruc, tipo, numero)
@@ -192,6 +195,7 @@ def listar_huerfanos(cursor) -> tuple[Documento, ...]:
                 documento_recibido_id=documento_recibido_id,
                 tipo_documento=tipo_documento,
                 clave=clave,
+                nombre_archivo=nombre_archivo,
             )
         )
     return tuple(huerfanos)

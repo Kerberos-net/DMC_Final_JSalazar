@@ -21,6 +21,7 @@ from re import compile as _compile_regex
 
 _NO_DIGITO_RE = _compile_regex(r"\D+")
 _ESPACIO_RE = _compile_regex(r"\s+")
+_NO_ALFANUM_RE = _compile_regex(r"[^A-Za-z0-9]+")
 
 _LONGITUD_TIPO = 2
 
@@ -46,6 +47,7 @@ class Documento:
     documento_recibido_id: int
     tipo_documento: str
     clave: ClaveComprobante | None
+    nombre_archivo: str | None = None
 
 
 @dataclass(frozen=True)
@@ -131,3 +133,75 @@ def asociar(nuevos: Sequence[Documento], huerfanos: Sequence[Documento]) -> tupl
                 )
             )
     return tuple(pares)
+
+
+def _tokens(nombre_archivo: str) -> tuple[str, ...]:
+    """Divide el nombre de archivo en tokens sobre `[^A-Za-z0-9]+` -- subsume el alfabeto crudo de
+    Gmail (espacio, parentesis, `#`, `+`) y el sanitizado (`-`/`_`/`.`)."""
+    return tuple(t for t in _NO_ALFANUM_RE.split(nombre_archivo) if t)
+
+
+def _hay_representantes_distintos(listas: Sequence[Sequence[int]]) -> bool:
+    """Sistema de representantes distintos: existe una asignacion inyectiva que da a cada componente
+    una posicion de token propia. Con tres componentes chicos, backtracking directo."""
+    conjuntos = sorted((set(lista) for lista in listas), key=len)
+    if any(not c for c in conjuntos):
+        return False
+
+    def _rec(indice: int, usados: frozenset[int]) -> bool:
+        if indice == len(conjuntos):
+            return True
+        return any(
+            _rec(indice + 1, usados | {posicion})
+            for posicion in conjuntos[indice]
+            if posicion not in usados
+        )
+
+    return _rec(0, frozenset())
+
+
+def _nombre_confirma_clave(clave: ClaveComprobante, tokens: Sequence[str]) -> bool:
+    """El RUC de emisor, la serie y el numero de `clave` aparecen los tres como tokens delimitados
+    y DISTINTOS del nombre de archivo. `tipo` NUNCA se exige (es el componente que los emisores
+    mutilan). La comparacion va del XML hacia el nombre: se verifica una clave que ya existe."""
+    ruc_idx = [i for i, t in enumerate(tokens) if t == clave.ruc_emisor]
+    serie_idx = [i for i, t in enumerate(tokens) if normalizar_serie(t) == clave.serie]
+    numero_idx = [i for i, t in enumerate(tokens) if normalizar_numero(t) == clave.numero]
+    return _hay_representantes_distintos((ruc_idx, serie_idx, numero_idx))
+
+
+def asociar_por_nombre_archivo(candidatos: Sequence[Documento]) -> tuple[Par, ...]:
+    """Segunda pasada acotada (ADR 0017 rev. 3), fisicamente separada de `asociar`. Candidatos XML:
+    `clave` completa. Candidatos PDF: `clave is None` y `nombre_archivo` presente. Empareja solo con
+    exclusividad 1:1 bilateral por nodo sobre TODO el conjunto sin pareja: si mas de un XML califica
+    para un PDF, o mas de un PDF para un XML, ninguno se asocia."""
+    xmls = [d for d in candidatos if d.tipo_documento == "XML" and d.clave is not None]
+    pdfs = [
+        d
+        for d in candidatos
+        if d.tipo_documento == "PDF" and d.clave is None and d.nombre_archivo
+    ]
+
+    aristas: list[tuple[Documento, Documento]] = []
+    for xml in xmls:
+        assert xml.clave is not None
+        for pdf in pdfs:
+            assert pdf.nombre_archivo is not None
+            if _nombre_confirma_clave(xml.clave, _tokens(pdf.nombre_archivo)):
+                aristas.append((xml, pdf))
+
+    grado_xml: dict[int, int] = defaultdict(int)
+    grado_pdf: dict[int, int] = defaultdict(int)
+    for xml, pdf in aristas:
+        grado_xml[xml.documento_recibido_id] += 1
+        grado_pdf[pdf.documento_recibido_id] += 1
+
+    return tuple(
+        Par(
+            xml_documento_id=xml.documento_recibido_id,
+            pdf_documento_id=pdf.documento_recibido_id,
+        )
+        for xml, pdf in aristas
+        if grado_xml[xml.documento_recibido_id] == 1
+        and grado_pdf[pdf.documento_recibido_id] == 1
+    )

@@ -168,17 +168,19 @@ def test_insertar_intento_permanente_no_agenda_reintento_proximo_reintento_null(
 
 
 def test_listar_huerfanos_filtra_documentoasociadoid_is_null():
-    filas = [(1, "XML", "20123456789", "01", "F001-00000123")]
+    filas = [(1, "XML", "factura.xml", "20123456789", "01", "F001-00000123")]
     cursor = _FakeCursor(filas=filas)
 
     resultado = listar_huerfanos(cursor)
 
     sentencia, _ = cursor.llamadas[0]
     assert "documentoasociadoid is null" in sentencia.lower()
+    assert "dr.nombrearchivo" in sentencia.lower()
     assert len(resultado) == 1
     documento = resultado[0]
     assert documento.documento_recibido_id == 1
     assert documento.tipo_documento == "XML"
+    assert documento.nombre_archivo == "factura.xml"
     assert documento.clave is not None
     assert documento.clave.ruc_emisor == "20123456789"
     assert documento.clave.tipo == "01"
@@ -187,12 +189,13 @@ def test_listar_huerfanos_filtra_documentoasociadoid_is_null():
 
 
 def test_listar_huerfanos_sin_datos_extraidos_completos_produce_clave_none():
-    filas = [(2, "PDF", None, None, None)]
+    filas = [(2, "PDF", "escaneo.pdf", None, None, None)]
     cursor = _FakeCursor(filas=filas)
 
     resultado = listar_huerfanos(cursor)
 
     assert resultado[0].clave is None
+    assert resultado[0].nombre_archivo == "escaneo.pdf"
 
 
 # --- obtener_procesamiento_id / contar_intentos (WU4: cli_procesamiento.py necesita el

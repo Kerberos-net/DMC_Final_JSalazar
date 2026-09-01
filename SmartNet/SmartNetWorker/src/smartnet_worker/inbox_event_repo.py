@@ -39,6 +39,39 @@ SELECT ?, ?, ?
 WHERE NOT EXISTS (SELECT 1 FROM fact.InboxEvent WHERE ProcesamientoId = ?)
 """
 
+# Re-emision PDF-only para una asociacion tardia (design.md D5/D6): un `Procesamiento` de un PDF
+# cuyo `DocumentoAsociadoId` transiciono NULL->non-null DESPUES de que se emitieron todos sus
+# eventos. El lado XML NUNCA se re-emite (caeria en shipped #25 `EsDocumentoAsociado` -> una
+# segunda `fact.Factura`). Disjunta de `_LISTAR_NO_NOTIFICADOS` por construccion. `JSON_VALUE` en
+# modo lax devuelve NULL tanto para "clave ausente" como para "valor null" -- los dos casos de "el
+# evento no refleja la asociacion".
+_LISTAR_ASOCIACION_NO_NOTIFICADA = """
+SELECT p.ProcesamientoId, p.Estado, p.DocumentoRecibidoId, dr.TipoDocumento, p.DocumentoAsociadoId,
+       dr.NombreArchivo, dr.MimeType, dr.RutaRelativa, dr.TamanoBytes,
+       de.TipoComprobante, de.Numero, de.RucProveedor, de.NombreProveedor, de.Monto, de.Moneda,
+       de.FechaEmision, de.CamposNoExtraidos, de.AfectacionMixta
+FROM fact.Procesamiento p
+JOIN fact.DocumentoRecibido dr ON dr.DocumentoRecibidoId = p.DocumentoRecibidoId
+LEFT JOIN fact.DatosExtraidos de ON de.ProcesamientoId = p.ProcesamientoId
+WHERE p.DocumentoAsociadoId IS NOT NULL
+  AND dr.TipoDocumento = 'PDF'
+  AND NOT EXISTS (SELECT 1 FROM fact.InboxEvent ie
+                  WHERE ie.ProcesamientoId = p.ProcesamientoId
+                    AND JSON_VALUE(ie.Payload, '$.documento.documentoAsociadoId') IS NOT NULL)
+"""
+
+# Mismo `NOT EXISTS` en el WHERE del INSERT (atomico, anti-TOCTOU -- misma disciplina que
+# `_INSERTAR_EVENTO`). Prueba de idempotencia: la fila recien insertada tiene un
+# `documentoAsociadoId` non-null, asi que satisface el EXISTS y saca al `Procesamiento` del
+# conjunto candidato -- una tercera fila es imposible.
+_INSERTAR_EVENTO_ASOCIACION = """
+INSERT INTO fact.InboxEvent (Tipo, ProcesamientoId, Payload)
+SELECT ?, ?, ?
+WHERE NOT EXISTS (SELECT 1 FROM fact.InboxEvent ie
+                 WHERE ie.ProcesamientoId = ?
+                   AND JSON_VALUE(ie.Payload, '$.documento.documentoAsociadoId') IS NOT NULL)
+"""
+
 
 @dataclass(frozen=True)
 class ProcesamientoNoNotificado:
@@ -66,32 +99,48 @@ class ProcesamientoNoNotificado:
     afectacion_mixta: bool | None
 
 
+def _fila_a_procesamiento(fila: tuple) -> ProcesamientoNoNotificado:
+    return ProcesamientoNoNotificado(
+        procesamiento_id=fila[0],
+        estado=fila[1],
+        documento_recibido_id=fila[2],
+        tipo_documento=fila[3],
+        documento_asociado_id=fila[4],
+        nombre_archivo=fila[5],
+        mime_type=fila[6],
+        ruta_relativa=fila[7],
+        tamano_bytes=fila[8],
+        tipo_comprobante=fila[9],
+        numero=fila[10],
+        ruc_proveedor=fila[11],
+        nombre_proveedor=fila[12],
+        monto=fila[13],
+        moneda=fila[14],
+        fecha_emision=fila[15],
+        campos_no_extraidos=fila[16],
+        afectacion_mixta=fila[17],
+    )
+
+
 def listar_no_notificados(cursor) -> tuple[ProcesamientoNoNotificado, ...]:
     cursor.execute(_LISTAR_NO_NOTIFICADOS)
-    return tuple(
-        ProcesamientoNoNotificado(
-            procesamiento_id=fila[0],
-            estado=fila[1],
-            documento_recibido_id=fila[2],
-            tipo_documento=fila[3],
-            documento_asociado_id=fila[4],
-            nombre_archivo=fila[5],
-            mime_type=fila[6],
-            ruta_relativa=fila[7],
-            tamano_bytes=fila[8],
-            tipo_comprobante=fila[9],
-            numero=fila[10],
-            ruc_proveedor=fila[11],
-            nombre_proveedor=fila[12],
-            monto=fila[13],
-            moneda=fila[14],
-            fecha_emision=fila[15],
-            campos_no_extraidos=fila[16],
-            afectacion_mixta=fila[17],
-        )
-        for fila in cursor.fetchall()
-    )
+    return tuple(_fila_a_procesamiento(fila) for fila in cursor.fetchall())
+
+
+def listar_asociacion_no_notificada(cursor) -> tuple[ProcesamientoNoNotificado, ...]:
+    """Conjunto candidato de la re-emision PDF-only (design.md D5/D6): PDFs cuya asociacion
+    transiciono NULL->non-null y ningun evento existente la refleja."""
+    cursor.execute(_LISTAR_ASOCIACION_NO_NOTIFICADA)
+    return tuple(_fila_a_procesamiento(fila) for fila in cursor.fetchall())
 
 
 def insertar_evento(cursor, procesamiento_id: int, payload: str) -> None:
     cursor.execute(_INSERTAR_EVENTO, _TIPO_EVENTO, procesamiento_id, payload, procesamiento_id)
+
+
+def insertar_evento_asociacion(cursor, procesamiento_id: int, payload: str) -> None:
+    """INSERT atomico con el mismo `NOT EXISTS` payload-aware en el WHERE (design.md D6). Deja
+    `_INSERTAR_EVENTO` intacto -- es una sentencia separada."""
+    cursor.execute(
+        _INSERTAR_EVENTO_ASOCIACION, _TIPO_EVENTO, procesamiento_id, payload, procesamiento_id
+    )
