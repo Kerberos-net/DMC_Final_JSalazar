@@ -19,6 +19,9 @@ empujar un tag `deploy/vX.Y.Z` sobre `main`, y lo publica como GitHub Release. E
 | `run-worker-entry.ps1` | Wrapper que Task Scheduler invoca por cada entry point. | automático |
 | `verify.ps1` | Verificación post-deploy. | después de cada deploy |
 | `backup.ps1` | Copia keyring + secretos antes de cada release. | lo llama `deploy.ps1` |
+| `apply-catalog-fixtures.ps1` | Crea y carga las 5 tablas `dbo.*` del catálogo externo (solo demo). | lo llama `deploy.ps1` |
+| `export-ca.ps1` | En la VM: exporta la CA de Caddy, abre el firewall :443, imprime la IP. | una vez / al sumar clientes |
+| `trust-ca-client.ps1` | En cada máquina cliente: hosts + importa la CA de Caddy. Autónomo. | una vez por cliente |
 | `Caddyfile.example` | Config del proxy inverso. | una vez / cambio de topología |
 
 ## Primera vez en un host nuevo

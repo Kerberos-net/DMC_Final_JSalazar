@@ -486,6 +486,8 @@ El usuario ejecuta cada script en la VM como Administrador, con guía paso a pas
    siguen sin commitear; el `VERSION` del paquete apunta a `480d5bc` que no incluye
    `UseWindowsService()`.
 3. **CA de Caddy en las máquinas cliente** (o cert real — ADR 0012): un navegador fuera de la VM
-   verá advertencia hasta importar la raíz o resolver el cert.
+   verá advertencia hasta importar la raíz o resolver el cert. Herramientas:
+   `deploy/export-ca.ps1` (en la VM: exporta `smartnet-root-ca.crt`, abre firewall :443, imprime
+   la IP) + `deploy/trust-ca-client.ps1` (en cada cliente: `hosts` → IP de la VM + importa la CA).
 4. Todo lo de la sección "Deuda de puesta en producción" (Vault, agregador con alertas, respaldo,
    entorno de pruebas, Caddy como servicio real).
