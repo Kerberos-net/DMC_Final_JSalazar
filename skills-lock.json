@@ -1,6 +1,12 @@
 {
   "version": 1,
   "skills": {
+    "auditar-drift": {
+      "source": "adminoryslabs/Armory",
+      "sourceType": "github",
+      "skillPath": "skills/auditar-drift/SKILL.md",
+      "computedHash": "38d2ec8747eee73ab388628552d97d92e9ad542b4e3f7e1fe23ce54a37266846"
+    },
     "create-harness": {
       "source": "adminoryslabs/Armory",
       "sourceType": "github",
@@ -24,6 +30,12 @@
       "sourceType": "github",
       "skillPath": "skills/generar-prd/SKILL.md",
       "computedHash": "e266c83c90073a7b1a944cea36ce067dc663db4ecb0ddee48373695fcc57d3e8"
+    },
+    "generar-readme": {
+      "source": "adminoryslabs/Armory",
+      "sourceType": "github",
+      "skillPath": "skills/generar-readme/SKILL.md",
+      "computedHash": "b0f99d09a7e7e69690b27d1343e18a64c41d8e1a610f635a5c9d9a7c7a1074ed"
     },
     "generar-tech-design": {
       "source": "adminoryslabs/Skills",

@@ -11,9 +11,9 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | **18 de 22 cerrados** (BACKLOG.md tiene 22 ítems: #18–#22 nacieron al implementar el #12 — #18 "Ajuste visual del diseño SPA" y #20 "Ajuste visual de bandeja y panel de errores" cerrados 2026-08-27, #21 y #22 cerrados 2026-08-30; abierto: #19 "Campos contables editables y resaltado OCR por campo") |
-| Ciclo SDD activo | Ninguno — último cerrado: ítem #22 (Consultas de catálogos en la SPA, solo lectura), 2026-08-30 |
-| Última fase cerrada | Ítem #22 (Consultas de catálogos en la SPA, solo lectura), 9 fases/PRs, 54/54 tareas cerradas, verify PASS WITH WARNINGS (0 CRITICAL, 3 WARNING, 3 SUGGESTION), 2 specs nuevas (`catalog-queries-api`, `catalog-queries-spa`) + 1 delta (`spa-shell-nav` 7→8) + ADR 0021, 9 *commits* apilados sobre `main` (`size:exception`) — ítem #22 cerrado 2026-08-30 |
+| Ítems del backlog | **22 de 26 cerrados** (BACKLOG.md aún lista 24 ítems: #18–#23 nacieron después del despiece inicial, #24 lo abrió el ciclo del #19, y #25 + #26 los abrió esta sesión al depurar la pantalla de detalle —ambos pendientes de agregar a `BACKLOG.md`—; #18 y #20 cerrados 2026-08-27, #21 y #22 cerrados 2026-08-30, #23 y #19 cerrados 2026-08-31, #25 y #26 cerrados 2026-09-01; sin ciclo SDD abierto: #10, #15, #16, #24) |
+| Ciclo SDD activo | Ninguno — último cerrado: ítem #26 (Asociación PDF↔XML cuando el PDF no produce clave propia), 2026-09-01 |
+| Última fase cerrada | Ítem #26 (Asociación PDF↔XML cuando el PDF no produce clave propia), 6 fases, 24/27 tareas cerradas (3 handoffs: integración bloqueada por bug de conftest, BACKLOG diferido), verify PASS WITH WARNINGS (0 CRITICAL, 5 WARNING, 2 SUGGESTION), spec delta +2 requisitos/+10 escenarios en `extraccion-y-asociacion` y 1 modificado + 1 nuevo/+6 escenarios en `inbox-event-publishing`, sincronizadas a `openspec/specs/`; enmienda `adrs/0017` a "Revisión 3"; sin PR ni commit todavía (rama `item-19-campos-contables-editables`, ~485 líneas `size:exception`) — ítem #26 cerrado 2026-09-01 |
 
 ---
 
@@ -1617,6 +1617,124 @@ Consistente con todos los archivos previos (#12–#17).
 
 ---
 
+## ✅ 19. Campos contables editables y resaltado OCR por campo
+
+El #18 dejó fuera, por requerir trabajo de servidor coordinado, hacer editables `base imponible`,
+`IGV` y `glosa` en el detalle y el resaltado OCR **por campo** (hoy un solo booleano por factura).
+Este ciclo los entrega: base/IGV editables solo en `PENDIENTE_VALIDACION` con proyección escalar
+`BasePEN`/`IgvPEN`/`NetoPEN` derivada por `REGLAS.md` §5/§6 sin regenerar el asiento; columna `glosa`
+en `fact.Factura` (SQL versionado); lista `CamposNoExtraidos` promovida por campo; recálculo de
+`PosibleDuplicado` al cambiar el triple de identidad. El `tipo de cambio` **no** se hace editable
+(ADR 0018): solo se estrecha la guarda `SinTipoCambio` existente para no bloquear a las NC `07` con
+referencia interna que §6 exime.
+
+**Ciclo SDD:** `openspec/changes/archive/2026-08-31-item-19-campos-contables-editables-resaltado-ocr/`
+· **33 de 33 tareas cerradas** — ✅ **CERRADO 2026-08-31**
+
+| Fase | Unidad | Alcance | Tareas | Estado |
+|---|---|---|---|---|
+| 1 | Unit 1 | SQL `021` — `ALTER TABLE fact.Factura ADD Glosa NVARCHAR(250) NULL, CamposNoExtraidos NVARCHAR(500) NULL`; `rollback/021_down.sql`; `checksums.txt` regenerado; sin `GRANT` nuevo (ADR 0003); idempotencia | 5/5 | ✅ |
+| 2 | Unit 2 | `Inbox.Core` `IndicadoresFactura` + `CalculoDeIndicadores` cargan la lista `CamposNoExtraidos` junto al booleano derivado (invariante de consistencia); `PayloadInboxParser` + `SqlPromocionRepository` la parsean y persisten verbatim (lista vacía → `NULL`); sin derivación server-side (D8) | 4/4 | ✅ |
+| 3 | Unit 3 | `Contable.Core/ProyeccionDeImportes.Derivar` puro (§5/§6, delega en `ConversionDeMoneda.Convertir` + colapso IGV-al-costo de §5); `ValidacionDeCorreccion.Validar(original, cambios)` sobre valores mergeados (par atómico, `base<0`, `IgvOrig>TotalOrig`, gate de estado → 422, IGV≠0 → 422 para boleta `03`/no-gravada no-NC, NC `07` exenta); `ServicioDeFacturas` ladder del trío + escritura escalar D4 + recomputo `PosibleDuplicado` D6 + auditoría por columna D7; `IUnidadDeTrabajo` +3 puertos; `SqlUnidadDeTrabajo` SELECT/UPDATE + `SinTipoCambio` estrechado; `FacturaEndpoints` `CorreccionFacturaRequest`/`FacturaRespuesta` aditivos; test del cambio de comportamiento §7 (3.15) | 15/15 | ✅ |
+| 4 | Unit 4 | SPA detalle: `campoResaltado(campo)` por campo (fallback al booleano pre-`021`); inputs base/IGV/glosa con gate `estado === 'PENDIENTE_VALIDACION'`, IGV forzado a 0/deshabilitado para `03`/`EXONERADA`/`INAFECTA` (NC `07` exenta); `detalle-page` arma el par atómico y hace `cargarTodo()` completo tras "Guardar avance" (D5) | 6/6 | ✅ |
+| 5 | — | BACKLOG #24 confirmado abierto; suites completas ejecutadas; smoke manual diferido (sin BD sembrada) | 3/3 | ✅ |
+
+### Pruebas
+
+| Suite | Antes | Después | Nuevas |
+|---|---|---|---|
+| SPA (Vitest) | 464 | **476** | +12 (`factura-form.spec`: resaltado por campo —solo listados, conteo exacto, vacío, fallback pre-`021`—, gate de editabilidad, lock de IGV `03`/`EXONERADA`/NC `07`, emisión del par + glosa; `detalle-page.spec`: refetch D5 limpia duplicado stale, strip `totalOrig`↔par, ruteo 409/422 conserva borrador) |
+| `SmartNet.Contable.Core.Tests` | 41 | **49** | +8 (`ProyeccionDeImportesTests` vs goldens §10.1/10.2/10.3/10.6/10.7; `NetoPEN = BasePEN + IgvPEN`) |
+| `SmartNet.Facturacion.Core.Tests` | 148 | **172** | +24 (`ValidacionDeCorreccionTests` firma `(original, cambios)` + guardas; `ServicioDeFacturasPhase2Tests` ladder del trío, una fila de auditoría por columna, sin fila `BaseImponible` sintética, proyección BORRADOR, colapso boleta, skip sin tasa + 200) |
+| `SmartNet.Facturacion.Infrastructure.Tests` | 52 | **65** | +13 (`SqlUnidadDeTrabajoFacturaTests`: round-trip `IgvOrig`/`Glosa`, `ExisteIdentidadPreviaAsync` excluye self + `DESCARTADA`, `ActualizarProyeccionEscalarAsync`, `SinTipoCambio` estrechado, cambio §7 3.15) |
+| `SmartNet.Inbox.Core.Tests` | 49 | **51** | +2 (`CalculoDeIndicadoresTests`: lista junto al booleano, invariante de consistencia) |
+| `SmartNet.Inbox.Infrastructure.Tests` | 57 | **59** | +2 (`SqlPromocionRepositoryTests`: persiste `CamposNoExtraidos`, lista vacía → `NULL`) |
+| `SmartNet.Db.Runner.Tests` | — | — | +3 (`Schema021GlosaCamposNoExtraidosTests`: forma de columna, sin permiso a nivel columna + `usr_worker` DENY, idempotencia) |
+| `SmartNet.Api.Tests` | 203 | **203** | 0 (campos aditivos, sin test JSON nuevo — ver SUGGESTION-3 / WARNING-3) |
+
+Ejecutadas por el orquestador y re-corridas por `sdd-verify` contra SQL Server local real: proyectos
+de #19 todos en verde (Contable.Core 49/49, Facturacion.Core 172/172, Facturacion.Infrastructure
+65/65, Api.Tests 203/203, Inbox.Core 51/51, Inbox.Infrastructure 59/59), SPA 476/476 (52 archivos).
+`npm run lint` (`tsc --noEmit` app + spec) limpio. La corrida de solución completa dio 5 fallos
+—todos *teardown* de `TestDatabaseFixture` o el *flake* conocido de `SesionPurgarTests` por
+contención de BD en paralelo, cada uno verde en aislamiento— ajenos a #19.
+
+### Decisiones de diseño
+
+- **`baseImponible` no es columna** (D1): el contrato lleva el par `{baseImponible, igv}` **atómico**;
+  el ladder escribe `TotalOrig = base + igv`, `IgvOrig = igv`. Enviar el par junto con `totalOrig` →
+  422. §6: la base es derivada e `IgvOrig` es nullable, así que la base sola es ambigua.
+- **`ValidacionDeCorreccion.Validar(original, cambios)` — pura, valores mergeados** (D2): la firma
+  crece un argumento; las tres guardas nuevas necesitan `TipoComprobante`/`Afectacion`/`Estado`, que
+  están en el registro cargado. Sin BD.
+- **Proyección escalar §5/§6 en `Contable.Core/ProyeccionDeImportes`** (D3): función pura que delega
+  en `ConversionDeMoneda.Convertir` (§6 solo) y le agrega el colapso de §5 (IGV al costo:
+  `03`/no gravada → `IgvPEN = 0`, `BasePEN = TotalPEN`). `Convertir` sola postería un `401111`
+  fantasma en una boleta; `Componer` es la recomposición completa, fuera de alcance.
+- **Escritura escalar sobre el asiento BORRADOR vigente en la misma transacción** (D4): solo cuando
+  `TotalOrig`/`IgvOrig`/`Moneda` cambiaron. Si falta la tasa aplicable, se salta la escritura y el
+  `SinTipoCambio` existente bloquea `validar`; el PATCH igual responde 200. Los invariantes §7 leen
+  columnas persistidas, así que derivar en read-time las deja stale.
+- **`guardarAvance` refetchea todo (`cargarTodo()`)** (D5): D4 sube la `Version` del asiento; un
+  refetch solo-factura deja el ETag del asiento stale y el siguiente edit de línea da 412.
+- **`PosibleDuplicado` recalculado en `PatchAsync` solo si cambió el triple de identidad**, vía
+  `IUnidadDeTrabajo.ExisteIdentidadPreviaAsync`; **sin** fila de `AuditoriaCorreccion` (D6): es un
+  indicador derivado, no una corrección de usuario.
+- **Auditoría de una fila por columna persistida** — `TotalOrig`, `IgvOrig`, `Glosa` (D7): `Campo`
+  nombra una columna; la base (`TotalOrig − IgvOrig`) queda reconstruible.
+- **`CamposNoExtraidos` es un hecho de extracción inmutable** (D8): se fija en la promoción, el PATCH
+  no lo muta; el resaltado significa "este valor no vino del documento — verificalo", que sigue
+  siendo verdad tras un edit manual. Derivarlo server-side duplicaría lógica del worker cruzando la
+  partición ADR 0003.
+- **Dos correcciones a las premisas de la propuesta, verificadas en código**: `fact.Factura` no
+  tiene estado `BORRADOR` (`CK_Factura_Estado` = `PENDIENTE_VALIDACION | VALIDADA | DESCARTADA`; el
+  gate de inmutabilidad es `Estado == PENDIENTE_VALIDACION`); la guarda de tipo de cambio ya existía,
+  #19 solo la **estrecha** para NC `07` con referencia interna.
+
+### Elementos conocidos, no ocultos
+
+`sdd-verify`: **0 CRITICAL, 4 WARNING, 3 SUGGESTION** (10/10 requisitos, 45/45 escenarios,
+`sdd-verify-validate` → `valid: true`).
+
+- **WARNING-1 (reconciliada al archivar)** — la prosa de `api-facturas/spec.md` decía `409` para una
+  edición contable sobre factura `VALIDADA`; la implementación y todos los tests usan `422` (design
+  D2; tasks.md 3.9 "RESOLVED from 409"). Corregido 409 → 422 en el delta y en la spec sincronizada.
+  El `409` del `SinTipoCambio` estrechado se mantiene (es su forma de respuesta existente).
+- **WARNING-2 (arrastrada / *follow-up*)** — la exención de la guarda IGV está codificada para
+  **todo** tipo `07`, mientras la spec la acota a "NC `07` con referencia interna". Rama dormida hoy
+  (`FacturaReferenciaId` no se puebla hasta #10/#11); estrechar el predicado cuando aterrice la
+  referenciación de NC.
+- **WARNING-3 (arrastrada / *follow-up*)** — cobertura fina a nivel JSON de API para
+  `FacturaRespuesta.CamposNoExtraidos`/`Glosa`: solo cubierto transitivamente. Falta una aserción en
+  `SmartNet.Api.Tests` sobre una respuesta real.
+- **WARNING-4 (aceptada / *follow-up*)** — los inputs editables de base/IGV se siembran desde la
+  proyección PEN (`basePEN`/`igvPEN`); para moneda extranjera el input muestra un número en magnitud
+  PEN. Aceptable para este *slice* (todos los escenarios de spec son PEN); *follow-up*: exponer
+  `IgvOrig` en `FacturaRespuesta` y sembrar desde `totalOrig − igvOrig`.
+- **SUGGESTION-1 (aceptada)** — 3er puerto `IUnidadDeTrabajo.ActualizarPosibleDuplicadoAsync` (el
+  diseño decía 2): un UPDATE de una columna sin CAS evita pisar las otras tres columnas de
+  indicadores. Integración-testeado.
+- **SUGGESTION-2 (atendida en verify)** — smoke manual de "Guardar avance" diferido (sin BD
+  sembrada); cubierto por integración 3.6–3.15 y specs SPA 4.1–4.6.
+- **SUGGESTION-3 (aceptada)** — nota Strict TDD: algunas adiciones de tipos TS y andamiaje de
+  plantilla se escribieron junto a los tests, no estrictamente antes. Cada tarea tiene ≥2 aserciones
+  ejecutadas contra código de producción; ambas suites en verde.
+
+*Follow-ups:* estrechar la exención IGV a NC-07-interna (W2); exponer `IgvOrig` en `FacturaRespuesta`
+(W4); test JSON de API para `CamposNoExtraidos`/`Glosa` (W3); smoke manual en el primer deploy;
+**BACKLOG #24** (conectar `ComposicionDeAsiento.Componer`) es el fix real del invariante §7 que D4
+activa.
+
+**RDD de gentle-ai desactivado a nivel de repo** (`D:` en exFAT, sin ACL), entrega
+`disabled/unmanaged`. 8 *commits* en la rama `item-19-campos-contables-editables` (desde `main`
+limpio, **no** desde `registro-compra-spa`), sin *push* ni PR: `a2e7396` (BACKLOG) → `fdca18f` →
+`d6739e9` → `38ba008` → `07f78fe` → `204bb0e` → `82646c0` → `480d5bc` (archivo). ~1.788 líneas
+cambiadas > presupuesto de 800, `size:exception` aceptado por el dueño. El *ledger* de intentos SDD
+se reinició una vez (el primer `begin` congeló la rama base equivocada). `SPRINT.md` y
+`skills-lock.json` quedaron modificados de antes, sin tocar.
+
+---
+
 ## ✅ 20. Ajuste visual de bandeja y panel de errores
 
 Conformar al *handoff* (`DESIGN_BRIEF.md` §2 dashboard, §5 panel de errores) las cinco pantallas de
@@ -1886,9 +2004,277 @@ slice) sobre `main` local sin *push* — más 4 *commits* previos de trabajo sin
 consolidaron al abrir el ciclo (sidebar réplica-canvas del #21, enriquecimiento de bandeja, entrada
 #22 en `BACKLOG.md`, chore).
 
+## ✅ 23. Registro de compra en la SPA (solo lectura)
+
+Pantalla de consulta del libro de compras: listado cabecera de las facturas `VALIDADA` con su
+asiento —comprobante, origen de libro `02`, proveedor, glosa, fecha contable, TC, base, IGV, neto—
+filtrado por período `YYYY-MM`, y al abrir una fila el detalle de líneas contables en modo lectura,
+con una marca visual de descuadre cabecera↔detalle. Sin editar, anular ni reactivar (siguen en
+#12), sin tocar el núcleo contable, sin SQL versionado ni `GRANT` nuevo. La entrada `Registro de
+compra` del sidebar (inerte tras el #21/#22) recibe ruta.
+
+**Ciclo SDD:** `openspec/changes/archive/2026-08-31-registro-compra-spa/` · **40 de 40 tareas
+cerradas** — ✅ **CERRADO 2026-08-31**
+
+| Fase | Unidad | Alcance | Tareas | Estado |
+|---|---|---|---|---|
+| 1 | Único PR | Contratos Core: `PeriodoContable` (record puro + `TryParse("YYYY-MM")`), records de respuesta con dinero `decimal?`, puerto `IRegistroCompraRepository`; `PurityScanTests` verde sin editar (escaneo por ensamblado) | 5/5 | ✅ |
+| 2 | Único PR | `SqlRegistroCompraRepository` (ADO puro, connection-per-call): listado `AsientoContable`+`Factura`+`LEFT JOIN dbo.Proveedor`, predicado `VALIDADA`/no-`ANULADO`, rango medio-abierto `[1° mes, 1° mes siguiente)`, `COUNT(*) OVER()`, `ORDER BY … AsientoContableId`; detalle re-aplicando el predicado; variante sin paginar para export | 4/4 | ✅ |
+| 3 | Único PR | `RegistroCompraEndpoints.cs` — `GET /api/registro-compra`, `/{asientoId}`, `/export`; `.RequireAuthorization()`, `periodo` validado y filename reconstruido de enteros parseados; `AddSingleton` en `Program.cs`; tests de contrato (DB real + cookie real) | 10/10 | ✅ |
+| 4 | Único PR | SPA data-access: `models/`, `registro-compra.service.ts` (signal + coalescing `programar`), `registro-compra-detalle.service.ts` (caché `Map` por `asientoId`, se limpia al cambiar filtro), `formato.mesActual` (mes local, nunca `toISOString`) | 7/7 | ✅ |
+| 5 | Único PR | SPA feature + UI: `registro-compra-tabla` (+ badge `esInconsistente` puro), `asiento-detalle` (líneas en lectura), `registro-compra-page` (container `OnPush`), ruta lazy con `authGuard` antes de `catalogos/*` | 7/7 | ✅ |
+| 6 | Único PR | Enmienda `spa-shell-nav`: `sidebar.ts` `nav-registro` → `/registro-compra` (grupo primario), `sidebar.spec.ts` loop inerte → 2 (`nav-errores`, `nav-sincronizacion`) + aserción ruteada | 3/3 | ✅ |
+| 7 | Único PR | Flujo 4 (`/api/registro-compra` listado + detalle + export) agregado al `SKILL.md` del harness `integration-spa-api` | 1/1 | ✅ |
+| 8 | Único PR | Verificación: suites completas, sin `.sql`/`GRANT` nuevo, `api-asientos` y `shell-layout.{ts,html,spec}` intactos | 3/3 | ✅ |
+
+### Pruebas
+
+| Suite | Antes | Después | Nuevas |
+|---|---|---|---|
+| SPA (Vitest) | 464 | **499** | +35 (`registro-compra.service`, `registro-compra-detalle.service`, `registro-compra-page`, `registro-compra-tabla` + badge, `asiento-detalle`, `models`, +4 en specs de `app.routes`/`formato`/`sidebar`) |
+| `SmartNet.Api.Tests` | 203 | **241** | +38 (`RegistroCompraEndpointsTests`: 401 ×3 rutas, filtro de período con días borde, predicado `VALIDADA`/no-`ANULADO`, envelope + `COUNT(*) OVER()` en 2 páginas, período vacío → `totalRegistros:0`, `periodo` malformado → 400, `proveedorNombre` null → solo código, `origenLibro` verbatim, detalle 404 como canal lateral, detalle sin líneas, export `.xlsx` + inyección de filename → 400) |
+| `SmartNet.Facturacion.Core.Tests` | 147 | **158** | +11 (`PeriodoContableTests`: `TryParse` bien formado, 9 rechazos —mes fuera de rango, no numérico, ancho/separador equivocado, componente extra, vacío, null—, igualdad por valor; `PurityScanTests` verde) |
+
+Ejecutadas por el orquestador y re-corridas por `sdd-verify` contra SQL Server local real: Api
+241/241, Facturacion.Core 158/158 (`PurityScanTests` verde), SPA 499/499 (57 archivos).
+`npm run lint` (`tsc --noEmit` sobre `tsconfig.app` + `tsconfig.spec`) limpio. Sin SQL versionado
+nuevo ni `GRANT` nuevo — los 38 tests de contrato contra base real prueban que los `GRANT SELECT`
+de `fact_api` en `008` bastan.
+
+### Decisiones de diseño
+
+- **`PaginaBandeja<T>` NO se reusa** (D1): nuevo record `PaginaRegistroCompra` en `Facturacion.Core`
+  con los mismos 5 campos de wire. `PaginaBandeja<T>` arrastra un `ResumenBandeja` obligatorio y
+  haría que `facturacion` dependa de `inbox`; el #22 chocó con lo mismo y respondió con
+  `PaginaProveedores`. El envelope que ve la SPA es byte-idéntico.
+- **`PeriodoContable` como value object puro + rango medio-abierto** (D2): el período viaja como
+  `record(int Anio, int Mes)` con `TryParse` puro (sin reloj → `PurityScan` verde); el adaptador
+  deriva `[primerDía, primerDíaMesSiguiente)` en vez de `BETWEEN` sobre `DATE`. Input inválido → 400.
+- **Detalle en ruta separada que re-aplica el predicado en su SQL** (D3): `GET /{asientoId}` vuelve
+  a filtrar por `Factura VALIDADA AND asiento <> ANULADO`; un id fuera del libro devuelve `404`
+  indistinguible de inexistente — no se puede usar como canal lateral para leer un asiento anulado.
+  `api-asientos` queda intacto.
+- **DTOs de dinero `decimal?`, no `decimal` con default 0** (D4): `Base/Igv/Neto/TC` son
+  `NULL`-ables en el esquema; coercionar `NULL→0` fabricaría un descuadre falso en el badge.
+  Ausente se renderiza `—`.
+- **Filename del `Content-Disposition` reconstruido desde los enteros parseados** (D5): nunca del
+  query string crudo (`registro-compra-{Anio:D4}-{Mes:D2}.xlsx`). Primera aplicación de la decisión
+  4 del ADR 0021 a input del usuario; RED test de inyección `periodo=2026-08%0D%0AX` → 400.
+- **Badge de inconsistencia = `computed()` puro, exacto al céntimo, sin epsilon** (D6): REGLAS.md §6
+  "no hay tolerancia". Enciende si `r2(base+igv) ≠ r2(neto)` **o** `r2(ΣDebe) ≠ r2(ΣHaber)` sobre las
+  líneas devueltas (§7.1); la percepción aparece en Debe y Haber y se cancela sola. Boleta/no
+  gravada (`igv=0`, `base=neto`) no da falso positivo. La pantalla nunca recalcula importes.
+- **`FacturaTestDataHelper.InsertarAsientoConfirmadoAsync`** — overload que persiste un asiento
+  inconsistente (`100 + 18 ≠ 999`) por SQL crudo, saltándose el dominio, para probar que la API
+  devuelve los importes verbatim sin "corregirlos".
+- **Ruta SPA de nivel superior `/registro-compra`** (D8), no bajo `catalogos/`: es un reporte
+  fiscal en el grupo primario del sidebar, no un catálogo.
+
+### Elementos conocidos, no ocultos
+
+`sdd-verify`: **0 CRITICAL, 1 WARNING, 2 SUGGESTION** (13/13 requisitos, 36/36 escenarios,
+`sdd-verify-validate` → `valid: true`).
+
+- **WARNING-1 (reconciliada al archivar)** — la prosa de `registro-compra-api/spec.md` decía
+  envelope `PaginaBandeja<T>`; la implementación usa `PaginaRegistroCompra<T>` (D1). Wire
+  byte-idéntico, sin defecto de comportamiento. La spec sincronizada a `openspec/specs/` ya quedó
+  con el texto corregido y el porqué.
+- **SUGGESTION-1 (reconciliada al archivar)** — la spec nombraba el id de fila `asientoId`; diseño,
+  record de la API y modelo SPA usan `asientoContableId` de punta a punta. La spec sincronizada
+  quedó alineada.
+- **SUGGESTION-2 (no-op)** — el detalle expone el mismo set de campos que una fila del listado más
+  `lineas`; el requisito 2 ya queda satisfecho.
+- **Desvío anotado (no defecto)** — `~/.claude/skills/_shared/strict-tdd.md` no existe en disco; se
+  siguió el ciclo RED→GREEN→REFACTOR del hard gate de `sdd-apply`. Durante el apply se detuvo un
+  `SmartNet.Api.exe` local (PID 5416) que bloqueaba el build.
+
+**RDD de gentle-ai desactivado a nivel de repo** (`D:` en exFAT, sin ACL), entrega
+`disabled/unmanaged`. Un solo *commit* `size:exception` (`9af306d`, ~1.150 líneas > presupuesto de
+800, aceptado por el dueño) en la rama `registro-compra-spa` (no `main`), sin *push*. Los cambios
+preexistentes sin commitear del working tree (`BACKLOG.md`, `SPRINT.md`, `SECURITY-REPORT.md`, los
+`CLAUDE.md` por módulo, `harnesses/`) se dejaron **fuera** de este commit.
+
 ---
 
-## ⬜ Ítems 10, 15, 16 y 19 — sin ciclo SDD abierto
+## ✅ 25. PDF asociado del par XML+PDF en el visor de documentos
+
+Un comprobante SUNAT que llega por correo como par XML + PDF nunca mostraba el PDF en el visor de la
+pantalla de detalle: solo el XML se proyectaba a `fact.DocumentoFactura`, y el evento del PDF —con su
+propio `ProcesamientoId`— o creaba una segunda `fact.Factura` marcada `PosibleDuplicado` o se
+descartaba en silencio. Este ciclo enruta el `InboxEvent` del PDF asociado, **antes** de
+`PoliticaDePromocion.Decidir`, a una rama fusiona / difiere / descarta que proyecta su
+`fact.DocumentoFactura` sobre la `fact.Factura` ya promovida del XML. Sin cambio de esquema, sin
+tocar el payload del `InboxEvent` (`_VERSION` queda en 1), sin deploy coordinado, sin tocar el worker
+Python. No es un ítem del despiece original: lo abrió esta sesión al depurar la pantalla de edición;
+recomendado como BACKLOG #25, hermano de #24.
+
+**Ciclo SDD:** `openspec/changes/archive/2026-09-01-pdf-asociado-en-documento-factura/` · **25 de 25
+tareas cerradas** — ✅ **CERRADO 2026-09-01**
+
+| Fase | Unidad | Alcance | Tareas | Estado |
+|---|---|---|---|---|
+| 1 | Único PR | Core puro: `ResolucionPar` / `DecisionDocumentoAsociado` (jerarquías cerradas, ctor `private protected`, espejo de `DecisionPromocion`), `PoliticaDeDocumentoAsociado` (predicado + map 1:1 puros); `PurityScanTests` verde por escaneo de ensamblado | 6/6 | ✅ |
+| 2 | Único PR | `IPromocionRepository` +`ResolverParAsync` +`FusionarDocumentoAsync`; `SqlPromocionRepository` — Query A (`fact.DocumentoFactura` JOIN `fact.Factura`) + Query B (`JSON_VALUE`/`TRY_CAST` sobre `fact.InboxEvent.Payload`), todo `SqlParameter`; fusión en una `SqlTransaction` reusando el catch 2601/2627 sobre `UQ_DocumentoFactura_DocumentoRecibidoId` + `MarcarPromovidoAsync`; tests de contrato + matriz de permisos `usr_api` | 8/8 | ✅ |
+| 3 | Único PR | Rama en `PromocionBackgroundService.ProcesarPendientesAsync` antes de `PoliticaDePromocion.Decidir`; tests E2E de ciclo (SQL real): XML-first fusiona, PDF-first difiere, XML descartado → PDF descartado tras 2 ciclos; regresión sobre `PayloadCompleto` (XML + `documentoAsociadoId`) | 4/4 | ✅ |
+| 4 | Único PR | `visor-documento.ts`: set `MIMES_RENDERIZABLES` (espejo de `DocumentoContenido.MimeAllowList`), `seleccionado` prefiere el primer documento renderizable, cae a `documentos[0]`, la selección explícita del usuario sigue ganando | 3/3 | ✅ |
+| 5 | Único PR | Verificación: `dotnet test` + `npm test`, sin `.sql` nuevo, sin bump de `_VERSION`, sin archivo del worker, sin migración de backfill | 4/4 | ✅ |
+
+### Pruebas
+
+| Suite | Antes | Después | Nuevas |
+|---|---|---|---|
+| `SmartNet.Inbox.Core.Tests` | 51 | **57** | +6 (`PoliticaDeDocumentoAsociadoTests`: PDF+asociado → true, **XML+asociado → false** —guarda de regresión de la Decisión 1—, PDF sin asociado → false, 3 mapeos `Decidir`) |
+| `SmartNet.Inbox.Infrastructure.Tests` | 59 | **71** | +12 (`SqlPromocionRepositoryTests` +7: Query A acierta, factura descartada → `ParNoPromovible`, evento `DESCARTADO` → `ParNoPromovible`, `PENDIENTE`/ausente → `NoDisponible`, fusión inserta 1 fila sin crear `Factura` y marca `PROMOVIDO`, no-op idempotente; `PermissionSufficiencyTests` +2: Query A y Query B bajo `usr_api`; `PromocionBackgroundServiceTests` +3 y 1 enmendado) |
+| SPA (Vitest) | 476 | **479** | +3 (`visor-documento.spec.ts`: lista mixta prefiere el PDF, lista solo-XML cae a `documentos[0]`, la selección explícita gana) |
+
+Ejecutadas por el orquestador y re-corridas por `sdd-verify` contra SQL Server local real: Inbox.Core
+57/57 (`PurityScanTests` verde), Inbox.Infrastructure 71/71 (aislado; una corrida concurrente dio 5
+timeouts de provisión de base desechable, nunca fallo de aserción), SPA 479/479 (52 archivos).
+`SmartNet.Api.Tests` 203/203 sin cambios. Sin `.sql` versionado nuevo ni `GRANT` nuevo — los tests de
+contrato contra base real prueban que los `GRANT SELECT`/`UPDATE` de `fact_api` en `008`
+(`fact.DocumentoFactura`, `fact.Factura`, `fact.InboxEvent`) bastan.
+
+### Decisiones de diseño
+
+- **Predicado de rama = `DocumentoAsociadoId != null` Y `TipoDocumento == "PDF"`** (D1): `asociar_documentos`
+  escribe el FK en *ambos* `Procesamiento` del par, así que `!= null` a secas mandaba también al XML
+  por la rama de fusión y nadie creaba la `Factura`. El bug estaba en la prosa de la propuesta; el
+  diseño lo corrigió. Un FK bidireccional no identifica el rol; el tipo sí.
+- **Resolución del par = dos SELECT, ambos dentro de los `GRANT` de `usr_api`** (D2): Query A busca la
+  factura del par vía el `DocumentoRecibidoId` ya guardado en `fact.DocumentoFactura`; Query B, solo si
+  A viene vacía, lee `$.documento.documentoRecibidoId` del payload del evento del par con `JSON_VALUE`
+  para distinguir "todavía no" de "nunca". Cierra el muro de conocimiento de ADR 0003 sin agregar un
+  campo al contrato ni un índice al esquema.
+- **Diferir = no hacer nada** (D3): `PENDIENTE` ya es el estado de la fila y `ListarPendientesAsync` la
+  re-selecciona sola; diferir un evento es cero SQL, sin estado `DIFERIDO`, sin contador de reintentos.
+- **`FusionarDocumentoAsync` como método de puerto propio** (D4), no un flag en `PromoverAsync`: su
+  contrato y `ResultadoPromocion` quedan intactos.
+- **El PDF asociado nunca promociona como su propia factura** (decisión del dueño 3): si el XML del par
+  falla la promoción estructural, el PDF se descarta con él. El PDF sin par sigue promocionando como hoy.
+- **`MIMES_RENDERIZABLES` en la SPA espeja `DocumentoContenido.MimeAllowList`**: la selección por defecto
+  solo reordena entre documentos que el server ya serviría inline; la frontera XSS de D2/ADR 0013 no se mueve.
+
+### Elementos conocidos, no ocultos
+
+`sdd-verify`: **0 CRITICAL, 4 WARNING, 1 SUGGESTION** (2/2 requisitos, 11/11 escenarios,
+`sdd-verify-validate` → `valid: true`).
+
+- **WARNING-1 (aceptada)** — escenario 3 (independencia de orden): ningún test E2E maneja la secuencia
+  completa PDF-first → difiere → XML promociona → PDF fusiona en una sola corrida; las patas están
+  cubiertas por separado. Consistente con la filosofía de "un solo E2E" de ADR 0019 — el dueño aceptó
+  archivar así.
+- **WARNING-2 (aceptada)** — escenario 5 (regresión del PDF sin par): cubierto a nivel unitario; sin E2E
+  de un PDF estructuralmente suficiente con `documentoAsociadoId` null promocionando.
+- **WARNING-3 (arrastrada)** — dos fallas preexistentes y no relacionadas en proyectos fuera de la
+  superficie del cambio: `RunnerFailureHaltTests.FailingScript_ExitsNonZero` (carrera de paralelismo
+  xUnit) y `SesionPurgarTests.DeletesRowsOlderThanTheRetentionWindow` (borde de retención). El apply
+  confirmó ambas con `git stash` limpio.
+- **WARNING-4 (atendida)** — el working tree traía ediciones sin commitear previas a la sesión
+  (`Program.cs`, `SmartNet.Api.csproj`, `.gitignore`, `SPRINT.md`, `skills-lock.json`); quedan **fuera**
+  del commit de este cambio.
+- **SUGGESTION** — agregar un E2E de independencia de orden y un E2E del PDF sin par para cerrar los dos
+  escenarios PARCIALES.
+- **Desvío anotado (no defecto)** — `~/.claude/skills/_shared/strict-tdd.md` no existe en disco; se siguió
+  el ciclo RED→GREEN→REFACTOR del hard gate de `sdd-apply`. El `sdd-archive` dejó la carpeta a medio mover;
+  el orquestador completó el archivado (6 artefactos + `specs/`) y borró la carpeta duplicada.
+
+*Follow-ups:* (1) agregar #25 a `BACKLOG.md`; (2) commitear el árbol sin mezclar las ediciones
+preexistentes; (3) query puntual de limpieza para la `fact.Factura` duplicada y F96X-1230 ya existentes;
+(4) la generación del asiento desde la SPA (`POST /api/facturas/{id}/abrir`) sigue sin UI — otro gap, no
+abordado acá.
+
+**RDD de gentle-ai desactivado a nivel de repo** (`D:` en exFAT, sin ACL), entrega `disabled/unmanaged`.
+Sin commit al cerrar — el árbol (rama `item-19-campos-contables-editables`) queda para revisión del dueño.
+Cambio estimado ~565 líneas (195 producción + 370 test), un solo PR `size:exception` aceptado por el dueño.
+
+---
+
+## ✅ 26. Asociación PDF↔XML cuando el PDF no produce clave propia
+
+Una factura SUNAT que llega como par XML + PDF no se asociaba porque la extracción del PDF no aislaba
+los cuatro componentes de la clave: multi-RUC sin `Configuracion.RUC`, serie alfanumérica `F96X` que
+el regex no parseaba, y un nombre de archivo con segmento extra + tipo no estándar. Este ciclo agrega
+un **segundo pase de asociación**, físicamente separado del exacto: para cada XML huérfano con clave
+completa, se verifica que su RUC + serie + número autoritativos aparezcan como tokens delimitados y
+**distintos** en el nombre de archivo del PDF, con exclusividad 1:1 bilateral. Más dos riders: la
+serie alfanumérica SUNAT y la re-emisión **solo del PDF** del `InboxEvent` cuando la asociación llega
+tarde (para que el ciclo #25 fusione). Sin cambio de esquema, sin payload, sin .NET. No es un ítem
+del despiece original: lo abrió esta sesión al depurar la pantalla de detalle; recomendado como
+BACKLOG #26, hermano de #25.
+
+**Ciclo SDD:** `openspec/changes/archive/2026-09-01-asociacion-pdf-clave-desde-xml/` · **24 de 27
+tareas cerradas** — ✅ **CERRADO 2026-09-01** (3 handoffs abiertos, ver Elementos conocidos)
+
+| Fase | Unidad | Alcance | Tareas | Estado |
+|---|---|---|---|---|
+| 1 | Único PR | Rider: `_extraer_serie_numero` ensanchado a series alfanuméricas SUNAT (`F96X`) con lookahead negativo que rechaza prosa (`NOTA-123`) | 2/2 | ✅ |
+| 2 | Único PR | Core puro `comprobante.py`: `Documento.nombre_archivo`, `asociar_por_nombre_archivo` + `_tokens` / `_nombre_confirma_clave` / `_hay_representantes_distintos` (SDR sobre `[^A-Za-z0-9]+`, igualdad normalizada por componente, 3 tokens distintos, exclusividad deg==1 por nodo). Sin imports de IO | 8/8 | ✅ |
+| 3 | Único PR | `_LISTAR_HUERFANOS` trae `dr.NombreArchivo`; `_asociar_pendientes` calcula el residuo (huérfanos menos emparejados exacto) y corre el 2º pase, concatenando `Par`; `asociar()` exacto byte-idéntico | 5/5 | ✅ |
+| 4 | Único PR | Re-emisión PDF-only: `_LISTAR_CANDIDATOS_ASOCIACION` (`DocumentoAsociadoId IS NOT NULL AND TipoDocumento='PDF' AND NOT EXISTS(JSON_VALUE(Payload,'$.documento.documentoAsociadoId') IS NOT NULL)`) + `_INSERTAR_EVENTO_ASOCIACION` (mismo `NOT EXISTS` anti-TOCTOU); `cli_inbox` 2º bucle reusando `construir_payload`, `_VERSION` en 1. Statements existentes intactos | 6/7 ⚠ | 🔄 |
+| 5 | Único PR | Enmienda `adrs/0017` §"Asociación PDF ↔ XML" ¶"Recuperación" (dos formas: clave propia / containment contra la clave del XML; exclusividad 1:1 bilateral global; falla seguro) + bullet en Alternativas y Consecuencias; Estado → "Revisión 3". `adrs - v2/` intacto | 1/2 ⚠ | 🔄 |
+| 6 | Único PR | Sweep: `pytest` unit gate + `ruff check` limpios | 2/3 ⚠ | 🔄 |
+
+### Pruebas
+
+| Suite | Antes | Después | Nuevas |
+|---|---|---|---|
+| `SmartNetWorker` unit (`pytest -m "not integracion and not externa and not ocr"`) | 266 | **285** | +19 (`test_pdf_texto` +3: `F96X`, `F001-1`, prosa rechazada; `test_comprobante` +10: containment feliz, tipo ausente, >1 XML / >1 PDF rechaza, near-miss `12300`, token `001` no es doble match, XML con clave incompleta no candidato, regresión ruta exacta; `test_cli_procesamiento` +2; `test_inbox_event_repo` +2; `test_cli_inbox` +2) |
+| `SmartNetWorker` integración | — | — | +2 escritos, **no corridos** (`test_segunda_pasada_containment...`, `test_reemision_pdf_only_candidate_query...`) |
+
+Ejecutadas por el orquestador y re-corridas por `sdd-verify`: unit gate 285/285 (`+19` vs 266 base),
+`ruff check` limpio en los 13 archivos tocados (11 E501 preexistentes en archivos no relacionados,
+idénticos a la base). Sin `dotnet test` — .NET intacto (el ciclo #25 maneja el evento del PDF
+re-emitido). `pytest -m integracion` **no corre** por un bug preexistente del harness (ver abajo).
+
+### Decisiones de diseño
+
+- **D1 — segundo pase separado, no plegado en `asociar`**: `comprobante.asociar` exacto queda
+  byte-idéntico; el containment es una función nueva sobre el residuo, con guarda de regresión.
+- **D2 — tokens distintos (SDR)**: los 3 componentes deben ocupar 3 posiciones de token distintas;
+  un solo token (`001`) satisface serie y número a la vez con la pertenencia a conjunto ingenua.
+- **D5 — re-emisión restringida a `TipoDocumento='PDF'`**: `asociar_documentos` escribe el FK en
+  ambos lados; re-emitir el evento del XML caería por `PoliticaDePromocion.Decidir` → segunda
+  `fact.Factura` (no hay guarda de unicidad de identidad — de ahí el follow-up #27).
+- **D9 — enmienda solo a `adrs/0017`**: `adrs - v2/` es el snapshot pre-revisión-2 pese al nombre de
+  carpeta; editarlo reescribiría historia.
+
+### Elementos conocidos, no ocultos
+
+`sdd-verify`: **0 CRITICAL, 5 WARNING, 2 SUGGESTION** (4/4 requisitos, 16/16 escenarios con test
+unitario que pasa, `sdd-verify-validate` → `valid: true`).
+
+- **W1 (arrastrada, handoff)** — los 2 tests de integración están escritos pero no corren:
+  `tests/integration/conftest.py` tiene `_RUNNER_PROJECT` apuntando a `SmartNet/db/runner/` cuando el
+  runner vive en `SmartNet/SmartNetApi/db/runner/`, así que **toda** la suite `-m integracion` del
+  worker se saltea. Bug preexistente del harness, no de este cambio. El dueño debe corregir la ruta y
+  correr `cd SmartNet/SmartNetWorker && pytest -m integracion`.
+- **W2 (reconciliada al archivar)** — el paréntesis del escenario near-miss listaba `01230`, pero
+  `normalizar_numero` quita ceros a la izquierda → `01230` es match real; solo `12300` lo es. La spec
+  sincronizada a `openspec/specs/` quedó corregida.
+- **W3 (handoff al dueño)** — `BACKLOG.md` no se tocó (owner-managed). Draft de #26 en `apply-progress.md`.
+- **W4 (atendida)** — el working tree también trae el trabajo sin commitear del ciclo #25 (.NET + SPA
+  + `openspec/specs/factura-promotion`,`pantalla-detalle-validacion`) y las ediciones pre-sesión
+  (`Program.cs`, `SmartNet.Api.csproj`, `.gitignore`, `SPRINT.md`, `skills-lock.json`). El commit de
+  este cambio debe stagear solo `SmartNet/SmartNetWorker/**`, `adrs/0017-frontera-del-motor-de-extraccion.md`
+  y las specs archivadas.
+- **W5 (aceptada)** — los tests de repo afirman substrings de SQL; la prueba real de la re-emisión
+  (idempotencia, partición de datos) queda pendiente de la integración bloqueada por W1.
+- **SUGGESTION ×2** — detalle en `verify-report.md`.
+
+*Follow-ups:* (1) corregir `conftest.py` y correr `-m integracion`; (2) agregar #26 a `BACKLOG.md`;
+(3) **#27 — guarda de unicidad de `Factura` por identidad de comprobante** (`ExisteIdentidadPreviaAsync`
+solo fija un indicador, nada impide una 2ª `fact.Factura` con el mismo RUC+tipo+serie+número; ADR
+0017 rev. 3 lo menciona); (4) commits separados #25/#26 sin mezclar ediciones pre-sesión;
+(5) test end-to-end de F96X-1230 (ya limpiada de `BDSmartNet`).
+
+**RDD de gentle-ai desactivado a nivel de repo** (`D:` en exFAT, sin ACL), entrega `disabled/unmanaged`.
+Sin commit al cerrar — el árbol (rama `item-19-campos-contables-editables`) queda para revisión del
+dueño. Cambio estimado ~485 líneas (~265 producción + ~220 test), un solo PR `size:exception` aceptado
+por el dueño.
+
+---
+
+## ⬜ Ítems 10, 15, 16 y 24 — sin ciclo SDD abierto
 
 Las fases de cada ítem **se definen cuando arranca su ciclo SDD**, no antes. Ponerlas aquí ahora
 sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ítem, y ninguno existe.
@@ -1898,7 +2284,7 @@ sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ít
 | 10 | Notas de crédito | #8 | ⚠ `REGLAS.md` §5, §7 | ⬜ |
 | 15 | Publicación a Drive | #14 | — | ⬜ |
 | 16 | Publicación a Sheets | #14 | — | ⬜ |
-| 19 | Campos contables editables y resaltado OCR por campo | #12, #18 | ⚠ `REGLAS.md` §5–§10 | ⬜ |
+| 24 | Conectar la composición del asiento al pipeline | #12, #19 | ⚠ `REGLAS.md` §5–§10 | ⬜ |
 
 ---
 
