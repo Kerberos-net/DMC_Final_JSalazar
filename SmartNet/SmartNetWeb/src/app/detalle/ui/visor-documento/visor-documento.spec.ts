@@ -52,4 +52,55 @@ describe('VisorDocumento', () => {
     const iframe: HTMLIFrameElement = fixture.nativeElement.querySelector('iframe');
     expect(iframe.src).toContain('/api/documentos/manual-2/contenido');
   });
+
+  // BACKLOG (pdf-asociado-en-documento-factura) Phase 4 — spec.md "Factura with an XML and a PDF
+  // document": the default selection must prefer the first inline-renderable document, not
+  // strictly documentos[0].
+  const docXml: DocumentoRespuesta = {
+    id: 'ingesta-xml',
+    origen: 'INGESTA',
+    nombreArchivo: 'factura.xml',
+    mimeType: 'application/xml',
+    fecha: '2026-08-09T10:00:00Z',
+  };
+  const docPdf: DocumentoRespuesta = {
+    id: 'ingesta-pdf',
+    origen: 'INGESTA',
+    nombreArchivo: 'factura.pdf',
+    mimeType: 'application/pdf',
+    fecha: '2026-08-10T10:00:00Z',
+  };
+  const docXmlSegundo: DocumentoRespuesta = {
+    id: 'ingesta-xml-2',
+    origen: 'INGESTA',
+    nombreArchivo: 'anexo.xml',
+    mimeType: 'application/xml',
+    fecha: '2026-08-11T10:00:00Z',
+  };
+
+  it('selects the PDF by default when the list has an earlier non-renderable XML row', () => {
+    const fixture = createComponent([docXml, docPdf]);
+
+    const iframe: HTMLIFrameElement = fixture.nativeElement.querySelector('iframe');
+    expect(iframe.src).toContain('/api/documentos/ingesta-pdf/contenido');
+  });
+
+  it('falls back to documentos[0] when no document in the list is inline-renderable', () => {
+    const fixture = createComponent([docXml, docXmlSegundo]);
+
+    const iframe: HTMLIFrameElement = fixture.nativeElement.querySelector('iframe');
+    expect(iframe.src).toContain('/api/documentos/ingesta-xml/contenido');
+  });
+
+  it('keeps an explicit user selection even when a renderable document exists', () => {
+    const fixture = createComponent([docXml, docPdf]);
+    const select: HTMLSelectElement = fixture.nativeElement.querySelector('[data-testid="selector-documento"]');
+
+    select.value = 'ingesta-xml';
+    select.dispatchEvent(new Event('change'));
+    fixture.detectChanges();
+
+    const iframe: HTMLIFrameElement = fixture.nativeElement.querySelector('iframe');
+    expect(iframe.src).toContain('/api/documentos/ingesta-xml/contenido');
+  });
 });

@@ -17,6 +17,10 @@ import { DocumentoRespuesta } from '../../models/documento.model';
   styleUrl: './visor-documento.css',
 })
 export class VisorDocumento {
+  // Mirrors SmartNet.Api's DocumentoContenido.MimeAllowList — anything else is served
+  // application/octet-stream and cannot render inline in the iframe (D2/ADR 0013).
+  private static readonly MIMES_RENDERIZABLES = new Set(['application/pdf', 'image/png', 'image/jpeg']);
+
   private readonly sanitizer = inject(DomSanitizer);
 
   readonly documentos = input.required<readonly DocumentoRespuesta[]>();
@@ -29,7 +33,13 @@ export class VisorDocumento {
       return null;
     }
     const id = this.seleccionadoIdSignal();
-    return documentos.find((d) => d.id === id) ?? documentos[0];
+    const explicito = documentos.find((d) => d.id === id);
+    if (explicito) {
+      return explicito;
+    }
+    return (
+      documentos.find((d) => VisorDocumento.MIMES_RENDERIZABLES.has(d.mimeType)) ?? documentos[0]
+    );
   });
 
   readonly urlSegura = computed<SafeResourceUrl | null>(() => {

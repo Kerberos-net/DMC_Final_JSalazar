@@ -138,6 +138,79 @@ public sealed class PermissionSufficiencyTests : IAsyncLifetime
         Assert.NotNull(exception);
     }
 
+    /// <summary>design.md Decision 2, Query A -- <see cref="SqlPromocionRepository.ResolverParAsync"/>'s
+    /// merge-target SELECT (`fact.DocumentoFactura` JOIN `fact.Factura`), replayed under `usr_api`,
+    /// referencing neither `fact.Procesamiento` nor `fact.DocumentoRecibido`.</summary>
+    [Fact]
+    public async Task UsrApi_CanSelect_QueryA_DocumentoFacturaJoinFactura()
+    {
+        var procesamientoId = await _db.InsertarProcesamientoAsync();
+        var documentoRecibidoId = await DocumentoRecibidoIdDeAsync(procesamientoId);
+        var facturaId = await _db.ExecuteAsUserAsync(UsrApi, async connection =>
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                $"""
+                 INSERT INTO fact.Factura (ProcesamientoId, ProveedorCodigo, TipoComprobante, TotalOrig, Moneda, FechaEmision)
+                 OUTPUT INSERTED.FacturaId
+                 VALUES ({procesamientoId}, 'P00000', '01', 100.00, 'PEN', '2026-08-09');
+                 """;
+            return (long)(await command.ExecuteScalarAsync())!;
+        });
+        await _db.ExecuteAsUserAsync(UsrApi, async connection =>
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                $"""
+                 INSERT INTO fact.DocumentoFactura (FacturaId, DocumentoRecibidoId, NombreArchivo, MimeType, RutaRelativa, TamanoBytes)
+                 VALUES ({facturaId}, {documentoRecibidoId}, 'f.pdf', 'application/pdf', '/f.pdf', 10);
+                 """;
+            return await command.ExecuteNonQueryAsync();
+        });
+
+        var facturaIdResuelto = await _db.ExecuteAsUserAsync(UsrApi, async connection =>
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                $"""
+                 SELECT TOP(1) f.FacturaId
+                 FROM fact.DocumentoFactura df
+                 JOIN fact.Factura f ON f.FacturaId = df.FacturaId
+                 WHERE df.DocumentoRecibidoId = {documentoRecibidoId} AND f.Estado <> 'DESCARTADA';
+                 """;
+            return (long)(await command.ExecuteScalarAsync())!;
+        });
+        Assert.Equal(facturaId, facturaIdResuelto);
+    }
+
+    /// <summary>design.md Decision 2, Query B -- <see cref="SqlPromocionRepository.ResolverParAsync"/>'s
+    /// fallback SELECT against `fact.InboxEvent.Payload`, replayed under `usr_api`.</summary>
+    [Fact]
+    public async Task UsrApi_CanSelect_QueryB_InboxEventPayloadJsonValue()
+    {
+        var procesamientoId = await _db.InsertarProcesamientoAsync();
+        var documentoRecibidoId = await DocumentoRecibidoIdDeAsync(procesamientoId);
+        await _db.InsertarInboxEventAsync(
+            procesamientoId,
+            "{\"documento\": {\"documentoRecibidoId\": " + documentoRecibidoId + "}}");
+
+        var estadoConsumo = await _db.ExecuteAsUserAsync(UsrApi, async connection =>
+        {
+            await using var command = connection.CreateCommand();
+            command.CommandText =
+                $"""
+                 SELECT TOP(1) EstadoConsumo
+                 FROM fact.InboxEvent
+                 WHERE TRY_CAST(JSON_VALUE(Payload, '$.documento.documentoRecibidoId') AS BIGINT) = {documentoRecibidoId};
+                 """;
+            return (string)(await command.ExecuteScalarAsync())!;
+        });
+        Assert.Equal("PENDIENTE", estadoConsumo.TrimEnd());
+    }
+
+    private Task<long> DocumentoRecibidoIdDeAsync(long procesamientoId) =>
+        _db.ExecuteScalarAsync<long>($"SELECT DocumentoRecibidoId FROM fact.Procesamiento WHERE ProcesamientoId = {procesamientoId};")!;
+
     [Theory]
     [InlineData("SELECT")]
     [InlineData("INSERT")]

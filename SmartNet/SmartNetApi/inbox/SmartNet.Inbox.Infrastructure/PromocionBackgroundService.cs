@@ -48,6 +48,15 @@ public sealed class PromocionBackgroundService : BackgroundService
         foreach (var pendiente in pendientes)
         {
             var evento = PayloadInboxParser.Parse(pendiente.PayloadJson);
+
+            // design.md Decision 1: the paired PDF's InboxEvent is routed here, BEFORE
+            // PoliticaDePromocion.Decidir, instead of running the structural sufficiency check.
+            if (PoliticaDeDocumentoAsociado.EsDocumentoAsociado(evento))
+            {
+                await ProcesarDocumentoAsociadoAsync(pendiente, evento, ct);
+                continue;
+            }
+
             var decision = PoliticaDePromocion.Decidir(evento);
 
             switch (decision)
@@ -59,6 +68,30 @@ public sealed class PromocionBackgroundService : BackgroundService
                     await _promocionRepository.DescartarAsync(pendiente.InboxEventId, descarta.Motivo, ct);
                     break;
             }
+        }
+    }
+
+    /// <summary>design.md data flow -- resolves the associated PDF's paired partner and merges,
+    /// defers, or discards accordingly (design D2/D3/D4). Never calls <c>PromoverAsync</c>: this
+    /// path creates zero <c>fact.Factura</c> rows.</summary>
+    private async Task ProcesarDocumentoAsociadoAsync(EventoInboxPendiente pendiente, EventoInbox evento, CancellationToken ct)
+    {
+        var resolucion = await _promocionRepository.ResolverParAsync(evento.DocumentoAsociadoId!.Value, ct);
+        var decision = PoliticaDeDocumentoAsociado.Decidir(resolucion);
+
+        switch (decision)
+        {
+            case DecisionDocumentoAsociado.Fusiona fusiona:
+                var documentoPromovido = new DocumentoPromovido(
+                    evento.DocumentoRecibidoId, evento.NombreArchivo, evento.MimeType, evento.RutaRelativa, evento.TamanoBytes);
+                await _promocionRepository.FusionarDocumentoAsync(pendiente.InboxEventId, fusiona.FacturaId, documentoPromovido, ct);
+                break;
+            case DecisionDocumentoAsociado.Difiere:
+                // design D3: defer = do nothing. Row stays PENDIENTE, self-heals next cycle.
+                break;
+            case DecisionDocumentoAsociado.Descarta descarta:
+                await _promocionRepository.DescartarAsync(pendiente.InboxEventId, descarta.Motivo, ct);
+                break;
         }
     }
 

@@ -213,6 +213,98 @@ public sealed class SqlPromocionRepository : IPromocionRepository
         await command.ExecuteNonQueryAsync(ct);
     }
 
+    /// <summary>
+    /// design.md Decision 2 -- Query A (the merge target, both grants inside <c>usr_api</c>), then
+    /// Query B only when A is empty (distinguishes "not yet" from "never"). Never queries
+    /// <c>fact.Procesamiento</c> or <c>fact.DocumentoRecibido</c> (ADR 0003 DENY).
+    /// </summary>
+    public async Task<ResolucionPar> ResolverParAsync(long documentoAsociadoId, CancellationToken ct)
+    {
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync(ct);
+
+        var facturaId = await ResolverFacturaIdDelParAsync(connection, documentoAsociadoId, ct);
+        if (facturaId is not null)
+        {
+            return new ResolucionPar.Fusionable(facturaId.Value);
+        }
+
+        var estadoConsumoPar = await ResolverEstadoConsumoDelParAsync(connection, documentoAsociadoId, ct);
+        return estadoConsumoPar switch
+        {
+            "DESCARTADO" => new ResolucionPar.ParNoPromovible("El evento asociado fue descartado"),
+            "PROMOVIDO" => new ResolucionPar.ParNoPromovible("La factura del evento asociado ya no está vigente"),
+            _ => new ResolucionPar.NoDisponible(),
+        };
+    }
+
+    private static async Task<long?> ResolverFacturaIdDelParAsync(
+        SqlConnection connection, long documentoAsociadoId, CancellationToken ct)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT TOP(1) f.FacturaId
+            FROM fact.DocumentoFactura df
+            JOIN fact.Factura f ON f.FacturaId = df.FacturaId
+            WHERE df.DocumentoRecibidoId = @documentoAsociadoId AND f.Estado <> 'DESCARTADA';
+            """;
+        command.Parameters.AddWithValue("@documentoAsociadoId", documentoAsociadoId);
+        var result = await command.ExecuteScalarAsync(ct);
+        return result is long facturaId ? facturaId : null;
+    }
+
+    private static async Task<string?> ResolverEstadoConsumoDelParAsync(
+        SqlConnection connection, long documentoAsociadoId, CancellationToken ct)
+    {
+        await using var command = connection.CreateCommand();
+        command.CommandText =
+            """
+            SELECT TOP(1) EstadoConsumo
+            FROM fact.InboxEvent
+            WHERE TRY_CAST(JSON_VALUE(Payload, '$.documento.documentoRecibidoId') AS BIGINT) = @documentoAsociadoId;
+            """;
+        command.Parameters.AddWithValue("@documentoAsociadoId", documentoAsociadoId);
+        var result = await command.ExecuteScalarAsync(ct);
+        return result as string;
+    }
+
+    /// <summary>
+    /// design.md Decision 4 -- one transaction reusing <see cref="InsertarDocumentoFacturaAsync"/>
+    /// (with its existing 2601/2627 idempotency catch) + <see cref="MarcarPromovidoAsync"/>. Never
+    /// calls <see cref="InsertarFacturaAsync"/>/<see cref="InsertarExtraccionesAsync"/> -- no second
+    /// <c>fact.Factura</c> row is ever created on this path.
+    /// </summary>
+    public async Task FusionarDocumentoAsync(
+        long inboxEventId, long facturaId, DocumentoPromovido documento, CancellationToken ct)
+    {
+        await using var connection = new SqlConnection(_connectionString);
+        await connection.OpenAsync(ct);
+        await using var transaction = (SqlTransaction)await connection.BeginTransactionAsync(ct);
+
+        try
+        {
+            try
+            {
+                await InsertarDocumentoFacturaAsync(connection, transaction, facturaId, documento, ct);
+            }
+            catch (SqlException ex) when (ex.Number is 2601 or 2627)
+            {
+                // UQ_DocumentoFactura_DocumentoRecibidoId violation -- a re-processed (reprocesar)
+                // associated event already projected this row; same anti-TOCTOU idempotency
+                // discipline as PromoverAsync's own catch above.
+            }
+
+            await MarcarPromovidoAsync(connection, transaction, inboxEventId, facturaId, ct);
+            await transaction.CommitAsync(ct);
+        }
+        catch
+        {
+            await transaction.RollbackAsync(ct);
+            throw;
+        }
+    }
+
     private static async Task<long> ResolverFacturaIdExistenteAsync(
         SqlConnection connection, SqlTransaction transaction, long procesamientoId, CancellationToken ct)
     {

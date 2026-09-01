@@ -40,6 +40,31 @@ public sealed class PromocionBackgroundServiceTests : IAsyncLifetime
          "evidencia": [], "afectacionMixta": null, "camposNoExtraidos": [], "advertenciasAsociacion": ["SIN_PAREJA"]}
         """;
 
+    /// <summary>BACKLOG (pdf-asociado-en-documento-factura) Phase 3 -- the paired PDF's own
+    /// comprobante is structurally incomplete: proves the merge branch never runs
+    /// <c>PoliticaDePromocion</c> for it (it would discard on that path).</summary>
+    private const string PayloadPdfAsociadoIncompleto =
+        """
+        {"version": 1, "estadoProcesamiento": "COMPLETADO",
+         "documento": {"documentoRecibidoId": 2, "tipoDocumento": "PDF", "documentoAsociadoId": 1,
+                       "nombreArchivo": "factura.pdf", "mimeType": "application/pdf",
+                       "rutaRelativa": "2026/08/factura.pdf", "tamanoBytes": 4096},
+         "comprobante": {"tipoComprobante": null, "numero": null, "rucProveedor": null,
+                         "nombreProveedor": null, "monto": null, "moneda": null, "fechaEmision": null},
+         "evidencia": [], "afectacionMixta": null, "camposNoExtraidos": [], "advertenciasAsociacion": []}
+        """;
+
+    private const string PayloadXmlInsuficienteAsociado =
+        """
+        {"version": 1, "estadoProcesamiento": "COMPLETADO",
+         "documento": {"documentoRecibidoId": 1, "tipoDocumento": "XML", "documentoAsociadoId": 2,
+                       "nombreArchivo": "factura.xml", "mimeType": "application/xml",
+                       "rutaRelativa": "2026/08/factura.xml", "tamanoBytes": 2048},
+         "comprobante": {"tipoComprobante": null, "numero": null, "rucProveedor": null,
+                         "nombreProveedor": null, "monto": null, "moneda": null, "fechaEmision": null},
+         "evidencia": [], "afectacionMixta": null, "camposNoExtraidos": [], "advertenciasAsociacion": []}
+        """;
+
     private PromocionBackgroundService BuildSut() => new(
         new SqlEventoInboxRepository(_db.ConnectionString),
         new SqlPromocionRepository(_db.ConnectionString),
@@ -67,6 +92,13 @@ public sealed class PromocionBackgroundServiceTests : IAsyncLifetime
         var documentoCount = await _db.ExecuteScalarAsync<int>(
             "SELECT COUNT(*) FROM fact.DocumentoFactura WHERE DocumentoRecibidoId = 1 AND NombreArchivo = 'factura.xml';");
         Assert.Equal(1, documentoCount);
+
+        // design.md Decision 1 regression guard (task 3.2): this fixture is XML+asociado -- the
+        // one the proposal's broken predicate (DocumentoAsociadoId != null alone, no TipoDocumento
+        // check) would have deferred forever instead of promoting. Proves it stays on the
+        // unchanged sufficiency path: exactly one Factura total, never a merge/defer branch.
+        var facturaCountTotal = await _db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM fact.Factura;");
+        Assert.Equal(1, facturaCountTotal);
     }
 
     [Fact]
@@ -108,5 +140,92 @@ public sealed class PromocionBackgroundServiceTests : IAsyncLifetime
         var estadoConsumoSegundo = await _db.ExecuteScalarAsync<string>(
             $"SELECT EstadoConsumo FROM fact.InboxEvent WHERE InboxEventId = {segundoEventoId};");
         Assert.Equal("PROMOVIDO", estadoConsumoSegundo!.TrimEnd());
+    }
+
+    /// <summary>design.md ordering proof table -- XML event first promotes normally; the paired
+    /// PDF event, processed in a later cycle, hits Query A and merges onto the same Factura
+    /// instead of creating a second one.</summary>
+    [Fact]
+    public async Task ProcesarPendientesAsync_XmlFirstThenPdf_MergesOntoOneFactura_BothEventsPromovido()
+    {
+        var procesamientoXmlId = await _db.InsertarProcesamientoAsync(gmailMessageId: "msg-par-xml-1");
+        var inboxEventXmlId = await _db.InsertarInboxEventAsync(procesamientoXmlId, PayloadCompleto);
+        var sut = BuildSut();
+        await sut.ProcesarPendientesAsync(CancellationToken.None);
+
+        var procesamientoPdfId = await _db.InsertarProcesamientoAsync(gmailMessageId: "msg-par-pdf-1");
+        var inboxEventPdfId = await _db.InsertarInboxEventAsync(procesamientoPdfId, PayloadPdfAsociadoIncompleto);
+        await sut.ProcesarPendientesAsync(CancellationToken.None);
+
+        var facturaCount = await _db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM fact.Factura;");
+        Assert.Equal(1, facturaCount);
+        var documentoCount = await _db.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM fact.DocumentoFactura WHERE DocumentoRecibidoId IN (1, 2);");
+        Assert.Equal(2, documentoCount);
+        var estadoXml = await _db.ExecuteScalarAsync<string>(
+            $"SELECT EstadoConsumo FROM fact.InboxEvent WHERE InboxEventId = {inboxEventXmlId};");
+        Assert.Equal("PROMOVIDO", estadoXml!.TrimEnd());
+        var estadoPdf = await _db.ExecuteScalarAsync<string>(
+            $"SELECT EstadoConsumo FROM fact.InboxEvent WHERE InboxEventId = {inboxEventPdfId};");
+        Assert.Equal("PROMOVIDO", estadoPdf!.TrimEnd());
+    }
+
+    /// <summary>design.md ordering proof table -- the PDF arrives before its XML partner exists at
+    /// all. Query A and Query B both come up empty -&gt; defer is a pure no-op (design D3): the
+    /// event stays PENDIENTE, no discard, no Factura created.</summary>
+    [Fact]
+    public async Task ProcesarPendientesAsync_PdfFirst_SingleCycle_StaysPendiente_NoDiscards()
+    {
+        var procesamientoPdfId = await _db.InsertarProcesamientoAsync(gmailMessageId: "msg-par-pdf-2");
+        var inboxEventPdfId = await _db.InsertarInboxEventAsync(procesamientoPdfId, PayloadPdfAsociadoIncompleto);
+        var sut = BuildSut();
+
+        await sut.ProcesarPendientesAsync(CancellationToken.None);
+
+        var estadoPdf = await _db.ExecuteScalarAsync<string>(
+            $"SELECT EstadoConsumo FROM fact.InboxEvent WHERE InboxEventId = {inboxEventPdfId};");
+        Assert.Equal("PENDIENTE", estadoPdf!.TrimEnd());
+        var descartes = await _db.ExecuteScalarAsync<int>(
+            "SELECT COUNT(*) FROM fact.InboxEvent WHERE EstadoConsumo = 'DESCARTADO';");
+        Assert.Equal(0, descartes);
+        var facturaCount = await _db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM fact.Factura;");
+        Assert.Equal(0, facturaCount);
+    }
+
+    /// <summary>design.md ordering proof table -- the XML partner discards on its own (structurally
+    /// insufficient, owner decision 3: the PDF never self-promotes). Once the discard is committed
+    /// (cycle 1), the PDF's own next cycle (cycle 2) sees Query B = 'DESCARTADO' -&gt;
+    /// <c>ParNoPromovible</c> -&gt; discards too. Two separate cycles avoids any same-cycle
+    /// ordering assumption over <c>ListarPendientesAsync</c>'s unordered result.</summary>
+    [Fact]
+    public async Task ProcesarPendientesAsync_XmlDescarta_ThenPdfDescartaAfterTwoCycles()
+    {
+        var procesamientoXmlId = await _db.InsertarProcesamientoAsync(gmailMessageId: "msg-par-xml-2");
+        var inboxEventXmlId = await _db.InsertarInboxEventAsync(procesamientoXmlId, PayloadXmlInsuficienteAsociado);
+        var sut = BuildSut();
+        await sut.ProcesarPendientesAsync(CancellationToken.None);
+
+        var estadoXml = await _db.ExecuteScalarAsync<string>(
+            $"SELECT EstadoConsumo FROM fact.InboxEvent WHERE InboxEventId = {inboxEventXmlId};");
+        Assert.Equal("DESCARTADO", estadoXml!.TrimEnd());
+
+        var procesamientoPdfId = await _db.InsertarProcesamientoAsync(gmailMessageId: "msg-par-pdf-3");
+        var inboxEventPdfId = await _db.InsertarInboxEventAsync(procesamientoPdfId, PayloadPdfAsociadoIncompleto);
+        await sut.ProcesarPendientesAsync(CancellationToken.None);
+
+        var estadoPdf = await _db.ExecuteScalarAsync<string>(
+            $"SELECT EstadoConsumo FROM fact.InboxEvent WHERE InboxEventId = {inboxEventPdfId};");
+        Assert.Equal("DESCARTADO", estadoPdf!.TrimEnd());
+
+        // Must discard via the merge-branch route (ResolverParAsync -> ParNoPromovible ->
+        // Descarta), NOT the normal PoliticaDePromocion insufficient-fields path -- otherwise this
+        // assertion would pass trivially even without the new routing (the PDF's own comprobante
+        // is also structurally incomplete). The motive text is what proves which path ran.
+        var motivoPdf = await _db.ExecuteScalarAsync<string>(
+            $"SELECT MotivoDescarte FROM fact.InboxEvent WHERE InboxEventId = {inboxEventPdfId};");
+        Assert.Equal("El evento asociado fue descartado", motivoPdf);
+
+        var facturaCount = await _db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM fact.Factura;");
+        Assert.Equal(0, facturaCount);
     }
 }

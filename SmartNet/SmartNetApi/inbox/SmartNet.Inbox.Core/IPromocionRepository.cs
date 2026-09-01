@@ -45,4 +45,22 @@ public interface IPromocionRepository
     /// identity (RUC + tipo de comprobante + número) via <c>IX_Factura_Identidad</c>.</summary>
     Task<bool> ExisteIdentidadPreviaAsync(
         string? rucProveedor, string tipoComprobante, string? numero, CancellationToken ct);
+
+    /// <summary>
+    /// design.md Decision 2 -- resolves the associated PDF's paired partner via query A
+    /// (<c>fact.DocumentoFactura</c> JOIN <c>fact.Factura</c>, <c>Estado &lt;&gt; 'DESCARTADA'</c>),
+    /// falling back to query B (<c>fact.InboxEvent.Payload</c> JSON) only when A is empty. Both
+    /// queries run inside <c>usr_api</c>'s grants -- never <c>fact.Procesamiento</c> or
+    /// <c>fact.DocumentoRecibido</c> (ADR 0003).
+    /// </summary>
+    Task<ResolucionPar> ResolverParAsync(long documentoAsociadoId, CancellationToken ct);
+
+    /// <summary>
+    /// design.md Decision 4 -- projects <paramref name="documento"/> onto the already-promoted
+    /// <paramref name="facturaId"/> and marks <paramref name="inboxEventId"/> <c>PROMOVIDO</c>, in
+    /// one transaction. Reuses the same private INSERT + idempotency catch as <c>PromoverAsync</c>;
+    /// never calls <c>InsertarFacturaAsync</c>/<c>InsertarExtraccionesAsync</c> -- no second
+    /// <c>fact.Factura</c> row is ever created on this path.
+    /// </summary>
+    Task FusionarDocumentoAsync(long inboxEventId, long facturaId, DocumentoPromovido documento, CancellationToken ct);
 }

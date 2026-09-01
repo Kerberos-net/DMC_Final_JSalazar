@@ -50,6 +50,20 @@ public sealed class SqlPromocionRepositoryTests : IAsyncLifetime
     private Task<long> DocumentoRecibidoIdDeAsync(long procesamientoId) =>
         _db.ExecuteScalarAsync<long>($"SELECT DocumentoRecibidoId FROM fact.Procesamiento WHERE ProcesamientoId = {procesamientoId};")!;
 
+    /// <summary>BACKLOG (pdf-asociado-en-documento-factura), Phase 2 -- a payload whose
+    /// <c>documento.documentoRecibidoId</c> is <paramref name="documentoRecibidoId"/>, the exact
+    /// JSON path <c>ResolverParAsync</c>'s Query B reads (design.md Decision 2). The stored payload
+    /// content never drives <c>PromoverAsync</c>/<c>DescartarAsync</c> behavior (they take
+    /// already-parsed arguments) -- only Query B ever reads it back.</summary>
+    private static string PayloadConDocumentoRecibidoId(long documentoRecibidoId) =>
+        $$"""
+        {"version": 1, "estadoProcesamiento": "COMPLETADO",
+         "documento": {"documentoRecibidoId": {{documentoRecibidoId}}, "tipoDocumento": "XML", "documentoAsociadoId": null,
+                       "nombreArchivo": "factura.xml", "mimeType": "application/xml",
+                       "rutaRelativa": "2026/08/factura.xml", "tamanoBytes": 2048},
+         "comprobante": null, "evidencia": [], "afectacionMixta": null, "camposNoExtraidos": [], "advertenciasAsociacion": []}
+        """;
+
     [Fact]
     public async Task PromoverAsync_InsertsFacturaAndFacturaExtraccion_AndMarksInboxEventPromovido()
     {
@@ -271,5 +285,149 @@ public sealed class SqlPromocionRepositoryTests : IAsyncLifetime
         var existe = await sut.ExisteIdentidadPreviaAsync("20100000001", "01", "F001-999", CancellationToken.None);
 
         Assert.False(existe);
+    }
+
+    /// <summary>design.md Decision 2, Query A -- a non-<c>DESCARTADA</c> partner <c>Factura</c>
+    /// already projects a <c>DocumentoFactura</c> row on the associated document's id.</summary>
+    [Fact]
+    public async Task ResolverParAsync_ReturnsFusionable_WhenQueryAHitsANonDiscardedPartnerFactura()
+    {
+        var procesamientoId = await _db.InsertarProcesamientoAsync();
+        var documentoRecibidoId = await DocumentoRecibidoIdDeAsync(procesamientoId);
+        var inboxEventId = await _db.InsertarInboxEventAsync(procesamientoId, "{}");
+        var sut = new SqlPromocionRepository(_db.ConnectionString);
+        var promovido = await sut.PromoverAsync(
+            inboxEventId, procesamientoId, MuestraFactura(), MuestraDocumento(documentoRecibidoId), CancellationToken.None);
+
+        var resolucion = await sut.ResolverParAsync(documentoRecibidoId, CancellationToken.None);
+
+        var fusionable = Assert.IsType<ResolucionPar.Fusionable>(resolucion);
+        Assert.Equal(promovido.FacturaId, fusionable.FacturaId);
+    }
+
+    /// <summary>design.md ordering proof table -- partner <c>Factura</c> later <c>DESCARTADA</c> by
+    /// a human (Query A empty, Estado filter) while the event still reads <c>PROMOVIDO</c> (Query
+    /// B) -- terminates the pair, never an infinite defer.</summary>
+    [Fact]
+    public async Task ResolverParAsync_ReturnsParNoPromovible_WhenPartnerFacturaWasDiscardedAfterPromotion()
+    {
+        var procesamientoId = await _db.InsertarProcesamientoAsync();
+        var documentoRecibidoId = await DocumentoRecibidoIdDeAsync(procesamientoId);
+        var inboxEventId = await _db.InsertarInboxEventAsync(
+            procesamientoId, PayloadConDocumentoRecibidoId(documentoRecibidoId));
+        var sut = new SqlPromocionRepository(_db.ConnectionString);
+        var promovido = await sut.PromoverAsync(
+            inboxEventId, procesamientoId, MuestraFactura(), MuestraDocumento(documentoRecibidoId), CancellationToken.None);
+        await _db.ExecuteNonQueryAsync($"UPDATE fact.Factura SET Estado = 'DESCARTADA' WHERE FacturaId = {promovido.FacturaId};");
+
+        var resolucion = await sut.ResolverParAsync(documentoRecibidoId, CancellationToken.None);
+
+        Assert.IsType<ResolucionPar.ParNoPromovible>(resolucion);
+    }
+
+    [Fact]
+    public async Task ResolverParAsync_ReturnsParNoPromovible_WhenPartnerEventWasDescartado()
+    {
+        var procesamientoId = await _db.InsertarProcesamientoAsync();
+        var documentoRecibidoId = await DocumentoRecibidoIdDeAsync(procesamientoId);
+        var inboxEventId = await _db.InsertarInboxEventAsync(
+            procesamientoId, PayloadConDocumentoRecibidoId(documentoRecibidoId));
+        var sut = new SqlPromocionRepository(_db.ConnectionString);
+        await sut.DescartarAsync(inboxEventId, "Faltan campos requeridos: monto", CancellationToken.None);
+
+        var resolucion = await sut.ResolverParAsync(documentoRecibidoId, CancellationToken.None);
+
+        Assert.IsType<ResolucionPar.ParNoPromovible>(resolucion);
+    }
+
+    [Fact]
+    public async Task ResolverParAsync_ReturnsNoDisponible_WhenPartnerEventIsStillPendiente()
+    {
+        var procesamientoId = await _db.InsertarProcesamientoAsync();
+        var documentoRecibidoId = await DocumentoRecibidoIdDeAsync(procesamientoId);
+        await _db.InsertarInboxEventAsync(procesamientoId, PayloadConDocumentoRecibidoId(documentoRecibidoId));
+        var sut = new SqlPromocionRepository(_db.ConnectionString);
+
+        var resolucion = await sut.ResolverParAsync(documentoRecibidoId, CancellationToken.None);
+
+        Assert.IsType<ResolucionPar.NoDisponible>(resolucion);
+    }
+
+    [Fact]
+    public async Task ResolverParAsync_ReturnsNoDisponible_WhenPartnerEventIsAbsent()
+    {
+        var sut = new SqlPromocionRepository(_db.ConnectionString);
+
+        var resolucion = await sut.ResolverParAsync(documentoAsociadoId: 999_999, CancellationToken.None);
+
+        Assert.IsType<ResolucionPar.NoDisponible>(resolucion);
+    }
+
+    /// <summary>design.md Decision 4 -- projects onto the given <c>FacturaId</c>, creates NO
+    /// <c>fact.Factura</c> row, and marks the source event <c>PROMOVIDO</c>.</summary>
+    [Fact]
+    public async Task FusionarDocumentoAsync_InsertsOneDocumentoFacturaRow_AndMarksEventPromovido_CreatingNoFactura()
+    {
+        var procesamientoIdOriginal = await _db.InsertarProcesamientoAsync();
+        var documentoRecibidoIdOriginal = await DocumentoRecibidoIdDeAsync(procesamientoIdOriginal);
+        var inboxEventIdOriginal = await _db.InsertarInboxEventAsync(procesamientoIdOriginal, "{}");
+        var sut = new SqlPromocionRepository(_db.ConnectionString);
+        var original = await sut.PromoverAsync(
+            inboxEventIdOriginal, procesamientoIdOriginal, MuestraFactura(), MuestraDocumento(documentoRecibidoIdOriginal),
+            CancellationToken.None);
+
+        var procesamientoIdPdf = await _db.InsertarProcesamientoAsync(gmailMessageId: "msg-inbox-pdf");
+        var documentoRecibidoIdPdf = await DocumentoRecibidoIdDeAsync(procesamientoIdPdf);
+        var inboxEventIdPdf = await _db.InsertarInboxEventAsync(procesamientoIdPdf, "{}");
+        var facturaCountAntes = await _db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM fact.Factura;");
+
+        await sut.FusionarDocumentoAsync(
+            inboxEventIdPdf, original.FacturaId, MuestraDocumento(documentoRecibidoIdPdf), CancellationToken.None);
+
+        var facturaCountDespues = await _db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM fact.Factura;");
+        Assert.Equal(facturaCountAntes, facturaCountDespues);
+
+        var documentoCount = await _db.ExecuteScalarAsync<int>(
+            $"SELECT COUNT(*) FROM fact.DocumentoFactura WHERE DocumentoRecibidoId = {documentoRecibidoIdPdf} AND FacturaId = {original.FacturaId};");
+        Assert.Equal(1, documentoCount);
+
+        var estadoConsumo = await _db.ExecuteScalarAsync<string>(
+            $"SELECT EstadoConsumo FROM fact.InboxEvent WHERE InboxEventId = {inboxEventIdPdf};");
+        Assert.Equal("PROMOVIDO", estadoConsumo!.TrimEnd());
+        var facturaIdEnEvento = await _db.ExecuteScalarAsync<long>(
+            $"SELECT FacturaId FROM fact.InboxEvent WHERE InboxEventId = {inboxEventIdPdf};");
+        Assert.Equal(original.FacturaId, facturaIdEnEvento);
+    }
+
+    /// <summary>design.md ordering proof table -- a re-emitted (reprocesar) associated event hits
+    /// <c>UQ_DocumentoFactura_DocumentoRecibidoId</c>, the same 2601/2627 catch as
+    /// <c>PromoverAsync</c>'s own idempotency path; <c>MarcarPromovidoAsync</c> still runs.</summary>
+    [Fact]
+    public async Task FusionarDocumentoAsync_IsAnIdempotentNoOp_WhenDocumentoRecibidoIdRepeats()
+    {
+        var procesamientoIdOriginal = await _db.InsertarProcesamientoAsync();
+        var documentoRecibidoIdOriginal = await DocumentoRecibidoIdDeAsync(procesamientoIdOriginal);
+        var inboxEventIdOriginal = await _db.InsertarInboxEventAsync(procesamientoIdOriginal, "{}");
+        var sut = new SqlPromocionRepository(_db.ConnectionString);
+        var original = await sut.PromoverAsync(
+            inboxEventIdOriginal, procesamientoIdOriginal, MuestraFactura(), MuestraDocumento(documentoRecibidoIdOriginal),
+            CancellationToken.None);
+
+        var procesamientoIdPdf = await _db.InsertarProcesamientoAsync(gmailMessageId: "msg-inbox-pdf-2");
+        var documentoRecibidoIdPdf = await DocumentoRecibidoIdDeAsync(procesamientoIdPdf);
+        var primerEventoPdfId = await _db.InsertarInboxEventAsync(procesamientoIdPdf, "{}");
+        await sut.FusionarDocumentoAsync(
+            primerEventoPdfId, original.FacturaId, MuestraDocumento(documentoRecibidoIdPdf), CancellationToken.None);
+
+        var segundoEventoPdfId = await _db.InsertarInboxEventAsync(procesamientoIdPdf, "{}");
+        await sut.FusionarDocumentoAsync(
+            segundoEventoPdfId, original.FacturaId, MuestraDocumento(documentoRecibidoIdPdf), CancellationToken.None);
+
+        var totalProyectado = await _db.ExecuteScalarAsync<int>(
+            $"SELECT COUNT(*) FROM fact.DocumentoFactura WHERE DocumentoRecibidoId = {documentoRecibidoIdPdf};");
+        Assert.Equal(1, totalProyectado);
+        var estadoConsumoSegundo = await _db.ExecuteScalarAsync<string>(
+            $"SELECT EstadoConsumo FROM fact.InboxEvent WHERE InboxEventId = {segundoEventoPdfId};");
+        Assert.Equal("PROMOVIDO", estadoConsumoSegundo!.TrimEnd());
     }
 }
