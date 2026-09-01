@@ -6,6 +6,12 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
+  <!-- DEPLOY-PLAN.md: hosts the API as a Windows Service in production (Program.cs
+       builder.Host.UseWindowsService()). No-op outside the Windows SCM. -->
+  <ItemGroup>
+    <PackageReference Include="Microsoft.Extensions.Hosting.WindowsServices" Version="10.0.0" />
+  </ItemGroup>
+
   <!-- design.md Decision 6: the API host references SmartNet.Auth.Core / .Infrastructure ONLY.
        It must NEVER reference SmartNet.Db.Runner, direct or transitive — a runtime that can alter
        a shared database at boot is precisely the thing item #1's permission boundary exists to

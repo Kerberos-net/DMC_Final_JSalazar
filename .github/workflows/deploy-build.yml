@@ -1,0 +1,147 @@
+# Build & package a deployable release. This workflow does NOT touch any host -- it only produces
+# `smartnet-vX.Y.Z.zip` and attaches it to a GitHub Release. The actual deployment is operated from
+# the host with the scripts under `deploy/` (see DEPLOY-PLAN.md).
+#
+# Trigger: pushing a tag `deploy/vX.Y.Z` on a commit that is on `main` and whose CI (ci.yml) is
+# green. The job re-verifies the schema checksum manifest as an explicit deploy gate -- ci.yml
+# already runs ChecksumManifestTests, this is belt-and-suspenders and keeps the gate visible here.
+
+name: Deploy — build & package
+
+on:
+  push:
+    tags:
+      - 'deploy/v*'
+
+permissions:
+  contents: write  # create the GitHub Release
+
+env:
+  DOTNET_NOLOGO: 'true'
+  DOTNET_SKIP_FIRST_TIME_EXPERIENCE: 'true'
+  RUNTIME: win-x64
+  API_PROJ: SmartNet/SmartNetApi/api/SmartNet.Api/SmartNet.Api.csproj
+  RUNNER_PROJ: SmartNet/SmartNetApi/db/runner/SmartNet.Db.Runner/SmartNet.Db.Runner.csproj
+  ADMIN_PROJ: SmartNet/SmartNetApi/admin/SmartNet.Admin/SmartNet.Admin.csproj
+  SPA_DIR: SmartNet/SmartNetWeb
+  WORKER_DIR: SmartNet/SmartNetWorker
+  SCHEMA_DIR: SmartNet/SmartNetBD/schema
+
+jobs:
+  empaquetar:
+    name: Compilar artefactos y publicar el paquete de release
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          fetch-depth: 0  # need history to check the tag is on main
+
+      - name: Derivar versión desde el tag
+        id: ver
+        run: |
+          TAG="${GITHUB_REF#refs/tags/}"          # deploy/v1.2.3
+          VERSION="${TAG#deploy/}"                # v1.2.3
+          echo "version=${VERSION}" >> "$GITHUB_OUTPUT"
+          echo "sha_short=$(git rev-parse --short HEAD)" >> "$GITHUB_OUTPUT"
+          echo "Tag ${TAG} -> versión ${VERSION}"
+
+      - name: Gate — el tag está sobre main
+        run: |
+          if ! git merge-base --is-ancestor HEAD origin/main; then
+            echo "::error::El commit del tag no está en origin/main. Un release solo se corta desde main."
+            exit 1
+          fi
+
+      - uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: '10.0.x'
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24.x'
+          cache: 'npm'
+          cache-dependency-path: ${{ env.SPA_DIR }}/package-lock.json
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Gate — manifiesto de checksums del esquema
+        shell: pwsh
+        run: |
+          $before = Get-Content "${{ env.SCHEMA_DIR }}/checksums.txt" -Raw
+          & "${{ env.SCHEMA_DIR }}/generate-checksums.ps1"
+          $after = Get-Content "${{ env.SCHEMA_DIR }}/checksums.txt" -Raw
+          if ($before -ne $after) {
+            Write-Host "::error::checksums.txt no está al día. Corré generate-checksums.ps1 y commiteá el manifiesto."
+            git --no-pager diff -- "${{ env.SCHEMA_DIR }}/checksums.txt"
+            exit 1
+          }
+          Write-Host "Manifiesto de checksums verificado."
+
+      - name: Publicar SmartNet.Db.Runner
+        run: >
+          dotnet publish ${{ env.RUNNER_PROJ }} -c Release -r ${{ env.RUNTIME }}
+          --self-contained false -o dist/pkg/runner
+
+      - name: Publicar SmartNet.Api
+        run: >
+          dotnet publish ${{ env.API_PROJ }} -c Release -r ${{ env.RUNTIME }}
+          --self-contained false -o dist/pkg/api
+
+      - name: Publicar SmartNet.Admin
+        run: >
+          dotnet publish ${{ env.ADMIN_PROJ }} -c Release -r ${{ env.RUNTIME }}
+          --self-contained false -o dist/pkg/admin
+
+      - name: Compilar la SPA
+        working-directory: ${{ env.SPA_DIR }}
+        run: |
+          npm ci
+          npm run build
+
+      - name: Copiar el build de la SPA
+        run: cp -r ${{ env.SPA_DIR }}/dist/spa/browser dist/pkg/web
+
+      - name: Construir el wheel del worker
+        working-directory: ${{ env.WORKER_DIR }}
+        run: |
+          python -m pip install --upgrade build
+          python -m build --wheel --outdir dist_wheel
+      - name: Copiar el wheel del worker
+        run: |
+          mkdir -p dist/pkg/worker
+          cp ${{ env.WORKER_DIR }}/dist_wheel/*.whl dist/pkg/worker/
+
+      - name: Copiar el esquema, los fixtures y los scripts de despliegue
+        run: |
+          mkdir -p dist/pkg/schema dist/pkg/fixtures
+          cp -r ${{ env.SCHEMA_DIR }}/. dist/pkg/schema/
+          # fixtures/ del catálogo externo dbo.* -- SOLO se aplican en la demo (config
+          # $AplicarFixturesCatalogoDemo); en producción real esas tablas ya existen.
+          cp -r SmartNet/SmartNetBD/fixtures/. dist/pkg/fixtures/
+          cp -r deploy dist/pkg/deploy
+
+      - name: Escribir VERSION
+        run: |
+          echo "${{ steps.ver.outputs.version }}  ${{ steps.ver.outputs.sha_short }}  $(date -u +%Y-%m-%dT%H:%M:%SZ)" > dist/pkg/VERSION
+          cat dist/pkg/VERSION
+
+      - name: Comprimir el paquete
+        run: |
+          cd dist/pkg
+          zip -r "../smartnet-${{ steps.ver.outputs.version }}.zip" .
+
+      - name: Publicar como artefacto del workflow
+        uses: actions/upload-artifact@v4
+        with:
+          name: smartnet-${{ steps.ver.outputs.version }}
+          path: dist/smartnet-${{ steps.ver.outputs.version }}.zip
+          retention-days: 90
+
+      - name: Publicar GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          files: dist/smartnet-${{ steps.ver.outputs.version }}.zip
+          generate_release_notes: true

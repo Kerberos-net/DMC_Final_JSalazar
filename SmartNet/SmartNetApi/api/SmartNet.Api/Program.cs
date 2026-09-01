@@ -15,6 +15,12 @@ using SmartNet.TiposCambio.Infrastructure;
 
 var builder = WebApplication.CreateBuilder(args);
 
+// DEPLOY-PLAN.md (host único Windows): the API runs as a Windows Service in production, with Kestrel
+// bound to loopback only (ASPNETCORE_URLS=http://127.0.0.1:5080) behind the Caddy reverse proxy
+// (ADR 0012). UseWindowsService() is a no-op when the process is NOT launched by the Windows SCM --
+// `dotnet run`, `dotnet test` and WebApplicationFactory<Program> are unaffected.
+builder.Host.UseWindowsService();
+
 // TimeProvider.System by default; SmartNet.Api.Tests substitutes a FakeTimeProvider via
 // ConfigureTestServices to drive the lockout escalation sequence without real waiting.
 builder.Services.AddSingleton(TimeProvider.System);

@@ -20,7 +20,15 @@ __pycache__/
 *.pyc
 .claude/.lecciones-aprendidas-seen
 
+# Deploy: config y secretos por entorno viven SOLO en el host, nunca en el repo
+deploy/config.*.ps1
+!deploy/config.example.ps1
+*.env
+
 # Indices y estado local de herramientas de asistencia (se regeneran)
 .codegraph/
 .engram/
 Arquitectura SmartNet.png
+
+# Paquetes de release compilados localmente
+/dist/

@@ -1,0 +1,69 @@
+# Caddyfile de ejemplo para SmartNet (DEPLOY-PLAN.md § Infraestructura).
+# Copialo a C:\SmartNet\caddy\Caddyfile en el host y ajustá el host y el bloque `tls`.
+#
+# Mismo origen tras proxy inverso (ADR 0012, requisito de seguridad, no preferencia):
+#   /        -> SPA Angular compilada (estáticos)
+#   /api/*   -> Kestrel en 127.0.0.1:5080 (SmartNet.Api, solo loopback)
+# Sin CORS: la SPA y la API comparten origen por diseño.
+
+{
+	# No abrir el :80 para el redirect HTTP->HTTPS: en Windows Server http.sys / IIS suele
+	# tener el puerto reservado, y el redirect no hace falta (los clientes entran directo por
+	# https://). Caddy sigue gestionando el certificado igual.
+	auto_https disable_redirects
+
+	# Directorio de datos fijo: si Caddy corre a veces en primer plano (troubleshooting) y a
+	# veces como tarea SYSTEM, sin esto cada contexto usa su propia CA local y 'caddy trust'
+	# instala la que no es. Con root fijo, todas las invocaciones comparten la misma CA.
+	storage file_system {
+		root C:\SmartNet\caddy\data
+	}
+}
+
+facturas.empresa.local {
+
+	# --- TLS -------------------------------------------------------------------------------
+	# PENDIENTE de decisión (ADR 0012): autoridad interna vs. dominio público con DNS interno.
+	# Let's Encrypt sobre `.local` NO es viable (RFC 6762). Hasta decidirlo, la CA local de Caddy
+	# desbloquea la demo -- hay que distribuir la raíz de Caddy a las máquinas cliente:
+	tls internal
+	#
+	# Autoridad interna con cert propio:
+	#   tls C:\SmartNet\caddy\certs\facturas.crt C:\SmartNet\caddy\certs\facturas.key
+	#
+	# Dominio público real con DNS interno (habilita ACME):
+	#   (quitar el bloque tls; Caddy gestiona el cert solo)
+
+	encode zstd gzip
+
+	# --- API ------------------------------------------------------------------------------
+	handle /api/* {
+		reverse_proxy 127.0.0.1:5080
+	}
+
+	# --- SPA (SPA fallback a index.html para el routing de Angular) ----------------------
+	handle {
+		root * C:\SmartNet\current\web
+		try_files {path} /index.html
+		file_server
+	}
+
+	# --- Cabeceras comunes --------------------------------------------------------------
+	header {
+		-Server
+		X-Content-Type-Options nosniff
+		Referrer-Policy strict-origin-when-cross-origin
+	}
+
+	# Límite de tasa básico para el login (requiere el módulo rate_limit; opcional).
+	# rate_limit {
+	#   zone login { match { path /api/sesion } key {remote_host} events 10 window 1m }
+	# }
+
+	log {
+		output file C:\SmartNet\logs\caddy\access.log {
+			roll_size 10MiB
+			roll_keep 10
+		}
+	}
+}
