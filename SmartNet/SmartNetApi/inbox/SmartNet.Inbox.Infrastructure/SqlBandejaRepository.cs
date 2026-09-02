@@ -21,8 +21,10 @@ namespace SmartNet.Inbox.Infrastructure;
 ///    (ADR 0003 revision 6, asymmetric-read grant), keyed by <c>ProcesamientoId</c> (design D3: a
 ///    second result set, never a <c>LEFT JOIN</c>, so it cannot multiply/break the paging).
 /// 4. Result set 3 -- the global estado aggregate feeding the dashboard cards (BACKLOG #21,
-///    design D2): one row, computed over ALL <c>fact.InboxEvent</c> rows with NO <c>WHERE</c>, so
-///    the counts are independent of the request's filter and paging parameters. Its <c>ERROR</c>
+///    design D2): one row, computed over every <c>fact.InboxEvent</c> row EXCEPT a
+///    <see cref="PromocionSecundaria"/> one (a #25 associated-doc merge that reuses another event's
+///    factura -- never a distinct bandeja item), so the counts stay independent of the request's
+///    filter and paging parameters while never double-counting a factura. Its <c>ERROR</c>
 ///    bucket uses an unfiltered <c>EXISTS</c> on <c>fact.ProcesamientoError</c> to match the row
 ///    Estado chip exactly (design D2b -- the <c>OBSOLETO</c> asymmetry: <c>FiltroWhere</c> filters
 ///    <c>&lt;&gt; 'OBSOLETO'</c> but the chip does not; a future change to one must move both).
@@ -105,6 +107,7 @@ public sealed class SqlBandejaRepository : IBandejaRepository
                  SELECT {BucketDerivado} AS Bucket
                  FROM fact.InboxEvent ie
                  LEFT JOIN fact.Factura f ON f.FacturaId = ie.FacturaId
+                 WHERE NOT ({PromocionSecundaria})
              ) b;
 
              IF NOT EXISTS (SELECT 1 FROM @pagina) AND @nroPagina > 1
@@ -263,6 +266,18 @@ public sealed class SqlBandejaRepository : IBandejaRepository
         """;
 
     /// <summary>
+    /// A PROMOVIDO InboxEvent that points at a factura it did NOT create (<c>ie.ProcesamientoId
+    /// &lt;&gt; f.ProcesamientoId</c>) is a *secondary* promotion — today only the BACKLOG #25
+    /// associated-PDF merge, which reuses the XML's factura instead of creating a second one. It
+    /// must never surface as its own bandeja row or resumen count: the factura is already
+    /// represented by the InboxEvent whose ProcesamientoId created it (<c>f.ProcesamientoId</c> is
+    /// NOT NULL and unique per factura via <c>UQ_Factura_Procesamiento</c>, so exactly one row
+    /// survives). References <c>ie</c>/<c>f</c> — only valid where both are in scope.
+    /// </summary>
+    private const string PromocionSecundaria =
+        "ie.EstadoConsumo = 'PROMOVIDO' AND ie.FacturaId IS NOT NULL AND ie.ProcesamientoId <> f.ProcesamientoId";
+
+    /// <summary>
     /// `estado` (raw EstadoConsumo, #13) and `estadoDerivado` (bucket, #21 follow-up) are mutually
     /// exclusive — the endpoint 400s on both. When both are null the design.md default-view
     /// predicate applies (`OrigenBandeja.EsVistaPorDefecto`). `estadoDerivado='TODOS'` widens to
@@ -293,6 +308,7 @@ public sealed class SqlBandejaRepository : IBandejaRepository
             OR f.ProveedorCodigo = @proveedor
             OR JSON_VALUE(ie.Payload, '$.comprobante.rucProveedor') = @proveedor
         )
+        AND NOT ({{PromocionSecundaria}})
         """;
 
     private static void AgregarParametroFecha(SqlCommand command, string nombre, DateOnly? valor)

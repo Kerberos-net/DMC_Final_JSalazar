@@ -75,6 +75,36 @@ public sealed class SqlBandejaRepositoryTests : IAsyncLifetime
     }
 
     [Fact]
+    public async Task ListarAsync_CollapsesASecondaryPromotion_OneRowPerFactura()
+    {
+        // The XML's InboxEvent creates the factura (fact.Factura.ProcesamientoId = this one).
+        var xmlInboxEventId = await PromoverFacturaAsync("msg-par-xml", proveedorCodigo: "P00000", numero: "F001-77");
+        var facturaId = await _db.ExecuteScalarAsync<long>(
+            "SELECT MAX(FacturaId) FROM fact.Factura WHERE Numero = 'F001-77';");
+
+        // The associated-PDF InboxEvent (BACKLOG #25 merge): a distinct ProcesamientoId, but
+        // marked PROMOVIDO onto the SAME factura instead of creating a second one.
+        var pdfProcesamientoId = await _db.InsertarProcesamientoAsync(gmailMessageId: "msg-par-pdf");
+        var pdfInboxEventId = await _db.InsertarInboxEventAsync(pdfProcesamientoId, "{}");
+        await _db.ExecuteNonQueryAsync(
+            $"UPDATE fact.InboxEvent SET EstadoConsumo = 'PROMOVIDO', FacturaId = {facturaId} WHERE InboxEventId = {pdfInboxEventId};");
+
+        var sut = new SqlBandejaRepository(_db.ConnectionString);
+        var resultado = await sut.ListarAsync(Filtros(estado: "PROMOVIDO", orden: "asc"), CancellationToken.None);
+
+        // The factura appears exactly once — via the XML's event, not the secondary PDF merge.
+        var item = Assert.Single(resultado.Items, i => i.FacturaId == facturaId);
+        Assert.Equal(xmlInboxEventId, item.InboxEventId);
+        Assert.DoesNotContain(resultado.Items, i => i.InboxEventId == pdfInboxEventId);
+
+        // The dashboard aggregate never double-counts the factura either.
+        Assert.Equal(1, resultado.Resumen.Validadas);
+        Assert.Equal(resultado.Resumen.Total,
+            resultado.Resumen.Pendientes + resultado.Resumen.Validadas + resultado.Resumen.ConError
+            + resultado.Resumen.Alertas + resultado.Resumen.Descartadas);
+    }
+
+    [Fact]
     public async Task ListarAsync_OrdersByFecha_Descending()
     {
         var procesamientoId1 = await _db.InsertarProcesamientoAsync(gmailMessageId: "msg-c");
