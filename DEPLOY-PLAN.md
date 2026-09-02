@@ -530,7 +530,35 @@ regla, no un bug; el camino previsto es "Recomponer asiento". Queda pendiente co
 
 ### Registro de ejecución v1.1.0
 
-_(pendiente)_
+**2026-09-01 — Verificación local previa (sustituye el gate "CI verde")**
+
+- SPA: `npm test` (Vitest) 527/527, `npm run lint` (tsc) limpio, `npm run build` OK.
+- Worker: `pytest` 285 passed / 28 skipped.
+- .NET: `dotnet build -c Release SmartNet.sln` 0 warnings / 0 errores.
+- .NET suite completa contra SQL Server local:
+  - 3 fallos **flaky** en `SmartNet.Api.Tests` por contención de bases `fact_test_<guid>` en
+    paralelo — 250/250 al correr el proyecto aislado.
+  - 2 rojos reales **preexistentes en `main`**, arreglados en esta sesión:
+    1. `ChecksumManifestTests.RealManifest_MatchesTheRealScripts_Exactly` — `checksums.txt`
+       guardaba el hash LF de `021_glosa_y_campos_no_extraidos.sql`; los `.sql` se hacen checkout
+       en CRLF (`.gitattributes eol=crlf`) y el test hashea los bytes on-disk. Commit `8ea8a09`
+       (regenera solo la línea de `021`).
+    2. `SesionPurgarTests.DeletesRowsOlderThanTheRetentionWindow` — bomba de tiempo en el test
+       (corte con `FakeTimeProvider`, seed con `SYSUTCDATETIME()` real). Commit `1c9e3d8`
+       (solo test).
+
+**2026-09-01 — Commits del release** (sobre `main`, sin push): `833a2df` (fix SPA edición inline
+de asiento-lineas), `8ea8a09`, `1c9e3d8`.
+
+**2026-09-01 — Empaquetado `smartnet-v1.1.0.zip`** — con los comandos de `deploy-build.yml`
+(`dotnet publish` x3 `-r win-x64 --self-contained false`, `npm ci && npm run build`,
+`python -m build --wheel`, copia de `schema/` + `fixtures/` + `deploy/`). `VERSION`:
+`v1.1.0  1c9e3d8  2026-09-02T02:04:37Z`. Tamaño ~10.5 MB (11 031 694 bytes). Contenido verificado:
+8 carpetas, 21 scripts de esquema (incl. `021`), wheel del worker, bundle de la SPA, 12 scripts de
+`deploy/`, fixtures del catálogo `dbo.*`, sin secretos (solo `config.example.ps1`).
+
+**EXECUTE en la VM** — _(pendiente: `deploy.ps1` aplica schema `021` a `BDSmartNet` compartida —
+autorización explícita requerida — + swap API/web/worker + `verify.ps1`)_
 
 ---
 
