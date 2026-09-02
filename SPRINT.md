@@ -11,9 +11,9 @@ Leyenda: ✅ cerrada · 🔄 en curso · ⬜ pendiente · ⛔ bloqueada
 
 | Estado global | Valor |
 |---|---|
-| Ítems del backlog | **22 de 26 cerrados** (BACKLOG.md aún lista 24 ítems: #18–#23 nacieron después del despiece inicial, #24 lo abrió el ciclo del #19, y #25 + #26 los abrió esta sesión al depurar la pantalla de detalle —ambos pendientes de agregar a `BACKLOG.md`—; #18 y #20 cerrados 2026-08-27, #21 y #22 cerrados 2026-08-30, #23 y #19 cerrados 2026-08-31, #25 y #26 cerrados 2026-09-01; sin ciclo SDD abierto: #10, #15, #16, #24) |
-| Ciclo SDD activo | Ninguno — último cerrado: ítem #26 (Asociación PDF↔XML cuando el PDF no produce clave propia), 2026-09-01 |
-| Última fase cerrada | Ítem #26 (Asociación PDF↔XML cuando el PDF no produce clave propia), 6 fases, 24/27 tareas cerradas (3 handoffs: integración bloqueada por bug de conftest, BACKLOG diferido), verify PASS WITH WARNINGS (0 CRITICAL, 5 WARNING, 2 SUGGESTION), spec delta +2 requisitos/+10 escenarios en `extraccion-y-asociacion` y 1 modificado + 1 nuevo/+6 escenarios en `inbox-event-publishing`, sincronizadas a `openspec/specs/`; enmienda `adrs/0017` a "Revisión 3"; sin PR ni commit todavía (rama `item-19-campos-contables-editables`, ~485 líneas `size:exception`) — ítem #26 cerrado 2026-09-01 |
+| Ítems del backlog | **23 de 26 cerrados** (BACKLOG.md aún lista 24 ítems: #18–#23 nacieron después del despiece inicial, #24 lo abrió el ciclo del #19, y #25 + #26 los abrió esta sesión —los tres pendientes de agregar a `BACKLOG.md`—; #18 y #20 cerrados 2026-08-27, #21 y #22 cerrados 2026-08-30, #23 y #19 cerrados 2026-08-31, #25, #26 y #24 cerrados 2026-09-01; sin ciclo SDD abierto: #10, #15, #16) |
+| Ciclo SDD activo | Ninguno — último cerrado: ítem #24 (Conectar la composición del asiento al pipeline), 2026-09-01 |
+| Última fase cerrada | Ítem #24 (Conectar la composición del asiento al pipeline), 6 fases, 29/29 tareas cerradas, verify PASS WITH WARNINGS (0 CRITICAL, 4 WARNING, 1 SUGGESTION), spec delta a 5 capacidades (`nucleo-contable`, `api-facturas`, `factura-promotion`, `sugerencia-cuenta`, `pantalla-detalle-validacion`) sincronizadas a `openspec/specs/`; sin PR ni commit todavía (rama `main`, ~1.900 líneas `size:exception`, 9 batches de apply) — ítem #24 cerrado 2026-09-01 |
 
 ---
 
@@ -2096,6 +2096,92 @@ preexistentes sin commitear del working tree (`BACKLOG.md`, `SPRINT.md`, `SECURI
 
 ---
 
+## ✅ 24. Conectar la composición del asiento al pipeline
+
+`ComposicionDeAsiento.Componer` (que puebla `BasePEN`/`IgvPEN`/`NetoPEN` y las líneas PRINCIPAL/DESTINO
+por REGLAS §5–§7) estaba completo y golden-testeado pero **no lo llamaba nada en producción**: `abrir`
+insertaba un encabezado sin importes ni líneas, el usuario armaba todo a mano, y varios invariantes §7
+pasaban de forma vacua. El #19 lo abrió a medias — al editar base/IGV, `BasePEN > 0` pero sin líneas,
+y `validar` ya fallaba. Este ciclo cablea el motor con la **Opción 3 (híbrida)**: siembra encabezado +
+líneas al `abrir` y al promover, la edición manual (#12) y los campos del #19 se apilan encima
+(auditados `REPARTO_MANUAL`), y `validar` corre §7 sobre lo persistido sin re-componer. Cierra los
+síntomas "no se genera el asiento" y "base/IGV no se muestran". NC y percepción (§10.4) quedan fuera
+de alcance. No es un ítem del despiece original — lo abrió el ciclo del #19.
+
+**Ciclo SDD:** `openspec/changes/archive/2026-09-01-cablear-composicion-asiento/` · **29 de 29 tareas
+cerradas** — ✅ **CERRADO 2026-09-01**
+
+| Fase | Unidad | Alcance | Tareas | Estado |
+|---|---|---|---|---|
+| 1 | Único PR | Core puro `SmartNet.Facturacion.Core`: `HechosDeComposicion` + `SembradoDeAsiento.Construir/.Sembrar` (mapea `EntradaAsiento` desde `FacturaPersistida`, corre `Componer` byte-idéntico, filtra líneas `Debe==0 && Haber==0` que `CK_Linea_Tipo` rechaza, renumera `Orden`). `PurityScanTests` verde | 5/5 | ✅ |
+| 2 | Único PR | Infra: `IUnidadDeTrabajo` +`ResolverHechosDeComposicionAsync` (`fact.ProveedorAtributo` + `dbo.Motivo` en tx), `CrearAsientoBorradorAsync(long, AsientoContable, ct)` (encabezado 7 cols + N líneas vía `AgregarParametrosDeLinea`), `ReemplazarLineasAsync` (bajo `TocarEncabezadoAsync` CAS). Sin script de esquema — los `GRANT` ya están en `008` | 5/5 | ✅ |
+| 3 | Único PR | `ServicioDeFacturas.AbrirAsync` compone y siembra en la primera creación (idempotente); `ServicioDeAsientos.RecomponerAsync` (1 audit `REPARTO_MANUAL`); §7 de-vacuumed — sentinels que prueban que un asiento vacío ya no confirma; test de reconciliación #19 (editar base/IGV descuadrado → 422 `"Los cargos 6x/1x suman X, se esperaba N"`). `InvariantesDeConfirmacion.cs` no se toca | 7/7 | ✅ |
+| 4 | Único PR | API: `sugerencia` cableada al DI de `Program.cs` (consumidor en tiempo de composición, sin endpoint); `POST /api/asientos/{id}/recomponer` (`If-Match`, body `{cuentaCodigo}` opcional con override); auto-seed en promoción vía puerto `ISembradorDeAsiento` (`Inbox.Core`) + `SembradorDeAsientoAdapter` (traga `SinTipoCambio`/`NoEncontrado`); E2E goldens §10.1/§10.2/§10.3 + flujo PATCH-descuadre→422→recomponer→CONFIRMADO. Guardas de regresión #25/#26 | 6/6 | ✅ |
+| 5 | Único PR | SPA: `asiento.service.recomponer(asientoId, cuentaCodigo?)`, `factura.service.abrir(id)`; `detalle-page` botón "recomponer asiento" (BORRADOR, confirmación en dos pasos) + "generar asiento" cuando `asiento()` es null + marcador de descuadre sobre el `cuadre()` existente (sin componente nuevo, `cuadre.ts` intacto); regresión de que `factura-form` muestra base/IGV del asiento sembrado | 5/5 | ✅ |
+| 6 | Único PR | Nota REGLAS §12 puntos 1 y 5 en `DEUDA-TECNICA.md` (no gate de ratificación) | 1/1 | ✅ |
+
+### Pruebas
+
+| Suite | Antes | Después | Nuevas |
+|---|---|---|---|
+| `SmartNet.Facturacion.Core.Tests` | ~172 (derivado) | **186** | +14 (`SembradoDeAsientoTests` 8, `ServicioDeAsientosTests` `RecomponerAsync` +5 incl. override `cuentaCodigo`, `ServicioDeFacturasPhase2Tests` +1 reconciliación #19) |
+| `SmartNet.Contable.Core.Tests` | 49 | **51** | +2 (sentinels de de-vacuuming §7: asiento sin líneas / solo crédito del proveedor → falla PRINCIPAL/Global-1) |
+| `SmartNet.Facturacion.Infrastructure.Tests` | ~66 (derivado) | **72** | +6 (`SqlUnidadDeTrabajoSembradoTests`: resolver, `CrearAsientoBorradorAsync` nueva firma, `ReemplazarLineasAsync` + CAS, `ObtenerCuentaContableAsync`) |
+| `SmartNet.Inbox.Infrastructure.Tests` | 71 | **75** | +4 (auto-seed: siembra una vez por factura promovida; cero en descarte / merge de PDF asociado / defer — `ProcesarDocumentoAsociadoAsync` de #25 intacto) |
+| `SmartNet.Api.Tests` | 208 (3 en rojo preexistentes) | **212** | +4 E2E (`CatalogoTestDataHelper` + goldens §10.1/§10.2/§10.3 + PATCH-descuadre→recomponer) + 5 del endpoint `/recomponer`; los 3 rojos preexistentes (GRAVADA sin IGV → `401111 Debe=0` → 500) quedaron verdes al agregar `IgvOrig` por defecto en el helper |
+| SPA (Vitest) | 479 | **491** | +12 (`asiento.service.spec` +2, `detalle-page.spec` +10: recomponer visible/oculto/confirm, generar-asiento, marcador de descuadre, regresión base/IGV) |
+
+Ejecutadas por el orquestador y re-corridas por `sdd-verify` contra SQL Server local real (`WebApplicationFactory`):
+build `dotnet build SmartNet.sln` 0/0; las 5 suites .NET verdes en aislamiento; SPA `npm test` 491/491,
+`npm run lint` limpio. `ComposicionDeAsiento.Componer`, `InvariantesDeConfirmacion`, `ProyeccionDeImportes.Derivar`,
+`PatchAsync` D4 y `CargarAsientoAsync` verificados byte-for-byte sin cambios.
+
+### Decisiones de diseño
+
+- **Opción 3 híbrida** — el motor siembra, el usuario ajusta encima (auditado), `validar` corre §7 sobre
+  lo persistido y no re-compone. Es la que mejor calza con ADR 0006 y la que menos toca el #19.
+- **A2 — línea placeholder sin cuenta** cuando `sugerencia` no devuelve candidata: `Componer` con cero
+  cargos + una línea `CuentaCodigo=null`; el invariante Global-2 de §7 bloquea `validar` hasta que el
+  usuario elija. Sin cuenta centinela.
+- **B3 — la siembra no audita; `recomponer` sí** (1 fila `REPARTO_MANUAL`, `EntidadTipo=ASIENTO`). Sin
+  valor nuevo de `AuditoriaCorreccion.Accion` → sin script de esquema.
+- **C2/C3 — auto-seed en la promoción** vía puerto en `Inbox.Core` + adapter que traga fallos; si no
+  hay tipo de cambio la promoción procede igual y la factura queda sin asiento hasta que exista el TC.
+- **D — editar base/IGV que descuadra el reparto manual bloquea `validar`** (422 `InvarianteContable.Principal`);
+  `recomponer` es la salida. La proyección escalar del #19 (`ProyeccionDeImportes` / `PatchAsync` D4) no cambia.
+
+### Elementos conocidos, no ocultos
+
+`sdd-verify`: **0 CRITICAL, 4 WARNING, 1 SUGGESTION** (12/12 requisitos, 32/34 escenarios con test que
+pasa — los 2 restantes = §10.4 percepción, diferida; `sdd-verify-validate` → `valid: true`).
+
+- **W1 (aceptada)** — la lógica de "tragar fallos" de `SembradorDeAsientoAdapter` (`SinTipoCambio`/`NoEncontrado`/inesperado
+  → log + return) no tiene test directo; el escenario de promoción en moneda extranjera sin TC está
+  cubierto solo del lado de la promoción con un fake que no puede lanzar. Riesgo bajo (~15 líneas de glue).
+- **W2 (aceptada, decisión del dueño)** — §10.4 (percepción): 2 escenarios de spec diferidos, sin
+  columna `fact.Factura.PercepcionOrig`. Non-goal declarado.
+- **W3 (aceptada)** — el marcador de descuadre de la SPA se ata al `cuadre()` existente (Debe vs Haber
+  de todas las líneas), no literalmente `Σ cargos PRINCIPAL ≠ BasePEN` del encabezado. Un reparto
+  cuadrado pero mal asignado podría ocultar el marcador aunque el §7 del servidor devuelva 422 igual
+  (pista de UX; el gate del servidor está probado por E2E).
+- **W4 (aceptada)** — los E2E goldens usan la cascada de sugerencia por el camino Tier-3 "primera
+  candidata" (una hoja sembrada por prefijo); las ramas multi-candidata / historial de uso las cubre
+  la suite propia del módulo `sugerencia`. La composición del asiento sí se ejercita end-to-end.
+- **Interrupción por límite de gasto** — el `apply` se corrió en 9 batches; el batch 8 murió por el
+  límite mensual de la cuenta y se retomó sin pérdida (árbol compilando). El sub-agente `sdd-archive`
+  dejó el folder sin mover (3ª vez en la sesión); el orquestador completó el move + `archive-report`.
+
+*Follow-ups:* (1) hoist de `MapearAfectacion` (duplicado 3×, SUGGESTION); (2) agregar #24, #25 y #26 a
+`BACKLOG.md`; (3) commit a `main` stageando solo `facturacion/**`, `contable/**`, `inbox/**`, `api/**`,
+`SmartNetWeb/src/app/detalle/**`, `DEUDA-TECNICA.md`, `openspec/**`; (4) **ciclo #28 — deduplicar la
+bandeja** (un comprobante XML+PDF genera 2–3 filas de `InboxEvent`; es el 3er síntoma reportado, sin arrancar).
+
+**RDD de gentle-ai desactivado a nivel de repo** (`disabled/unmanaged`). Sin commit al cerrar — el
+árbol (`main`, sobre los 11 commits previos de la sesión) queda para revisión del dueño. Cambio
+estimado ~1.900 líneas, un solo PR `size:exception` aceptado por el dueño (rechazó la cadena de 3 PRs).
+
+---
+
 ## ✅ 25. PDF asociado del par XML+PDF en el visor de documentos
 
 Un comprobante SUNAT que llega por correo como par XML + PDF nunca mostraba el PDF en el visor de la
@@ -2274,7 +2360,7 @@ por el dueño.
 
 ---
 
-## ⬜ Ítems 10, 15, 16 y 24 — sin ciclo SDD abierto
+## ⬜ Ítems 10, 15 y 16 — sin ciclo SDD abierto
 
 Las fases de cada ítem **se definen cuando arranca su ciclo SDD**, no antes. Ponerlas aquí ahora
 sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ítem, y ninguno existe.
@@ -2284,7 +2370,6 @@ sería inventarlas: el despiece en fases sale de la spec y el diseño de ese ít
 | 10 | Notas de crédito | #8 | ⚠ `REGLAS.md` §5, §7 | ⬜ |
 | 15 | Publicación a Drive | #14 | — | ⬜ |
 | 16 | Publicación a Sheets | #14 | — | ⬜ |
-| 24 | Conectar la composición del asiento al pipeline | #12, #19 | ⚠ `REGLAS.md` §5–§10 | ⬜ |
 
 ---
 
