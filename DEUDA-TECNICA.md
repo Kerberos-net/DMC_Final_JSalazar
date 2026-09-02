@@ -58,7 +58,7 @@ Estado de referencia (SPRINT.md): 20 de 24 ítems del backlog cerrados. Sin cicl
 | # | Tema | Dónde está anotado | Observación |
 |---|---|---|---|
 | 5.1 | Las tres preguntas de respaldo: modelo de recuperación, cadena de `LOG BACKUP`, RPO efectivo de la instancia compartida | ADR 0014 | |
-| 5.2 | Las seis reglas de `REGLAS.md` §12 sin ratificar por un contador (los puntos 1 y 5 afectan a todo asiento en moneda extranjera ya confirmado) | `REGLAS.md` §12 | |
+| 5.2 | Las seis reglas de `REGLAS.md` §12 sin ratificar por un contador (los puntos 1 y 5 afectan a todo asiento en moneda extranjera ya confirmado) | `REGLAS.md` §12 | #24 cablea §5–§7 al flujo productivo (`abrir`/promoción siembran el asiento vía `ComposicionDeAsiento.Componer`) pero **no ratifica ninguna regla**. Punto 1 (TC venta para el asiento) ya se ejecutaba en producción vía la proyección escalar del #19 (`ProyeccionDeImportes.Derivar`); #24 no amplía esa exposición. Punto 5 (la NC hereda el TC de la factura de origen) sigue **inalcanzable** este ciclo: la composición de notas de crédito es non-goal del #24 y `FacturaReferenciaId` nunca se puebla. Sigue siendo una nota, no un gate de ratificación (obs 309, decisión 7). |
 | 5.3 | Topología, proxy inverso, TLS y entornos | ADR 0012 | |
 | 5.4 | Secretos y agregador de logs (salvo `EstadoIntegracion`, ya en #17) | ADR 0015 | |
 | 5.5 | No existe *pipeline* de despliegue en el repositorio | — | |

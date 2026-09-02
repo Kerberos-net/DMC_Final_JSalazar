@@ -52,6 +52,22 @@ export class DetallePage {
 
   readonly cuadre = computed(() => calcularCuadre(this.asiento()?.lineas ?? []));
 
+  /** design E: cabecera ≠ detalle. El motor sembró la semilla, pero una edición de base/IGV (#19
+   * D4) o de líneas (#12) dejó el reparto descuadrado; `validar` devolverá 422 §7 hasta que el
+   * usuario re-alinee las líneas o llame a "recomponer". Solo tiene sentido en BORRADOR. */
+  readonly descuadreAsiento = computed(() => {
+    const a = this.asiento();
+    return !!a && a.estado !== 'CONFIRMADO' && !this.cuadre().cuadrado;
+  });
+
+  /** design E: "generar asiento" -- el asiento no se sembró en la promoción (moneda extranjera sin
+   * TC vigente); se ofrece la acción explícita para crearlo ahora que puede haber un TC. */
+  readonly puedeGenerarAsiento = computed(() => !!this.factura() && this.asiento() === null);
+
+  /** two-step confirm en el contenedor (mismo patrón que el borrado de línea en `asiento-lineas`),
+   * el proyecto no usa `window.confirm`. */
+  readonly confirmandoRecomponer = signal(false);
+
   /** spa-visual-detalle-validacion "Page header ... title `{tipoComprobante} - {numero} - {proveedor}`". */
   readonly tituloDetalle = computed(() => {
     const f = this.factura();
@@ -207,6 +223,41 @@ export class DetallePage {
 
   volver(): void {
     this.location.back();
+  }
+
+  pedirRecomponer(): void {
+    this.confirmandoRecomponer.set(true);
+  }
+
+  cancelarRecomponer(): void {
+    this.confirmandoRecomponer.set(false);
+  }
+
+  /** design E: regenera la semilla del motor sobre el asiento BORRADOR, descartando las ediciones
+   * manuales de líneas. Mismo patrón try/`manejarError` que `onEditarLinea`. */
+  async onRecomponer(): Promise<void> {
+    const asientoId = this.asiento()?.asientoContableId;
+    if (asientoId === undefined) {
+      return;
+    }
+    this.confirmandoRecomponer.set(false);
+    try {
+      await this.asientoService.recomponer(asientoId);
+      this.problema.set(null);
+    } catch (err) {
+      this.manejarError(err);
+    }
+  }
+
+  /** design E: crea el asiento cuando la promoción no pudo sembrarlo (moneda extranjera sin TC). */
+  async generarAsiento(): Promise<void> {
+    try {
+      await this.facturaService.abrir(this.facturaId);
+      this.problema.set(null);
+      await this.cargarTodo();
+    } catch (err) {
+      this.manejarError(err);
+    }
   }
 
   async validar(fechaCorteContable: string): Promise<void> {

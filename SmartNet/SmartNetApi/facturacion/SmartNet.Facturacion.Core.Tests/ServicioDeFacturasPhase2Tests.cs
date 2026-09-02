@@ -758,4 +758,50 @@ public class ServicioDeFacturasPhase2Tests
         Assert.Null(store.UnidadDeTrabajo.UltimoPosibleDuplicadoEscrito);
         Assert.DoesNotContain(nameof(IUnidadDeTrabajo.ExisteIdentidadPreviaAsync), store.UnidadDeTrabajo.Llamadas);
     }
+
+    // --- BACKLOG #24 (tasks 3.7, design D) — §7 reconciliación con la proyección escalar de #19.
+    // Tras un PATCH base/IGV que mueve los escalares del encabezado sin tocar un reparto manual ya
+    // persistido, `validar` devuelve InvariantesIncumplidas(Principal) con el mensaje de descuadre.
+    // NO se re-mapea a 409 (solo FechaAnteriorAlCorte / ProveedorVarios lo hacen).
+    // `ProyeccionDeImportes.Derivar` y el bloque D4 de `PatchAsync` quedan sin cambios. ---
+
+    [Fact]
+    public async Task ValidarAsync_WhenAManualSplitNoLongerSumsToTheMovedHeaderBase_ReturnsInvariantesIncumplidas_Principal_NotRemappedTo409()
+    {
+        var store = new FakeFacturacionStore();
+        // Encabezado ya re-derivado por un PATCH base/IGV (#19 D4): BasePEN 1000 / IgvPEN 180.
+        // El reparto manual persistido sigue sumando 100 en los cargos 6x/1x -> descuadre §7.
+        store.UnidadDeTrabajo.AsientoACargar = new AsientoPersistido(
+            AsientoContableId: 501,
+            FacturaId: 100,
+            Estado: AsientoPersistido.Borrador,
+            NumeroAsiento: null,
+            Version: VersionInicial,
+            Asiento: new AsientoContable(
+                ProveedorCodigo: "P00123",
+                FechaContable: new DateOnly(2026, 8, 10),
+                MotivoDescripcion: "Compra",
+                TipoCambioVenta: null,
+                BasePEN: 1000m,
+                IgvPEN: 180m,
+                NetoPEN: 1180m,
+                AfectacionCongelada: Afectacion.Gravada,
+                Comprobante: TipoComprobante.Factura,
+                Lineas: new[]
+                {
+                    new LineaAsiento(1, Bloque.Principal, TipoLinea.D, 100m, 0m, "639915", null, null, null),
+                    new LineaAsiento(2, Bloque.Principal, TipoLinea.D, 18m, 0m, "401111", null, null, null),
+                    new LineaAsiento(3, Bloque.Principal, TipoLinea.H, 0m, 118m, "421001", null, null, null),
+                }),
+            Hechos: HechosDeConflicto.Ninguno);
+        var sut = new ServicioDeFacturas(store);
+
+        var resultado = await sut.ValidarAsync(501, new DateOnly(2026, 8, 1), Ahora, usuarioId: 1, CancellationToken.None);
+
+        var incumplidas = Assert.IsType<ResultadoComando.InvariantesIncumplidas>(resultado);
+        Assert.Contains(incumplidas.Fallos, f =>
+            f.Invariante == InvarianteContable.Principal &&
+            f.Detalle == "Los cargos 6x/1x suman 100, se esperaba 1000.");
+        Assert.False(store.UnidadDeTrabajo.Committed);
+    }
 }

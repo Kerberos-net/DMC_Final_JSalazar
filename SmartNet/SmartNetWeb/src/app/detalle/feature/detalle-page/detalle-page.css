@@ -52,6 +52,18 @@
   max-width: 16rem;
 }
 
+.detalle-asiento__sin-asiento,
+.detalle-asiento__recomponer {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  flex-wrap: wrap;
+}
+
+.detalle-asiento__descuadre {
+  margin: 0;
+}
+
 @media (max-width: 1100px) {
   .detalle-layout {
     grid-template-columns: minmax(0, 1fr);

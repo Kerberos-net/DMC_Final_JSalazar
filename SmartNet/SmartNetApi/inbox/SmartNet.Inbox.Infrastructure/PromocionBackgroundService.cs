@@ -17,15 +17,18 @@ public sealed class PromocionBackgroundService : BackgroundService
 
     private readonly IEventoInboxRepository _eventoInboxRepository;
     private readonly IPromocionRepository _promocionRepository;
+    private readonly ISembradorDeAsiento _sembradorDeAsiento;
     private readonly TimeProvider _timeProvider;
 
     public PromocionBackgroundService(
         IEventoInboxRepository eventoInboxRepository,
         IPromocionRepository promocionRepository,
+        ISembradorDeAsiento sembradorDeAsiento,
         TimeProvider timeProvider)
     {
         _eventoInboxRepository = eventoInboxRepository;
         _promocionRepository = promocionRepository;
+        _sembradorDeAsiento = sembradorDeAsiento;
         _timeProvider = timeProvider;
     }
 
@@ -62,7 +65,14 @@ public sealed class PromocionBackgroundService : BackgroundService
             switch (decision)
             {
                 case DecisionPromocion.Promueve:
-                    await PromoverAsync(pendiente, evento, ct);
+                    // BACKLOG #24 (design C2/C3): tras COMMIT de la promoción, siembra el asiento
+                    // BORRADOR de la factura recién promovida vía el puerto (adaptador en
+                    // SmartNet.Api -> ServicioDeFacturas.AbrirAsync). El sembrador NUNCA lanza:
+                    // una siembra fallida (sin tipo de cambio / factura ausente) no aborta el ciclo
+                    // ni revierte la promoción. La rama de documento asociado (#25/#26) queda
+                    // deliberadamente fuera — no crea filas fact.Factura.
+                    var facturaPromovidaId = await PromoverAsync(pendiente, evento, ct);
+                    await _sembradorDeAsiento.SembrarAsync(facturaPromovidaId, ct);
                     break;
                 case DecisionPromocion.Descarta descarta:
                     await _promocionRepository.DescartarAsync(pendiente.InboxEventId, descarta.Motivo, ct);
@@ -95,7 +105,7 @@ public sealed class PromocionBackgroundService : BackgroundService
         }
     }
 
-    private async Task PromoverAsync(EventoInboxPendiente pendiente, EventoInbox evento, CancellationToken ct)
+    private async Task<long> PromoverAsync(EventoInboxPendiente pendiente, EventoInbox evento, CancellationToken ct)
     {
         var comprobante = evento.Comprobante!; // PoliticaDePromocion.Decidir already confirmed presence.
         var proveedor = await _promocionRepository.ResolverProveedorAsync(comprobante.RucProveedor, ct);
@@ -109,7 +119,8 @@ public sealed class PromocionBackgroundService : BackgroundService
         var documentoPromovido = new DocumentoPromovido(
             evento.DocumentoRecibidoId, evento.NombreArchivo, evento.MimeType, evento.RutaRelativa, evento.TamanoBytes);
 
-        await _promocionRepository.PromoverAsync(
+        var resultado = await _promocionRepository.PromoverAsync(
             pendiente.InboxEventId, pendiente.ProcesamientoId, facturaPromovida, documentoPromovido, ct);
+        return resultado.FacturaId;
     }
 }

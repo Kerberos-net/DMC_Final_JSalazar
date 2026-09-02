@@ -1,6 +1,8 @@
 using Microsoft.Data.SqlClient;
+using SmartNet.Catalogos.Core;
 using SmartNet.Contable.Core;
 using SmartNet.Facturacion.Core;
+using SmartNet.Sugerencia.Core;
 using SmartNet.TiposCambio.Core;
 
 namespace SmartNet.Facturacion.Infrastructure;
@@ -35,6 +37,7 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
     private readonly SqlConnection _connection;
     private readonly SqlTransaction _transaction;
     private readonly ITipoCambioRepository _tipoCambioRepository;
+    private readonly ServicioDeSugerencia? _servicioDeSugerencia;
     private bool _committed;
     private bool _disposed;
 
@@ -44,11 +47,16 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
     // nunca deja una fila a medio escribir.
     private readonly HashSet<(string Tipo, long FacturaId)> _emitidosEnEstaTx = new();
 
-    internal SqlUnidadDeTrabajo(SqlConnection connection, SqlTransaction transaction, ITipoCambioRepository tipoCambioRepository)
+    internal SqlUnidadDeTrabajo(
+        SqlConnection connection,
+        SqlTransaction transaction,
+        ITipoCambioRepository tipoCambioRepository,
+        ServicioDeSugerencia? servicioDeSugerencia = null)
     {
         _connection = connection;
         _transaction = transaction;
         _tipoCambioRepository = tipoCambioRepository;
+        _servicioDeSugerencia = servicioDeSugerencia;
     }
 
     public async Task<AsientoPersistido?> CargarAsientoAsync(long asientoId, CancellationToken ct)
@@ -551,22 +559,187 @@ public sealed class SqlUnidadDeTrabajo : IUnidadDeTrabajo
         return resultado is long id ? id : null;
     }
 
-    public async Task<long> CrearAsientoBorradorAsync(
-        long facturaId, string proveedorCodigo, DateOnly fechaContable, CancellationToken ct)
+    // BACKLOG #24 (design A1/A3) -- hechos externos que SembradoDeAsiento (Core) necesita y que una
+    // FacturaPersistida no lleva. fact.ProveedorAtributo y dbo.Motivo se leen DENTRO de la
+    // transacción (una sola consulta); el tipo de cambio se resuelve en su propia conexión vía
+    // ITipoCambioRepository -- mismo criterio que ExisteTipoCambioVigenteAsync (catálogo externo
+    // read-only, ADR 0003, nunca escrito desde este flujo).
+    public async Task<HechosDeComposicion> ResolverHechosDeComposicionAsync(long facturaId, CancellationToken ct)
     {
-        // ALCANCE PR 2: solo el ENCABEZADO -- la composición de líneas (Bloque PRINCIPAL/DESTINO)
-        // es de Phase 3 (tasks.md), igual que GuardarAsientoAsync en PR 1.
+        bool esRelacionada;
+        string? motivoDescripcion;
+        string moneda;
+        DateOnly fechaEmision;
+        string proveedorCodigo;
+        int? motivoCodigo;
+
+        await using (var command = CrearComando(
+            """
+            SELECT ISNULL(pa.EsRelacionada, 0), m.motivo, f.Moneda, f.FechaEmision,
+                   f.ProveedorCodigo, f.Motivo
+            FROM fact.Factura f
+            LEFT JOIN fact.ProveedorAtributo pa ON pa.ProveedorCodigo = f.ProveedorCodigo
+            LEFT JOIN dbo.Motivo m ON m.codigo = f.Motivo
+            WHERE f.FacturaId = @facturaId;
+            """))
+        {
+            command.Parameters.AddWithValue("@facturaId", facturaId);
+            await using var reader = await command.ExecuteReaderAsync(ct);
+            if (!await reader.ReadAsync(ct))
+            {
+                throw new InvalidOperationException(
+                    $"No existe fact.Factura {facturaId} al resolver los hechos de composición.");
+            }
+
+            esRelacionada = reader.GetBoolean(0);
+            motivoDescripcion = reader.IsDBNull(1) ? null : reader.GetString(1).TrimEnd();
+            moneda = reader.GetString(2).TrimEnd();
+            fechaEmision = DateOnly.FromDateTime(reader.GetDateTime(3));
+            proveedorCodigo = reader.GetString(4).TrimEnd();
+            motivoCodigo = reader.IsDBNull(5) ? null : reader.GetInt32(5);
+        }
+
+        TipoCambioCongelado? tipoCambio = null;
+        if (moneda != MonedaLocal
+            && await _tipoCambioRepository.ObtenerVigenteAsync(fechaEmision, ct) is ResultadoTipoCambio.Vigente vigente)
+        {
+            tipoCambio = TipoCambioCongelado.DeTipoCambio(vigente.Valor);
+        }
+
+        // BACKLOG #24 Phase 4.1 -- si Program.cs cableó ServicioDeSugerencia, se resuelve la cuenta
+        // de cargo por defecto (cascada REGLAS.md §3 sobre proveedor + motivo). Sin sugerencia o sin
+        // el servicio inyectado -> null -> SembradoDeAsiento.Sembrar cae al placeholder (design A2).
+        // El servicio abre sus propias conexiones (dbo.CuentaContable / dbo.Motivo /
+        // fact.SugerenciaCuenta son lecturas de catálogo, nunca escritas desde esta transacción).
+        CuentaContable? cuentaSugerida = null;
+        if (_servicioDeSugerencia is not null)
+        {
+            var sugerencia = await _servicioDeSugerencia.SugerirParaFacturaAsync(proveedorCodigo, motivoCodigo, ct);
+            if (sugerencia.Cuenta is not null)
+            {
+                cuentaSugerida = sugerencia.CandidatasVigentes
+                    .FirstOrDefault(c => c.Cuenta == sugerencia.Cuenta.CuentaCodigo);
+            }
+        }
+
+        return new HechosDeComposicion(esRelacionada, motivoDescripcion, tipoCambio, cuentaSugerida);
+    }
+
+    // BACKLOG #24 (design C1) -- lectura in-tx de dbo.CuentaContable por código exacto (grant
+    // SELECT dbo.CuentaContable en 008). Mismo mapeo que SqlCuentaContableRepository.Map.
+    public async Task<CuentaContable?> ObtenerCuentaContableAsync(string cuentaCodigo, CancellationToken ct)
+    {
         await using var command = CrearComando(
             """
-            INSERT INTO fact.AsientoContable (FacturaId, OrigenLibro, ProveedorCodigo, FechaContable, Estado)
-            OUTPUT inserted.AsientoContableId
-            VALUES (@facturaId, '02', @proveedorCodigo, @fechaContable, 'BORRADOR');
+            SELECT cuenta, descripcion, nivel, ctarefleja, ctapuente
+            FROM dbo.CuentaContable
+            WHERE cuenta = @cuenta;
             """);
-        command.Parameters.AddWithValue("@facturaId", facturaId);
-        command.Parameters.AddWithValue("@proveedorCodigo", proveedorCodigo);
-        command.Parameters.AddWithValue("@fechaContable", fechaContable.ToDateTime(TimeOnly.MinValue));
+        command.Parameters.AddWithValue("@cuenta", cuentaCodigo);
 
-        return (long)(await command.ExecuteScalarAsync(ct))!;
+        await using var reader = await command.ExecuteReaderAsync(ct);
+        if (!await reader.ReadAsync(ct))
+        {
+            return null;
+        }
+
+        return new CuentaContable(
+            Cuenta: reader.GetString(0),
+            Descripcion: reader.GetString(1),
+            Nivel: reader.IsDBNull(2) ? null : reader.GetByte(2),
+            CtaReflejaCodigo: reader.IsDBNull(3) ? null : reader.GetString(3),
+            CtaPuenteCodigo: reader.IsDBNull(4) ? null : reader.GetString(4));
+    }
+
+    public async Task<long> CrearAsientoBorradorAsync(
+        long facturaId, AsientoContable asiento, CancellationToken ct)
+    {
+        // BACKLOG #24 (design B1) -- encabezado (escalares del motor) + N líneas ya compuestas, en
+        // esta transacción. Las líneas NO pasan por AgregarLineaAsync (su CAS de encabezado espera
+        // una Version que aquí nadie sostiene -- la fila se acaba de crear).
+        long asientoId;
+        await using (var command = CrearComando(
+            """
+            INSERT INTO fact.AsientoContable
+                (FacturaId, OrigenLibro, ProveedorCodigo, FechaContable, Estado,
+                 MotivoDescripcion, TipoCambioVenta, BasePEN, IgvPEN, NetoPEN)
+            OUTPUT inserted.AsientoContableId
+            VALUES (@facturaId, '02', @proveedorCodigo, @fechaContable, 'BORRADOR',
+                    @motivoDescripcion, @tipoCambioVenta, @basePen, @igvPen, @netoPen);
+            """))
+        {
+            command.Parameters.AddWithValue("@facturaId", facturaId);
+            command.Parameters.AddWithValue("@proveedorCodigo", asiento.ProveedorCodigo);
+            command.Parameters.AddWithValue("@fechaContable", asiento.FechaContable.ToDateTime(TimeOnly.MinValue));
+            command.Parameters.AddWithValue("@motivoDescripcion", (object?)asiento.MotivoDescripcion ?? DBNull.Value);
+            command.Parameters.AddWithValue("@tipoCambioVenta", (object?)asiento.TipoCambioVenta ?? DBNull.Value);
+            command.Parameters.AddWithValue("@basePen", asiento.BasePEN);
+            command.Parameters.AddWithValue("@igvPen", asiento.IgvPEN);
+            command.Parameters.AddWithValue("@netoPen", asiento.NetoPEN);
+
+            asientoId = (long)(await command.ExecuteScalarAsync(ct))!;
+        }
+
+        await InsertarLineasAsync(asientoId, asiento.Lineas, ct);
+        return asientoId;
+    }
+
+    public async Task<ResultadoEscritura> ReemplazarLineasAsync(
+        long asientoContableId, byte[] versionEsperada, AsientoContable asiento, CancellationToken ct)
+    {
+        // BACKLOG #24 (design B2) -- CAS de encabezado -> DELETE detalle -> UPDATE escalares
+        // (nunca Estado/NumeroAsiento) -> re-INSERT. TocarEncabezadoAsync ya incrementa Version.
+        var bump = await TocarEncabezadoAsync(asientoContableId, versionEsperada, ct);
+        if (bump != ResultadoEscritura.Aplicado)
+        {
+            return bump;
+        }
+
+        await using (var borrado = CrearComando(
+            "DELETE FROM fact.AsientoContableDetalle WHERE AsientoContableId = @id;"))
+        {
+            borrado.Parameters.AddWithValue("@id", asientoContableId);
+            await borrado.ExecuteNonQueryAsync(ct);
+        }
+
+        await using (var encabezado = CrearComando(
+            """
+            UPDATE fact.AsientoContable
+            SET MotivoDescripcion = @motivoDescripcion, TipoCambioVenta = @tipoCambioVenta,
+                BasePEN = @basePen, IgvPEN = @igvPen, NetoPEN = @netoPen, FechaContable = @fechaContable
+            WHERE AsientoContableId = @id;
+            """))
+        {
+            encabezado.Parameters.AddWithValue("@motivoDescripcion", (object?)asiento.MotivoDescripcion ?? DBNull.Value);
+            encabezado.Parameters.AddWithValue("@tipoCambioVenta", (object?)asiento.TipoCambioVenta ?? DBNull.Value);
+            encabezado.Parameters.AddWithValue("@basePen", asiento.BasePEN);
+            encabezado.Parameters.AddWithValue("@igvPen", asiento.IgvPEN);
+            encabezado.Parameters.AddWithValue("@netoPen", asiento.NetoPEN);
+            encabezado.Parameters.AddWithValue("@fechaContable", asiento.FechaContable.ToDateTime(TimeOnly.MinValue));
+            encabezado.Parameters.AddWithValue("@id", asientoContableId);
+            await encabezado.ExecuteNonQueryAsync(ct);
+        }
+
+        await InsertarLineasAsync(asientoContableId, asiento.Lineas, ct);
+        return ResultadoEscritura.Aplicado;
+    }
+
+    private async Task InsertarLineasAsync(long asientoContableId, IReadOnlyList<LineaAsiento> lineas, CancellationToken ct)
+    {
+        foreach (var linea in lineas)
+        {
+            await using var command = CrearComando(
+                """
+                INSERT INTO fact.AsientoContableDetalle
+                    (AsientoContableId, Orden, Bloque, Tipo, Debe, Haber, CuentaCodigo, CuentaDescripcion,
+                     CtaReflejaCodigo, CtaPuenteCodigo, SinCuenta)
+                VALUES
+                    (@asientoId, @orden, @bloque, @tipo, @debe, @haber, @cuentaCodigo, @cuentaDescripcion,
+                     @ctaRefleja, @ctaPuente, @sinCuenta);
+                """);
+            AgregarParametrosDeLinea(command, asientoContableId, linea);
+            await command.ExecuteNonQueryAsync(ct);
+        }
     }
 
     public async Task<long> RegistrarAdjuntoAsync(AdjuntoManual adjunto, CancellationToken ct)

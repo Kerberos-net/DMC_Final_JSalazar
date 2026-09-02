@@ -360,6 +360,94 @@ public sealed class AsientoEndpointsTests : SesionEndpointsTestBase
         Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
     }
 
+    // --- recomponer (BACKLOG #24, spec.md api-asientos "recomponer regenerates the engine seed") ---
+
+    [Fact]
+    public async Task Recomponer_OnABorradorAsiento_RegeneratesLineas_BumpsEtag_AndAuditsRepartoManual()
+    {
+        var facturaId = await Db.InsertarFacturaAsync();
+        var asientoId = await Db.InsertarAsientoBorradorBalanceadoAsync(facturaId);
+        var etag = TokenDeConcurrencia.Codificar(await Db.ObtenerVersionAsientoAsync(asientoId));
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/asientos/{asientoId}/recomponer");
+        request.Headers.TryAddWithoutValidation("If-Match", etag);
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        Assert.NotNull(response.Headers.ETag);
+        Assert.NotEqual(etag, response.Headers.ETag!.Tag);
+
+        // No suggestion wired yet -> design-A2 placeholder path: at least one regenerated PRINCIPAL
+        // cargo line carries no cuenta (SinCuenta = 1), so §7 Global-2 would block validar.
+        var sinCuenta = await Db.ExecuteScalarAsync<int>(
+            $"SELECT COUNT(*) FROM fact.AsientoContableDetalle WHERE AsientoContableId = {asientoId} AND SinCuenta = 1;");
+        Assert.True(sinCuenta >= 1);
+
+        var auditoria = await Db.ExecuteScalarAsync<int>(
+            $"SELECT COUNT(*) FROM fact.AuditoriaCorreccion WHERE EntidadTipo = 'ASIENTO' AND EntidadId = {asientoId} AND Accion = 'REPARTO_MANUAL';");
+        Assert.Equal(1, auditoria);
+    }
+
+    [Fact]
+    public async Task Recomponer_OnAConfirmadoAsiento_Returns409()
+    {
+        var facturaId = await Db.InsertarFacturaAsync();
+        var asientoId = await Db.InsertarAsientoBorradorBalanceadoAsync(facturaId);
+        await Db.ExecuteNonQueryAsync($"UPDATE fact.AsientoContable SET Estado = 'CONFIRMADO' WHERE AsientoContableId = {asientoId};");
+        var etag = TokenDeConcurrencia.Codificar(await Db.ObtenerVersionAsientoAsync(asientoId));
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/asientos/{asientoId}/recomponer");
+        request.Headers.TryAddWithoutValidation("If-Match", etag);
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.Conflict, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Recomponer_WithAStaleIfMatch_Returns412()
+    {
+        var facturaId = await Db.InsertarFacturaAsync();
+        var asientoId = await Db.InsertarAsientoBorradorBalanceadoAsync(facturaId);
+        var etagObsoleto = TokenDeConcurrencia.Codificar(new byte[] { 0, 0, 0, 0, 0, 0, 0, 1 });
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var request = new HttpRequestMessage(HttpMethod.Post, $"/api/asientos/{asientoId}/recomponer");
+        request.Headers.TryAddWithoutValidation("If-Match", etagObsoleto);
+        var response = await client.SendAsync(request);
+
+        Assert.Equal(HttpStatusCode.PreconditionFailed, response.StatusCode);
+    }
+
+    [Fact]
+    public async Task Recomponer_WithoutIfMatch_Returns428()
+    {
+        var facturaId = await Db.InsertarFacturaAsync();
+        var asientoId = await Db.InsertarAsientoBorradorBalanceadoAsync(facturaId);
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var response = await client.PostAsync($"/api/asientos/{asientoId}/recomponer", content: null);
+
+        Assert.Equal((HttpStatusCode)428, response.StatusCode);
+        Assert.Equal("application/problem+json", response.Content.Headers.ContentType?.MediaType);
+    }
+
+    [Fact]
+    public async Task Recomponer_WithoutACookie_Returns401()
+    {
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = factory.CreateClient(new WebApplicationFactoryClientOptions { HandleCookies = false });
+
+        var response = await client.PostAsync("/api/asientos/1/recomponer", content: null);
+
+        Assert.Equal(HttpStatusCode.Unauthorized, response.StatusCode);
+    }
+
     // --- GET /api/asientos/{id} (tasks.md 3.8/3.9, spec.md asiento-lectura-api) ---
 
     [Fact]

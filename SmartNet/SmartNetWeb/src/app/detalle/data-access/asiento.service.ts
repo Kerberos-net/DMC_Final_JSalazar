@@ -79,6 +79,24 @@ export class AsientoService {
     await this.cargar(asientoId);
   }
 
+  /** design C1/E -- `POST /api/asientos/{id}/recomponer`: regenera la semilla del motor (líneas +
+   * cabecera) descartando las ediciones manuales. `If-Match` obligatorio (428 sin él); cuerpo
+   * opcional `{ cuentaCodigo }` para fijar la cuenta del cargo por defecto. Devuelve el
+   * `AsientoRespuesta` completo + nuevo ETag, igual que `actualizarLinea`. */
+  async recomponer(asientoId: number, cuentaCodigo?: string | null): Promise<void> {
+    const respuesta = await firstValueFrom(
+      this.http.post<AsientoRespuesta>(
+        `/api/asientos/${asientoId}/recomponer`,
+        cuentaCodigo ? { cuentaCodigo } : null,
+        {
+          headers: { 'If-Match': this.etagRequerido() },
+          observe: 'response',
+        }
+      )
+    );
+    this.aplicar(respuesta);
+  }
+
   private aplicar(respuesta: HttpResponse<AsientoRespuesta>): void {
     this.asientoSignal.set(respuesta.body);
     this.etagSignal.set(respuesta.headers.get('ETag'));

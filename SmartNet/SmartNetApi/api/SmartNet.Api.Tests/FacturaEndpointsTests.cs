@@ -652,4 +652,186 @@ public sealed class FacturaEndpointsTests : SesionEndpointsTestBase
 
         Assert.Equal(HttpStatusCode.NotFound, response.StatusCode);
     }
+
+    // --- BACKLOG #24 (tasks.md 4.5/4.6) — REGLAS §10 goldens end to end: seed the plan-contable +
+    // dbo.Motivo rows the suggestion cascade needs, POST /abrir, GET /asiento, assert the composed
+    // asiento against REGLAS §10.x, then POST /validar → CONFIRMADO + correlativo.
+    // §10.4 (percepción) is a declared non-goal this cycle (no fact.Factura.PercepcionOrig column) —
+    // deliberately NOT covered here.
+
+    private static LineaRespuesta Linea(AsientoRespuesta asiento, string bloque, string tipo, string cuenta) =>
+        Assert.Single(asiento.Lineas, l => l.Bloque == bloque && l.Tipo == tipo && l.CuentaCodigo == cuenta);
+
+    private async Task<AsientoRespuesta> AbrirYLeerAsientoAsync(SmartNetApiFactory factory, HttpClient client, long facturaId)
+    {
+        var abrir = await client.PostAsync($"/api/facturas/{facturaId}/abrir", content: null);
+        Assert.Equal(HttpStatusCode.OK, abrir.StatusCode);
+
+        var get = await client.GetAsync($"/api/facturas/{facturaId}/asiento");
+        Assert.Equal(HttpStatusCode.OK, get.StatusCode);
+        var cuerpo = await get.Content.ReadFromJsonAsync<FacturaAsientoRespuesta>();
+        Assert.NotNull(cuerpo!.Asiento);
+        return cuerpo.Asiento!;
+    }
+
+    [Fact]
+    public async Task Reglas_10_1_FacturaGravadaEnSolesConDestino_ComposesAndValidates()
+    {
+        await Db.SeedMotivoAsync(900, "Fletes traslado de mercaderia", "631111");
+        await Db.SeedCuentaContableAsync("631111", "FLETE TRASLADO DE MERCADERIA", ctaRefleja: "946311", ctaPuente: "791111");
+        await Db.SeedCuentaContableAsync("946311", "DESTINO DEL FLETE");
+        await Db.SeedCuentaContableAsync("791111", "CARGAS IMPUTABLES A CTA DE COSTOS");
+        await Db.SeedCuentaContableAsync("401111", "IGV - CUENTA PROPIA");
+        await Db.SeedCuentaContableAsync("421211", "FACTURAS Y BOLETAS EN SOLES");
+
+        var facturaId = await Db.InsertarFacturaAsync(
+            numero: "F001-00234", afectacion: "GRAVADA", totalOrig: 1180.00m, igvOrig: 180.00m);
+        await Db.AsignarMotivoAsync(facturaId, 900);
+
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var asiento = await AbrirYLeerAsientoAsync(factory, client, facturaId);
+
+        Assert.Equal(1000.00m, asiento.BasePEN);
+        Assert.Equal(180.00m, asiento.IgvPEN);
+        Assert.Equal(1180.00m, await Db.ExecuteScalarAsync<decimal>(
+            $"SELECT NetoPEN FROM fact.AsientoContable WHERE FacturaId = {facturaId};"));
+
+        Assert.Equal(1000.00m, Linea(asiento, "PRINCIPAL", "D", "631111").Debe);
+        Assert.Equal(180.00m, Linea(asiento, "PRINCIPAL", "D", "401111").Debe);
+        Assert.Equal(1180.00m, Linea(asiento, "PRINCIPAL", "H", "421211").Haber);
+        Assert.Equal(1000.00m, Linea(asiento, "DESTINO", "D", "946311").Debe);
+        Assert.Equal(1000.00m, Linea(asiento, "DESTINO", "H", "791111").Haber);
+        Assert.Equal(5, asiento.Lineas.Count);
+
+        var validar = await client.PostAsync($"/api/facturas/{facturaId}/validar?fechaCorteContable=2026-08-01", content: null);
+        Assert.Equal(HttpStatusCode.OK, validar.StatusCode);
+        Assert.Equal("VALIDADA", (await Db.ExecuteScalarAsync<string>(
+            $"SELECT Estado FROM fact.Factura WHERE FacturaId = {facturaId};"))!.TrimEnd());
+        var numeroAsiento = await Db.ExecuteScalarAsync<string>(
+            $"SELECT NumeroAsiento FROM fact.AsientoContable WHERE FacturaId = {facturaId};");
+        Assert.False(string.IsNullOrWhiteSpace(numeroAsiento));
+        Assert.Equal("CONFIRMADO", (await Db.ExecuteScalarAsync<string>(
+            $"SELECT Estado FROM fact.AsientoContable WHERE FacturaId = {facturaId};"))!.TrimEnd());
+    }
+
+    [Fact]
+    public async Task Reglas_10_2_BoletaIgvAlCosto_HasNo401111()
+    {
+        await Db.SeedMotivoAsync(901, "Utiles de escritorio", "656111");
+        await Db.SeedCuentaContableAsync("656111", "UTILES DE ESCRITORIO");
+        await Db.SeedCuentaContableAsync("421211", "FACTURAS Y BOLETAS EN SOLES");
+
+        var facturaId = await Db.InsertarFacturaAsync(
+            tipoComprobante: "03", numero: "B004-00456", afectacion: "INAFECTA", totalOrig: 1180.00m, igvOrig: null);
+        await Db.AsignarMotivoAsync(facturaId, 901);
+
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var asiento = await AbrirYLeerAsientoAsync(factory, client, facturaId);
+
+        Assert.Equal(0m, asiento.IgvPEN);
+        Assert.DoesNotContain(asiento.Lineas, l => l.CuentaCodigo == "401111");
+        Assert.Equal(1180.00m, Linea(asiento, "PRINCIPAL", "D", "656111").Debe);
+        Assert.Equal(1180.00m, Linea(asiento, "PRINCIPAL", "H", "421211").Haber);
+
+        var validar = await client.PostAsync($"/api/facturas/{facturaId}/validar?fechaCorteContable=2026-08-01", content: null);
+        Assert.Equal(HttpStatusCode.OK, validar.StatusCode);
+        Assert.Equal("CONFIRMADO", (await Db.ExecuteScalarAsync<string>(
+            $"SELECT Estado FROM fact.AsientoContable WHERE FacturaId = {facturaId};"))!.TrimEnd());
+    }
+
+    [Fact]
+    public async Task Reglas_10_3_FacturaEnDolaresRelacionada_ConvertsWithDerivedRounding()
+    {
+        await Db.SeedMotivoAsync(902, "Compra en dolares", "601111");
+        await Db.SeedCuentaContableAsync("601111", "MERCADERIAS");
+        await Db.SeedCuentaContableAsync("401111", "IGV - CUENTA PROPIA");
+        await Db.SeedCuentaContableAsync("431212", "FACTURAS Y BOLETAS RELAC. EN DOLARES");
+        await Db.SeedProveedorRelacionadoAsync();
+
+        var facturaId = await Db.InsertarFacturaAsync(
+            numero: "F045-01210", moneda: "USD", afectacion: "GRAVADA", fechaEmision: "2026-08-10",
+            totalOrig: 1180.00m, igvOrig: 180.00m);
+        await Db.AsignarMotivoAsync(facturaId, 902);
+        await Db.InsertarTipoCambioAsync(fecha: "2026-08-10", compra: 3.7500m, venta: 3.7895m);
+
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        var asiento = await AbrirYLeerAsientoAsync(factory, client, facturaId);
+
+        Assert.Equal(3789.50m, asiento.BasePEN);
+        Assert.Equal(682.11m, asiento.IgvPEN);
+        Assert.Equal(3.7895m, asiento.TipoCambioVenta);
+        Assert.Equal(4471.61m, await Db.ExecuteScalarAsync<decimal>(
+            $"SELECT NetoPEN FROM fact.AsientoContable WHERE FacturaId = {facturaId};"));
+
+        Assert.Equal(3789.50m, Linea(asiento, "PRINCIPAL", "D", "601111").Debe);
+        Assert.Equal(682.11m, Linea(asiento, "PRINCIPAL", "D", "401111").Debe);
+        Assert.Equal(4471.61m, Linea(asiento, "PRINCIPAL", "H", "431212").Haber);
+
+        var validar = await client.PostAsync($"/api/facturas/{facturaId}/validar?fechaCorteContable=2026-08-01", content: null);
+        Assert.Equal(HttpStatusCode.OK, validar.StatusCode);
+        Assert.Equal("CONFIRMADO", (await Db.ExecuteScalarAsync<string>(
+            $"SELECT Estado FROM fact.AsientoContable WHERE FacturaId = {facturaId};"))!.TrimEnd());
+    }
+
+    [Fact]
+    public async Task PatchBaseIgv_UnbalancingASeededSplit_BlocksValidar_UntilRecomponer()
+    {
+        await Db.SeedMotivoAsync(903, "Fletes traslado de mercaderia", "631111");
+        await Db.SeedCuentaContableAsync("631111", "FLETE TRASLADO DE MERCADERIA", ctaRefleja: "946311", ctaPuente: "791111");
+        await Db.SeedCuentaContableAsync("946311", "DESTINO DEL FLETE");
+        await Db.SeedCuentaContableAsync("791111", "CARGAS IMPUTABLES A CTA DE COSTOS");
+        await Db.SeedCuentaContableAsync("401111", "IGV - CUENTA PROPIA");
+        await Db.SeedCuentaContableAsync("421211", "FACTURAS Y BOLETAS EN SOLES");
+
+        var facturaId = await Db.InsertarFacturaAsync(
+            numero: "F001-DESC", afectacion: "GRAVADA", totalOrig: 1180.00m, igvOrig: 180.00m);
+        await Db.AsignarMotivoAsync(facturaId, 903);
+
+        await using var factory = new SmartNetApiFactory(Db.ConnectionString, KeyRingPath);
+        using var client = await AuthenticatedClientAsync(factory);
+
+        await AbrirYLeerAsientoAsync(factory, client, facturaId);
+
+        // #19 D4: move the header scalars via the base/IGV atomic pair; the persisted 6x/1x cargo
+        // lines still sum to the OLD base (1000), so §7 PRINCIPAL will no longer reconcile.
+        var facturaEtag = TokenDeConcurrencia.Codificar(await Db.ObtenerVersionFacturaAsync(facturaId));
+        var patch = new HttpRequestMessage(HttpMethod.Patch, $"/api/facturas/{facturaId}")
+        {
+            Content = JsonContent.Create(new CorreccionFacturaRequest(
+                null, null, null, null, null, null, null, BaseImponible: 600.00m, Igv: 108.00m)),
+        };
+        patch.Headers.TryAddWithoutValidation("If-Match", facturaEtag);
+        Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(patch)).StatusCode);
+
+        var validarBloqueado = await client.PostAsync(
+            $"/api/facturas/{facturaId}/validar?fechaCorteContable=2026-08-01", content: null);
+        Assert.Equal((HttpStatusCode)422, validarBloqueado.StatusCode);
+        var problema = await validarBloqueado.Content.ReadAsStringAsync();
+        Assert.Contains("Los cargos 6x/1x suman", problema);
+        Assert.Contains("bloque-principal-invalido", problema);
+
+        // recomponer regenerates the lines from the current factura values (base 600 / IGV 108).
+        var asientoGet = await client.GetAsync($"/api/facturas/{facturaId}/asiento");
+        var asientoEtag = asientoGet.Headers.ETag!.Tag;
+        var asientoId = (await asientoGet.Content.ReadFromJsonAsync<FacturaAsientoRespuesta>())!.AsientoContableId!.Value;
+
+        var recomponer = new HttpRequestMessage(HttpMethod.Post, $"/api/asientos/{asientoId}/recomponer");
+        recomponer.Headers.TryAddWithoutValidation("If-Match", asientoEtag);
+        Assert.Equal(HttpStatusCode.OK, (await client.SendAsync(recomponer)).StatusCode);
+
+        Assert.Equal(600.00m, await Db.ExecuteScalarAsync<decimal>(
+            $"SELECT SUM(Debe) FROM fact.AsientoContableDetalle WHERE AsientoContableId = {asientoId} AND Bloque = 'PRINCIPAL' AND CuentaCodigo = '631111';"));
+
+        var validarOk = await client.PostAsync(
+            $"/api/facturas/{facturaId}/validar?fechaCorteContable=2026-08-01", content: null);
+        Assert.Equal(HttpStatusCode.OK, validarOk.StatusCode);
+        Assert.Equal("CONFIRMADO", (await Db.ExecuteScalarAsync<string>(
+            $"SELECT Estado FROM fact.AsientoContable WHERE FacturaId = {facturaId};"))!.TrimEnd());
+    }
 }

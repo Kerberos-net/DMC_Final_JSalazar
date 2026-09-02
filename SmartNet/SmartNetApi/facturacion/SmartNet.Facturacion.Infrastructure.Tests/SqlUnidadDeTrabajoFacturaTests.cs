@@ -1,3 +1,4 @@
+using SmartNet.Contable.Core;
 using SmartNet.Db.TestBootstrap;
 using SmartNet.Facturacion.Core;
 
@@ -211,7 +212,21 @@ public sealed class SqlUnidadDeTrabajoFacturaTests : IAsyncLifetime
         long asientoId;
         await using (var uow = await store.AbrirAsync(CancellationToken.None))
         {
-            asientoId = await uow.CrearAsientoBorradorAsync(facturaId, "P00123", new DateOnly(2026, 8, 10), CancellationToken.None);
+            var asiento = new AsientoContable(
+                ProveedorCodigo: "P00123",
+                FechaContable: new DateOnly(2026, 8, 10),
+                MotivoDescripcion: null,
+                TipoCambioVenta: null,
+                BasePEN: 100m,
+                IgvPEN: 18m,
+                NetoPEN: 118m,
+                AfectacionCongelada: Afectacion.Gravada,
+                Comprobante: TipoComprobante.Factura,
+                Lineas: new[]
+                {
+                    new LineaAsiento(1, Bloque.Principal, TipoLinea.D, 100m, 0m, "639915", null, null, null),
+                });
+            asientoId = await uow.CrearAsientoBorradorAsync(facturaId, asiento, CancellationToken.None);
             await uow.CommitAsync(CancellationToken.None);
         }
 

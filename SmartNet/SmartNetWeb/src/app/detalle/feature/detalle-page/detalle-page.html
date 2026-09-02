@@ -62,8 +62,37 @@
 
         <app-picker-proveedor #picker (seleccionar)="onProveedorSeleccionado($event)" />
 
+        @if (puedeGenerarAsiento()) {
+          <div class="detalle-asiento__sin-asiento" data-testid="sin-asiento">
+            <p>Esta factura todavía no tiene asiento contable.</p>
+            <button class="btn" type="button" data-testid="generar-asiento" (click)="generarAsiento()">
+              Generar asiento
+            </button>
+          </div>
+        }
+
         @if (asiento(); as a) {
           <div class="detalle-asiento">
+            @if (descuadreAsiento()) {
+              <p class="alerta alerta--informativa detalle-asiento__descuadre" role="alert" data-testid="descuadre-asiento">
+                La cabecera no coincide con el detalle: la suma de los cargos difiere de la base /
+                neto del asiento. «Validar» quedará bloqueado hasta re-alinear las líneas o recomponer.
+              </p>
+            }
+
+            @if (a.estado !== 'CONFIRMADO') {
+              <div class="detalle-asiento__recomponer">
+                @if (confirmandoRecomponer()) {
+                  <span role="alert">Se reemplazarán las líneas por la semilla del motor y se perderán las ediciones manuales. ¿Continuar?</span>
+                  <button class="btn" type="button" data-testid="confirmar-recomponer" (click)="onRecomponer()">Sí, recomponer</button>
+                  <button class="btn btn--secundario" type="button" data-testid="cancelar-recomponer" (click)="cancelarRecomponer()">Cancelar</button>
+                } @else {
+                  <button class="btn btn--secundario" type="button" data-testid="recomponer-asiento" (click)="pedirRecomponer()">
+                    Recomponer asiento
+                  </button>
+                }
+              </div>
+            }
             <app-asiento-lineas
               [lineas]="a.lineas"
               [editable]="a.estado !== 'CONFIRMADO'"

@@ -24,6 +24,7 @@ public static class AsientoEndpoints
         app.MapPost("/api/asientos/{id:long}/lineas", (Delegate)AgregarLineaAsync).RequireAuthorization();
         app.MapPatch("/api/asientos/{id:long}/lineas/{lineaId:long}", (Delegate)ActualizarLineaAsync).RequireAuthorization();
         app.MapDelete("/api/asientos/{id:long}/lineas/{lineaId:long}", (Delegate)EliminarLineaAsync).RequireAuthorization();
+        app.MapPost("/api/asientos/{id:long}/recomponer", (Delegate)RecomponerAsync).RequireAuthorization();
         app.MapPost("/api/asientos/{id:long}/reabrir", (Delegate)ReabrirAsync).RequireAuthorization();
         app.MapPost("/api/asientos/{id:long}/anular", (Delegate)AnularAsync).RequireAuthorization();
 
@@ -119,6 +120,29 @@ public static class AsientoEndpoints
         return await ResponderConAsientoActualizadoAsync(id, resultado, http, ct);
     }
 
+    /// <summary>BACKLOG #24 (spec.md api-asientos "recomponer regenerates the engine seed", design
+    /// B2/C1) — <c>POST /api/asientos/{id}/recomponer</c>: regenera todas las líneas del asiento
+    /// BORRADOR desde los valores actuales de la factura. <c>If-Match</c> obligatorio (mismo patrón
+    /// que las demás rutas de comando). El cuerpo JSON <c>{ "cuentaCodigo": "..." }</c> es opcional
+    /// (parámetro nullable = cuerpo vacío permitido); <c>cuentaCodigo</c> cierra el bucle A2 cuando
+    /// el asistente elige una cuenta. Respuesta idéntica a <c>PATCH /api/asientos/{id}/lineas</c>:
+    /// asiento actualizado + ETag nuevo, o el mapeo <see cref="ProblemasDeNegocio"/> (409 CONFIRMADO,
+    /// 412 If-Match rancio, 404 no existe).</summary>
+    private static async Task<IResult> RecomponerAsync(
+        long id, RecomposicionAsientoRequest? cuerpo, HttpContext http, ServicioDeAsientos servicio, TimeProvider tiempo,
+        CancellationToken ct)
+    {
+        if (!IfMatch.Requerido(http, out var version, out var error))
+        {
+            return error!;
+        }
+
+        var resultado = await servicio.RecomponerAsync(
+            id, version, cuerpo?.CuentaCodigo, ResolverUsuarioId(http), tiempo.GetUtcNow(), ct);
+
+        return await ResponderConAsientoActualizadoAsync(id, resultado, http, ct);
+    }
+
     /// <summary>spec.md "reabrir without motivo -&gt; 400 Bad Request" -- validado ANTES de exigir
     /// If-Match (mismo orden que <c>FacturaEndpoints.EliminarAdjuntoAsync</c>'s cheque de motivo).</summary>
     private static async Task<IResult> ReabrirAsync(
@@ -199,6 +223,11 @@ public static class AsientoEndpoints
 }
 
 internal sealed record CorreccionAsientoRequest(string Campo, string? ValorOriginal, string? ValorNuevo);
+
+/// <summary>Cuerpo opcional de <c>POST /api/asientos/{id}/recomponer</c> (BACKLOG #24, design C1):
+/// <c>cuentaCodigo</c> es la cuenta que el asistente eligió para el cargo por defecto, o
+/// <c>null</c> para dejar que la cascada de sugerencia decida.</summary>
+internal sealed record RecomposicionAsientoRequest(string? CuentaCodigo);
 
 /// <summary>Cuerpo de <c>POST/PATCH /api/asientos/{id}/lineas[/{lineaId}]</c> -- espejo HTTP de
 /// <see cref="LineaAsiento"/> (#8), que no se serializa directamente (sus enums <see cref="Bloque"/>/

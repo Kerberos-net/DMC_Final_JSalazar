@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Time.Testing;
 using SmartNet.Db.TestBootstrap;
+using SmartNet.Inbox.Core;
 
 namespace SmartNet.Inbox.Infrastructure.Tests;
 
@@ -12,6 +13,22 @@ namespace SmartNet.Inbox.Infrastructure.Tests;
 public sealed class PromocionBackgroundServiceTests : IAsyncLifetime
 {
     private TestDatabaseFixture _db = null!;
+    private readonly FakeSembradorDeAsiento _sembrador = new();
+
+    /// <summary>BACKLOG #24 (design C2) — el puerto <see cref="ISembradorDeAsiento"/> se falsea aquí:
+    /// estas pruebas prueban el <em>cableado</em> (una siembra por factura promovida, cero en las
+    /// ramas de fusión/descarte), no la composición real del asiento (eso vive en el E2E de
+    /// <c>SmartNet.Api.Tests</c>).</summary>
+    private sealed class FakeSembradorDeAsiento : ISembradorDeAsiento
+    {
+        public List<long> FacturasSembradas { get; } = new();
+
+        public Task SembrarAsync(long facturaId, CancellationToken ct)
+        {
+            FacturasSembradas.Add(facturaId);
+            return Task.CompletedTask;
+        }
+    }
 
     public async Task InitializeAsync() => _db = await InboxTestDatabaseFixtureHelper.MigratedDatabaseAsync();
 
@@ -68,6 +85,7 @@ public sealed class PromocionBackgroundServiceTests : IAsyncLifetime
     private PromocionBackgroundService BuildSut() => new(
         new SqlEventoInboxRepository(_db.ConnectionString),
         new SqlPromocionRepository(_db.ConnectionString),
+        _sembrador,
         new FakeTimeProvider());
 
     [Fact]
@@ -227,5 +245,66 @@ public sealed class PromocionBackgroundServiceTests : IAsyncLifetime
 
         var facturaCount = await _db.ExecuteScalarAsync<int>("SELECT COUNT(*) FROM fact.Factura;");
         Assert.Equal(0, facturaCount);
+    }
+
+    // --- BACKLOG #24 (design C2/C3): promotion auto-seed via ISembradorDeAsiento ---
+
+    [Fact]
+    public async Task ProcesarPendientesAsync_AfterPromotingAFactura_SeedsItsAsientoExactlyOnce()
+    {
+        var procesamientoId = await _db.InsertarProcesamientoAsync();
+        await _db.InsertarInboxEventAsync(procesamientoId, PayloadCompleto);
+        var sut = BuildSut();
+
+        await sut.ProcesarPendientesAsync(CancellationToken.None);
+
+        var facturaId = await _db.ExecuteScalarAsync<long>(
+            $"SELECT FacturaId FROM fact.Factura WHERE ProcesamientoId = {procesamientoId};");
+        Assert.Equal(new[] { facturaId }, _sembrador.FacturasSembradas);
+    }
+
+    [Fact]
+    public async Task ProcesarPendientesAsync_WhenTheEventIsDiscarded_NeverSeedsAnAsiento()
+    {
+        var procesamientoId = await _db.InsertarProcesamientoAsync();
+        await _db.InsertarInboxEventAsync(procesamientoId, PayloadInsuficiente);
+        var sut = BuildSut();
+
+        await sut.ProcesarPendientesAsync(CancellationToken.None);
+
+        Assert.Empty(_sembrador.FacturasSembradas);
+    }
+
+    /// <summary>#25/#26 non-disturbance: the associated-PDF merge branch
+    /// (<c>ProcesarDocumentoAsociadoAsync</c>) creates zero <c>fact.Factura</c> rows and MUST never
+    /// call <see cref="ISembradorDeAsiento.SembrarAsync"/>. Only the XML's own promotion seeds — and
+    /// exactly once, even after the later merge cycle.</summary>
+    [Fact]
+    public async Task ProcesarPendientesAsync_XmlThenAssociatedPdfMerge_SeedsOnlyForTheXmlPromotion()
+    {
+        var procesamientoXmlId = await _db.InsertarProcesamientoAsync(gmailMessageId: "msg-seed-xml-1");
+        await _db.InsertarInboxEventAsync(procesamientoXmlId, PayloadCompleto);
+        var sut = BuildSut();
+        await sut.ProcesarPendientesAsync(CancellationToken.None);
+
+        var procesamientoPdfId = await _db.InsertarProcesamientoAsync(gmailMessageId: "msg-seed-pdf-1");
+        await _db.InsertarInboxEventAsync(procesamientoPdfId, PayloadPdfAsociadoIncompleto);
+        await sut.ProcesarPendientesAsync(CancellationToken.None);
+
+        var facturaId = await _db.ExecuteScalarAsync<long>("SELECT FacturaId FROM fact.Factura;");
+        Assert.Equal(new[] { facturaId }, _sembrador.FacturasSembradas);
+    }
+
+    /// <summary>The PDF arrives before its XML partner — defer is a pure no-op, no Factura, no seed.</summary>
+    [Fact]
+    public async Task ProcesarPendientesAsync_PdfFirstDefer_NeverSeedsAnAsiento()
+    {
+        var procesamientoPdfId = await _db.InsertarProcesamientoAsync(gmailMessageId: "msg-seed-pdf-2");
+        await _db.InsertarInboxEventAsync(procesamientoPdfId, PayloadPdfAsociadoIncompleto);
+        var sut = BuildSut();
+
+        await sut.ProcesarPendientesAsync(CancellationToken.None);
+
+        Assert.Empty(_sembrador.FacturasSembradas);
     }
 }

@@ -19,15 +19,23 @@ internal static class FacturaTestDataHelper
         string? rucProveedor = "20100000001",
         string estado = "PENDIENTE_VALIDACION",
         string moneda = "PEN",
-        string fechaEmision = "2026-08-10")
+        string fechaEmision = "2026-08-10",
+        string afectacion = "GRAVADA",
+        decimal totalOrig = 118.00m,
+        decimal? igvOrig = 18.00m)
     {
+        // BACKLOG #24: a GRAVADA factura MUST carry a positive IgvOrig — the seed engine emits a
+        // 401111 IGV line and CK_Linea_Tipo rejects a zero-amount 'D' line. A boleta / no-gravada
+        // factura passes igvOrig: null.
         await db.ExecuteNonQueryAsync(
             $"""
              INSERT INTO fact.Factura
-                 (ProveedorCodigo, RucProveedor, TipoComprobante, Numero, TotalOrig, Moneda, FechaEmision, Afectacion, Estado)
+                 (ProveedorCodigo, RucProveedor, TipoComprobante, Numero, TotalOrig, IgvOrig, Moneda, FechaEmision, Afectacion, Estado)
              VALUES
                  ('P00123', {(rucProveedor is null ? "NULL" : $"'{rucProveedor}'")}, '{tipoComprobante}',
-                  {(numero is null ? "NULL" : $"'{numero}'")}, 118.00, '{moneda}', '{fechaEmision}', 'GRAVADA', '{estado}');
+                  {(numero is null ? "NULL" : $"'{numero}'")}, {totalOrig.ToString(CultureInfo.InvariantCulture)},
+                  {(igvOrig is null ? "NULL" : igvOrig.Value.ToString(CultureInfo.InvariantCulture))},
+                  '{moneda}', '{fechaEmision}', '{afectacion}', '{estado}');
              """);
         return await db.ExecuteScalarAsync<long>("SELECT MAX(FacturaId) FROM fact.Factura;");
     }

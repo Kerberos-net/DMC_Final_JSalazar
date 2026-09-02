@@ -55,6 +55,13 @@ export class FacturaService {
     await firstValueFrom(this.http.post<void>(`/api/facturas/${id}/validar`, null, { params }));
   }
 
+  /** `POST /api/facturas/{id}/abrir` (design C/E) -- crea el asiento BORRADOR compuesto por el
+   * motor si aún no existe (caso moneda extranjera sin TC vigente en la promoción). Sin cuerpo,
+   * sin `If-Match`; idempotente en el servidor. 200 sin cuerpo -- el detalle recarga el asiento. */
+  async abrir(id: number): Promise<void> {
+    await firstValueFrom(this.http.post<void>(`/api/facturas/${id}/abrir`, null));
+  }
+
   /** `POST /api/facturas/{id}/confirmar-afectacion` (design D10) -- misma forma CAS que
    * `guardar()`: `If-Match` obligatorio, respuesta trae la `FacturaRespuesta` completa + nuevo
    * ETag. Solo registra la afirmación del asistente; NO desbloquea `validar` (gate dormido). */

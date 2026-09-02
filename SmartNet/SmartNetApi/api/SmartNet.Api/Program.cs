@@ -10,6 +10,7 @@ using SmartNet.Facturacion.Core;
 using SmartNet.Facturacion.Infrastructure;
 using SmartNet.Inbox.Core;
 using SmartNet.Inbox.Infrastructure;
+using SmartNet.Sugerencia.Core;
 using SmartNet.TiposCambio.Core;
 using SmartNet.TiposCambio.Infrastructure;
 
@@ -61,7 +62,8 @@ builder.Services.AddSingleton<IBandejaRepository>(sp =>
 builder.Services.AddSingleton<IFacturacionStore>(sp =>
     new SqlFacturacionStore(
         ApiConnectionOptions.Resolve(sp.GetRequiredService<IConfiguration>()),
-        sp.GetRequiredService<ITipoCambioRepository>()));
+        sp.GetRequiredService<ITipoCambioRepository>(),
+        sp.GetRequiredService<ServicioDeSugerencia>()));
 builder.Services.AddScoped<ServicioDeFacturas>();
 
 // BACKLOG #11 Phase 3 (PR 3) composition root: ServicioDeAsientos over the same IFacturacionStore
@@ -110,6 +112,31 @@ builder.Services.AddSingleton<IProveedorRepository>(sp =>
 // above; a plain Singleton like the other read-only catalog repos.
 builder.Services.AddSingleton<ICuentaContableRepository>(sp =>
     new SqlCuentaContableRepository(ApiConnectionOptions.Resolve(sp.GetRequiredService<IConfiguration>())));
+
+// BACKLOG #24 Phase 4.1 composition root: sugerencia is finally wired (SmartNetApi/CLAUDE.md noted
+// it existed but was not in Program.cs). Compose-time consumer ONLY -- no endpoint, no SPA
+// suggestion UI (owner decision 3). ServicioDeSugerencia holds no per-request state (read-only
+// cascade over dbo.Motivo / dbo.CuentaContable / fact.SugerenciaCuenta), so Singleton like the
+// plain repos. Threaded into SqlFacturacionStore above so the seeded cargo línea gets a real
+// account instead of the design-A2 "sin cuenta" placeholder.
+builder.Services.AddSingleton<ISugerenciaCuentaRepository>(sp =>
+    new SqlSugerenciaCuentaRepository(ApiConnectionOptions.Resolve(sp.GetRequiredService<IConfiguration>())));
+builder.Services.AddSingleton<IMotivoRepository>(sp =>
+    new SqlMotivoRepository(ApiConnectionOptions.Resolve(sp.GetRequiredService<IConfiguration>())));
+builder.Services.AddSingleton<IMotivoAtributoRepository>(sp =>
+    new SqlMotivoAtributoRepository(ApiConnectionOptions.Resolve(sp.GetRequiredService<IConfiguration>())));
+builder.Services.AddSingleton<ServicioDeSugerencia>(sp => new ServicioDeSugerencia(
+    sp.GetRequiredService<ISugerenciaCuentaRepository>(),
+    sp.GetRequiredService<ICuentaContableRepository>(),
+    sp.GetRequiredService<IMotivoRepository>(),
+    sp.GetRequiredService<IMotivoAtributoRepository>()));
+
+// BACKLOG #24 (design C2/C3) composition root: ISembradorDeAsiento adapter over ServicioDeFacturas
+// .AbrirAsync -- the promotion pipeline seeds each promoted factura's BORRADOR asiento through this
+// port without SmartNet.Inbox.Infrastructure ever referencing the facturación module. Singleton
+// (consumed by the hosted PromocionBackgroundService); it opens its own scope per invocation
+// because ServicioDeFacturas is AddScoped.
+builder.Services.AddSingleton<ISembradorDeAsiento, SembradorDeAsientoAdapter>();
 
 // design D7: PeriodicTimer(1 min) with the DI-registered TimeProvider.System above -- so a test
 // that substitutes a FakeTimeProvider via SmartNetApiFactory could drive it deterministically the

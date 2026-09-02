@@ -1,5 +1,6 @@
 using Microsoft.Data.SqlClient;
 using SmartNet.Facturacion.Core;
+using SmartNet.Sugerencia.Core;
 using SmartNet.TiposCambio.Core;
 using SmartNet.TiposCambio.Infrastructure;
 
@@ -21,16 +22,24 @@ public sealed class SqlFacturacionStore : IFacturacionStore
 {
     private readonly string _connectionString;
     private readonly ITipoCambioRepository _tipoCambioRepository;
+    private readonly ServicioDeSugerencia? _servicioDeSugerencia;
 
     public SqlFacturacionStore(string connectionString)
         : this(connectionString, new SqlTipoCambioRepository(connectionString))
     {
     }
 
-    public SqlFacturacionStore(string connectionString, ITipoCambioRepository tipoCambioRepository)
+    // BACKLOG #24 Phase 4.1: the third parameter stays optional so the ~20 existing 1-/2-arg call
+    // sites (infra test suites) keep compiling and simply get the design-A2 placeholder path.
+    // Program.cs passes the DI-resolved ServicioDeSugerencia.
+    public SqlFacturacionStore(
+        string connectionString,
+        ITipoCambioRepository tipoCambioRepository,
+        ServicioDeSugerencia? servicioDeSugerencia = null)
     {
         _connectionString = connectionString;
         _tipoCambioRepository = tipoCambioRepository;
+        _servicioDeSugerencia = servicioDeSugerencia;
     }
 
     public async Task<IUnidadDeTrabajo> AbrirAsync(CancellationToken ct)
@@ -38,6 +47,6 @@ public sealed class SqlFacturacionStore : IFacturacionStore
         var connection = new SqlConnection(_connectionString);
         await connection.OpenAsync(ct);
         var transaction = (SqlTransaction)await connection.BeginTransactionAsync(ct);
-        return new SqlUnidadDeTrabajo(connection, transaction, _tipoCambioRepository);
+        return new SqlUnidadDeTrabajo(connection, transaction, _tipoCambioRepository, _servicioDeSugerencia);
     }
 }

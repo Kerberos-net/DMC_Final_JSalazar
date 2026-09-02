@@ -1,3 +1,4 @@
+using SmartNet.Catalogos.Core;
 using SmartNet.Contable.Core;
 
 namespace SmartNet.Facturacion.Core;
@@ -43,11 +44,37 @@ public interface IUnidadDeTrabajo : IAsyncDisposable
     /// reutilizar la lógica de <see cref="ServicioDeFacturas.ValidarAsync"/> (PR 1, deviación #1).</summary>
     Task<long?> ObtenerAsientoVigenteIdAsync(long facturaId, CancellationToken ct);
 
-    /// <summary>Crea un <c>fact.AsientoContable</c> nuevo en BORRADOR para una factura sin asiento
-    /// vigente (design D1, <c>abrir</c>) y devuelve su id. La composición de líneas (Bloque
-    /// PRINCIPAL/DESTINO) es de Phase 3 — este método solo crea el ENCABEZADO.</summary>
+    /// <summary>BACKLOG #24 (design A1/A3) — resuelve los hechos externos que
+    /// <see cref="SembradoDeAsiento"/> necesita y que una <see cref="FacturaPersistida"/> no lleva:
+    /// <c>fact.ProveedorAtributo.EsRelacionada</c>, <c>dbo.Motivo.descripcion</c> y el tipo de
+    /// cambio VENTA vigente para la fecha de emisión (null para PEN). Precedente:
+    /// <see cref="ExisteTipoCambioVigenteAsync"/> — una lectura catálogo-ish sobre este puerto.</summary>
+    Task<HechosDeComposicion> ResolverHechosDeComposicionAsync(long facturaId, CancellationToken ct);
+
+    /// <summary>BACKLOG #24 (design C1) — lee una fila de <c>dbo.CuentaContable</c> por su código
+    /// exacto (grant <c>SELECT dbo.CuentaContable</c> en <c>008</c>), o <c>null</c> si no existe. Lo
+    /// que <see cref="ServicioDeAsientos.RecomponerAsync"/> usa para resolver el <c>cuentaCodigo</c>
+    /// opcional del cuerpo a una <see cref="CuentaContable"/> (con su reflejo/puente) antes de
+    /// re-sembrar — así el asistente cierra el bucle A2 en una sola acción.</summary>
+    Task<CuentaContable?> ObtenerCuentaContableAsync(string cuentaCodigo, CancellationToken ct);
+
+    /// <summary>BACKLOG #24 (design B1) — crea un <c>fact.AsientoContable</c> nuevo en BORRADOR para
+    /// una factura sin asiento vigente (design D1, <c>abrir</c>) y persiste el encabezado (escalares
+    /// del motor) más las <c>N</c> líneas ya compuestas por <see cref="ComposicionDeAsiento.Componer"/>.
+    /// Devuelve el id del asiento nuevo. Las líneas se insertan en un bucle dentro de la misma
+    /// transacción — NUNCA vía <c>AgregarLineaAsync</c> (su CAS de encabezado espera una Version que
+    /// el llamador no sostiene: la fila se creó microsegundos antes en esta transacción).</summary>
     Task<long> CrearAsientoBorradorAsync(
-        long facturaId, string proveedorCodigo, DateOnly fechaContable, CancellationToken ct);
+        long facturaId, AsientoContable asiento, CancellationToken ct);
+
+    /// <summary>BACKLOG #24 (design B2, <c>recomponer</c>) — reemplaza TODAS las líneas de un asiento
+    /// BORRADOR por las recién compuestas y re-deriva los escalares del encabezado
+    /// (<c>BasePEN/IgvPEN/NetoPEN/MotivoDescripcion/TipoCambioVenta/FechaContable</c> — nunca
+    /// <c>Estado</c> ni <c>NumeroAsiento</c>). CAS contra <c>fact.AsientoContable.Version</c> vía el
+    /// mismo <c>TocarEncabezadoAsync</c> que las escrituras de línea: <see cref="ResultadoEscritura.VersionEnConflicto"/>
+    /// con un ETag rancio, <see cref="ResultadoEscritura.NoEncontrado"/> si el asiento no existe.</summary>
+    Task<ResultadoEscritura> ReemplazarLineasAsync(
+        long asientoContableId, byte[] versionEsperada, AsientoContable asiento, CancellationToken ct);
 
     /// <summary>Inserta un <c>fact.AdjuntoManual</c> y devuelve su id.</summary>
     Task<long> RegistrarAdjuntoAsync(AdjuntoManual adjunto, CancellationToken ct);

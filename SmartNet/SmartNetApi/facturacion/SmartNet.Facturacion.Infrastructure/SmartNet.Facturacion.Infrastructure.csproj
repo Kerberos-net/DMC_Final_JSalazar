@@ -14,6 +14,13 @@
 
   <ItemGroup>
     <ProjectReference Include="..\SmartNet.Facturacion.Core\SmartNet.Facturacion.Core.csproj" />
+    <!-- BACKLOG #24 (design A3): CuentaContable en la firma de
+         IUnidadDeTrabajo.ResolverHechosDeComposicionAsync / HechosDeComposicion. -->
+    <ProjectReference Include="..\..\catalogos\SmartNet.Catalogos.Core\SmartNet.Catalogos.Core.csproj" />
+    <!-- BACKLOG #24 Phase 4.1: ServicioDeSugerencia (compose-time consumer) threaded into
+         SqlUnidadDeTrabajo.ResolverHechosDeComposicionAsync so the seeded cargo gets a real
+         account instead of the design-A2 placeholder. -->
+    <ProjectReference Include="..\..\sugerencia\SmartNet.Sugerencia.Core\SmartNet.Sugerencia.Core.csproj" />
     <!-- PR 5 (Phase 5, SinTipoCambio gap closure): wires the existing item #3/#11
          ITipoCambioRepository port + SqlTipoCambioRepository adapter into
          SqlUnidadDeTrabajo.CargarAsientoAsync / ServicioDeFacturas.AbrirAsync's D4 gate. -->

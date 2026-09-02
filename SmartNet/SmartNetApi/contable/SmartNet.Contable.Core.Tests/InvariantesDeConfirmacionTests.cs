@@ -262,6 +262,47 @@ public class InvariantesDeConfirmacionTests
         Assert.Contains(rechazo.Fallos, f => f.Invariante == InvarianteContable.SumaDebeIgualHaber);
     }
 
+    // ---- BACKLOG #24 (tasks 3.1/3.5) — de-vacuuming de §7 ----------------------------------------
+    // Hasta #24, `abrir` sembraba el asiento solo con el encabezado (cero líneas) y §7 se evaluaba
+    // en vacío: Global-1 con 0==0, PRINCIPAL sobre cero cargos. Con la semilla de
+    // `ComposicionDeAsiento.Componer` cableada en producción (`SembradoDeAsiento.Sembrar`), un
+    // asiento sin bloque PRINCIPAL ya no confirma. `InvariantesDeConfirmacion.cs` NO cambia — solo
+    // deja de recibir asientos vacíos. Estos tests fijan el borde: si algún flujo vuelve a intentar
+    // confirmar un asiento sin cargos, §7 lo rechaza por PRINCIPAL.
+
+    [Fact]
+    public void DeVacuuming_AsientoSinLineas_YaNoEsConfirmable_FallaPrincipal()
+    {
+        var vacio = AsientoValido() with { Lineas = Array.Empty<LineaAsiento>() };
+
+        var rechazo = EvaluarYEsperarRechazo(vacio);
+
+        // cargos 6x/1x suman 0, se esperaba la BasePEN 1000 -> PRINCIPAL incumplida.
+        Assert.Contains(rechazo.Fallos, f => f.Invariante == InvarianteContable.Principal);
+        Assert.Contains(
+            rechazo.Fallos,
+            f => f.Invariante == InvarianteContable.Principal && f.Detalle == "Los cargos 6x/1x suman 0, se esperaba 1000.00.");
+    }
+
+    [Fact]
+    public void DeVacuuming_AsientoConSoloElCreditoDelProveedor_FallaPrincipalYGlobal1()
+    {
+        // lo que un seed header-only + una única línea de crédito produciría: sin cargos 6x, y el
+        // asiento ni siquiera cuadra (Debe 0 != Haber 1180).
+        var soloCredito = AsientoValido() with
+        {
+            Lineas = new List<LineaAsiento>
+            {
+                new(1, Bloque.Principal, TipoLinea.H, 0m, 1180.00m, "421211", "FACTURAS Y BOLETAS EN SOLES", null, null),
+            },
+        };
+
+        var rechazo = EvaluarYEsperarRechazo(soloCredito);
+
+        Assert.Contains(rechazo.Fallos, f => f.Invariante == InvarianteContable.Principal);
+        Assert.Contains(rechazo.Fallos, f => f.Invariante == InvarianteContable.SumaDebeIgualHaber);
+    }
+
     // ---- tasks.md 4.13: la precondición vieja de NC no aparece en ningún lugar --------------------
 
     [Fact]

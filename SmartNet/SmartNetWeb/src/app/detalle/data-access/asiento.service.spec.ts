@@ -131,6 +131,42 @@ describe('AsientoService', () => {
     expect(service.etag()).toBe('"a2"');
   });
 
+  it('recomponer() POSTs /asientos/{id}/recomponer with If-Match and threads the new ETag + asiento', async () => {
+    const cargaPromise = service.cargarPorFactura(42);
+    httpMock
+      .expectOne('/api/facturas/42/asiento')
+      .flush({ asientoContableId: 7, asiento }, { headers: { ETag: '"a1"' } });
+    await cargaPromise;
+
+    const promise = service.recomponer(7);
+
+    const req = httpMock.expectOne('/api/asientos/7/recomponer');
+    expect(req.request.method).toBe('POST');
+    expect(req.request.headers.get('If-Match')).toBe('"a1"');
+    expect(req.request.body).toBeNull();
+    const regenerado = { ...asiento, lineas: [] };
+    req.flush(regenerado, { headers: { ETag: '"a2"' } });
+
+    await promise;
+    expect(service.asiento()).toEqual(regenerado);
+    expect(service.etag()).toBe('"a2"');
+  });
+
+  it('recomponer() sends the optional { cuentaCodigo } body when provided', async () => {
+    const cargaPromise = service.cargarPorFactura(42);
+    httpMock
+      .expectOne('/api/facturas/42/asiento')
+      .flush({ asientoContableId: 7, asiento }, { headers: { ETag: '"a1"' } });
+    await cargaPromise;
+
+    const promise = service.recomponer(7, '631111');
+    const req = httpMock.expectOne('/api/asientos/7/recomponer');
+    expect(req.request.body).toEqual({ cuentaCodigo: '631111' });
+    req.flush({ ...asiento }, { headers: { ETag: '"a2"' } });
+    await promise;
+    expect(service.etag()).toBe('"a2"');
+  });
+
   it('eliminarLinea() DELETEs the línea by lineaId with If-Match, and replaces state from the response', async () => {
     const cargaPromise = service.cargarPorFactura(42);
     httpMock

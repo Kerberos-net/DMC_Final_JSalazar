@@ -291,4 +291,100 @@ public class ServicioDeAsientosTests
         Assert.Equal(CasoConflicto.AsientoYaConfirmado, conflicto.Caso);
         Assert.False(store.UnidadDeTrabajo.Committed);
     }
+
+    // -----------------------------------------------------------------------------------------
+    // BACKLOG #24 (tasks 3.3/3.4) — RecomponerAsync: regenera las líneas desde la factura + los
+    // hechos actuales vía ReemplazarLineasAsync y escribe UNA fila REPARTO_MANUAL (design B3).
+    // Gate BORRADOR + CAS de encabezado, igual que el resto de comandos de línea.
+    // -----------------------------------------------------------------------------------------
+
+    [Fact]
+    public async Task RecomponerAsync_WhenAsientoIsBorrador_ReplacesLineas_WritesOneRepartoManualAudit_AndCommits()
+    {
+        var store = new FakeFacturacionStore();
+        store.UnidadDeTrabajo.AsientoACargar = Borrador();
+        var sut = new ServicioDeAsientos(store);
+
+        var resultado = await sut.RecomponerAsync(
+            501, VersionActual, cuentaCodigo: null, usuarioId: 1, Ahora, CancellationToken.None);
+
+        Assert.IsType<ResultadoComando.Aplicado>(resultado);
+        Assert.NotNull(store.UnidadDeTrabajo.UltimoAsientoReemplazado);
+        var auditoria = Assert.Single(store.UnidadDeTrabajo.AuditoriasRegistradas);
+        Assert.Equal(EntradaAuditoria.Acciones.RepartoManual, auditoria.Accion);
+        Assert.Equal(EntradaAuditoria.EntidadTipos.Asiento, auditoria.EntidadTipo);
+        Assert.Equal("Cargos", auditoria.Campo);
+        Assert.Null(auditoria.Motivo);
+        Assert.True(store.UnidadDeTrabajo.Committed);
+    }
+
+    [Fact]
+    public async Task RecomponerAsync_WhenAsientoIsConfirmado_ReturnsConflicto_AndNeverReplacesLineas()
+    {
+        var store = new FakeFacturacionStore();
+        store.UnidadDeTrabajo.AsientoACargar = Confirmado();
+        var sut = new ServicioDeAsientos(store);
+
+        var resultado = await sut.RecomponerAsync(
+            501, VersionActual, cuentaCodigo: null, usuarioId: 1, Ahora, CancellationToken.None);
+
+        var conflicto = Assert.IsType<ResultadoComando.Conflicto>(resultado);
+        Assert.Equal(CasoConflicto.AsientoYaConfirmado, conflicto.Caso);
+        Assert.DoesNotContain(nameof(IUnidadDeTrabajo.ReemplazarLineasAsync), store.UnidadDeTrabajo.Llamadas);
+        Assert.False(store.UnidadDeTrabajo.Committed);
+    }
+
+    [Fact]
+    public async Task RecomponerAsync_WhenVersionIsStale_ReturnsVersionEnConflicto_AndNeverCommits()
+    {
+        var store = new FakeFacturacionStore();
+        store.UnidadDeTrabajo.AsientoACargar = Borrador();
+        store.UnidadDeTrabajo.ResultadoDeReemplazarLineas = ResultadoEscritura.VersionEnConflicto;
+        var sut = new ServicioDeAsientos(store);
+
+        var resultado = await sut.RecomponerAsync(
+            501, new byte[] { 0, 0, 0, 0, 0, 0, 0, 1 }, cuentaCodigo: null, usuarioId: 1, Ahora, CancellationToken.None);
+
+        Assert.IsType<ResultadoComando.VersionEnConflicto>(resultado);
+        Assert.Empty(store.UnidadDeTrabajo.AuditoriasRegistradas);
+        Assert.False(store.UnidadDeTrabajo.Committed);
+    }
+
+    // BACKLOG #24 (design C1) — el cuentaCodigo opcional del cuerpo se resuelve contra
+    // dbo.CuentaContable e inyecta en los hechos como CuentaSugerida antes de sembrar.
+
+    [Fact]
+    public async Task RecomponerAsync_WithAnExplicitCuentaCodigo_SeedsThatAccountOnTheCargoLine_NoPlaceholder()
+    {
+        var store = new FakeFacturacionStore();
+        store.UnidadDeTrabajo.AsientoACargar = Borrador();
+        store.UnidadDeTrabajo.CuentasContables["631111"] = new SmartNet.Catalogos.Core.CuentaContable(
+            "631111", "FLETE TRASLADO DE MERCADERIA", null, "946311", "791111");
+        var sut = new ServicioDeAsientos(store);
+
+        var resultado = await sut.RecomponerAsync(
+            501, VersionActual, cuentaCodigo: "631111", usuarioId: 1, Ahora, CancellationToken.None);
+
+        Assert.IsType<ResultadoComando.Aplicado>(resultado);
+        var asiento = store.UnidadDeTrabajo.UltimoAsientoReemplazado!;
+        Assert.Contains(asiento.Lineas, l =>
+            l.CuentaCodigo == "631111" && l.Bloque == Bloque.Principal && l.Tipo == TipoLinea.D);
+        Assert.DoesNotContain(asiento.Lineas, l => l.CuentaCodigo is null);
+        Assert.True(store.UnidadDeTrabajo.Committed);
+    }
+
+    [Fact]
+    public async Task RecomponerAsync_WithAnUnknownCuentaCodigo_ReturnsCorreccionInvalida_AndNeverReplacesLineas()
+    {
+        var store = new FakeFacturacionStore();
+        store.UnidadDeTrabajo.AsientoACargar = Borrador();
+        var sut = new ServicioDeAsientos(store);
+
+        var resultado = await sut.RecomponerAsync(
+            501, VersionActual, cuentaCodigo: "999999", usuarioId: 1, Ahora, CancellationToken.None);
+
+        Assert.IsType<ResultadoComando.CorreccionInvalida>(resultado);
+        Assert.DoesNotContain(nameof(IUnidadDeTrabajo.ReemplazarLineasAsync), store.UnidadDeTrabajo.Llamadas);
+        Assert.False(store.UnidadDeTrabajo.Committed);
+    }
 }

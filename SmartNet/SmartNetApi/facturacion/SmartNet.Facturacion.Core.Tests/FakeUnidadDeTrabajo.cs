@@ -136,11 +136,43 @@ public sealed class FakeUnidadDeTrabajo : IUnidadDeTrabajo
         return Task.FromResult(AsientoVigenteId);
     }
 
+    // BACKLOG #24 -- hechos que ResolverHechosDeComposicionAsync devuelve; default sano no-nulo
+    // (proveedor no relacionado, sin motivo, sin TC, sin cuenta sugerida -> design A2 placeholder).
+    public HechosDeComposicion HechosACargar { get; set; } = new(false, null, null, null);
+    public AsientoContable? UltimoAsientoBorradorCreado { get; private set; }
+    public AsientoContable? UltimoAsientoReemplazado { get; private set; }
+    public ResultadoEscritura ResultadoDeReemplazarLineas { get; set; } = ResultadoEscritura.Aplicado;
+
+    public Task<HechosDeComposicion> ResolverHechosDeComposicionAsync(long facturaId, CancellationToken ct)
+    {
+        Llamadas.Add(nameof(ResolverHechosDeComposicionAsync));
+        return Task.FromResult(HechosACargar);
+    }
+
+    // BACKLOG #24 (design C1) -- dbo.CuentaContable por código exacto; vacío por defecto -> null ->
+    // RecomponerAsync devuelve CorreccionInvalida (422) para un cuentaCodigo desconocido.
+    public Dictionary<string, SmartNet.Catalogos.Core.CuentaContable> CuentasContables { get; } = new(StringComparer.Ordinal);
+
+    public Task<SmartNet.Catalogos.Core.CuentaContable?> ObtenerCuentaContableAsync(string cuentaCodigo, CancellationToken ct)
+    {
+        Llamadas.Add(nameof(ObtenerCuentaContableAsync));
+        return Task.FromResult(CuentasContables.TryGetValue(cuentaCodigo, out var cuenta) ? cuenta : null);
+    }
+
     public Task<long> CrearAsientoBorradorAsync(
-        long facturaId, string proveedorCodigo, DateOnly fechaContable, CancellationToken ct)
+        long facturaId, AsientoContable asiento, CancellationToken ct)
     {
         Llamadas.Add(nameof(CrearAsientoBorradorAsync));
+        UltimoAsientoBorradorCreado = asiento;
         return Task.FromResult(AsientoBorradorCreadoId);
+    }
+
+    public Task<ResultadoEscritura> ReemplazarLineasAsync(
+        long asientoContableId, byte[] versionEsperada, AsientoContable asiento, CancellationToken ct)
+    {
+        Llamadas.Add(nameof(ReemplazarLineasAsync));
+        UltimoAsientoReemplazado = asiento;
+        return Task.FromResult(ResultadoDeReemplazarLineas);
     }
 
     public Task<long> RegistrarAdjuntoAsync(AdjuntoManual adjunto, CancellationToken ct)

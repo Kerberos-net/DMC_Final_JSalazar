@@ -252,6 +252,76 @@ public sealed class ServicioDeAsientos
         return new ResultadoComando.Aplicado();
     }
 
+    /// <summary>BACKLOG #24 (design B2/C1) — <c>POST /api/asientos/{id}/recomponer</c>: regenera
+    /// TODAS las líneas del asiento BORRADOR desde los valores actuales de la factura más los hechos
+    /// externos (<see cref="IUnidadDeTrabajo.ResolverHechosDeComposicionAsync"/>) y re-deriva los
+    /// escalares del encabezado, reemplazando cualquier reparto manual previo vía
+    /// <see cref="IUnidadDeTrabajo.ReemplazarLineasAsync"/> (CAS de encabezado). Escribe UNA fila
+    /// <c>REPARTO_MANUAL</c> (design B3): la recomposición destruye el reparto manual del asistente y
+    /// eso necesita rastro. Mismo gate BORRADOR que el resto de comandos de línea.
+    ///
+    /// <paramref name="cuentaCodigo"/> (design C1, cierra el bucle A2): cuando el asistente elige una
+    /// cuenta explícita, se resuelve contra <c>dbo.CuentaContable</c>
+    /// (<see cref="IUnidadDeTrabajo.ObtenerCuentaContableAsync"/>) y se inyecta en los hechos como
+    /// <c>CuentaSugerida</c> antes de sembrar, de modo que la recomposición produce un asiento
+    /// PRINCIPAL + DESTINO completo en una sola acción. Un <c>cuentaCodigo</c> no nulo pero
+    /// irresoluble devuelve <see cref="ResultadoComando.CorreccionInvalida"/> (422): la cuenta del
+    /// cuerpo es un dato de forma del comando, no una regla contable. Ausente ⇒ vuelve a correr la
+    /// cascada de sugerencia (o el placeholder de design A2 si no hay ninguna).</summary>
+    public async Task<ResultadoComando> RecomponerAsync(
+        long asientoId, byte[] versionEsperada, string? cuentaCodigo, long usuarioId, DateTimeOffset ahora,
+        CancellationToken ct)
+    {
+        await using var uow = await _store.AbrirAsync(ct);
+
+        var persistido = await uow.CargarAsientoAsync(asientoId, ct);
+        if (persistido is null)
+        {
+            return new ResultadoComando.NoEncontrado();
+        }
+
+        if (persistido.Estado != AsientoPersistido.Borrador)
+        {
+            return new ResultadoComando.Conflicto(
+                CasoConflicto.AsientoYaConfirmado, "El asiento ya fue confirmado — reábralo antes de recomponerlo.");
+        }
+
+        var factura = await uow.CargarFacturaAsync(persistido.FacturaId, ct);
+        if (factura is null)
+        {
+            return new ResultadoComando.NoEncontrado();
+        }
+
+        var antes = await uow.CargarLineasPersistidasAsync(asientoId, ct);
+        var hechos = await uow.ResolverHechosDeComposicionAsync(persistido.FacturaId, ct);
+
+        if (cuentaCodigo is not null)
+        {
+            var cuenta = await uow.ObtenerCuentaContableAsync(cuentaCodigo, ct);
+            if (cuenta is null)
+            {
+                return new ResultadoComando.CorreccionInvalida(
+                    $"La cuenta contable '{cuentaCodigo}' no existe en el plan de cuentas.");
+            }
+
+            hechos = hechos with { CuentaSugerida = cuenta };
+        }
+
+        var asiento = SembradoDeAsiento.Sembrar(factura, hechos);
+
+        var escritura = await uow.ReemplazarLineasAsync(asientoId, versionEsperada, asiento, ct);
+        var resultadoEscritura = ServicioDeFacturas.TraducirResultadoEscritura(escritura);
+        if (resultadoEscritura is not null)
+        {
+            return resultadoEscritura;
+        }
+
+        await RegistrarRepartoManualAsync(uow, asientoId, antes, usuarioId, ahora, ct);
+
+        await uow.CommitAsync(ct);
+        return new ResultadoComando.Aplicado();
+    }
+
     /// <summary>design D6, fila 7: "manual split override -&gt; REPARTO_MANUAL, Campo=Cargos, JSON
     /// array -&gt; JSON array, Motivo=null". Recarga las líneas DESPUÉS de la escritura para construir
     /// el snapshot <c>ValorNuevo</c> -- <paramref name="antes"/> ya trae el snapshot previo.</summary>

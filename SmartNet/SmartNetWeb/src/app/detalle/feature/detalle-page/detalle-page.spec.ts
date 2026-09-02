@@ -63,7 +63,11 @@ describe('DetallePage', () => {
     ],
   };
 
-  async function crearPagina(facturaOverride: Partial<FacturaRespuesta> = {}, asientoOverride: Partial<AsientoRespuesta> = {}) {
+  async function crearPagina(
+    facturaOverride: Partial<FacturaRespuesta> = {},
+    asientoOverride: Partial<AsientoRespuesta> = {},
+    sinAsiento = false
+  ) {
     const facturaFlush = { ...factura, ...facturaOverride };
     const asientoFlush = { ...asiento, ...asientoOverride };
     await TestBed.configureTestingModule({
@@ -82,7 +86,12 @@ describe('DetallePage', () => {
     httpMock.expectOne('/api/facturas/42').flush(facturaFlush, { headers: { ETag: '"f1"' } });
     httpMock
       .expectOne('/api/facturas/42/asiento')
-      .flush({ asientoContableId: 7, asiento: asientoFlush } as FacturaAsientoRespuesta, { headers: { ETag: '"a1"' } });
+      .flush(
+        (sinAsiento
+          ? { asientoContableId: null, asiento: null }
+          : { asientoContableId: 7, asiento: asientoFlush }) as FacturaAsientoRespuesta,
+        { headers: { ETag: '"a1"' } }
+      );
     httpMock.expectOne('/api/facturas/42/documentos').flush([]);
     httpMock.expectOne('/api/facturas/42/historial').flush([]);
     await Promise.resolve();
@@ -388,6 +397,119 @@ describe('DetallePage', () => {
 
       expect(fixture.componentInstance.categoriaProblema()).toBe('invariante');
       expect(fixture.componentInstance.borradorFactura()).toEqual({ baseImponible: 400, igv: 72 });
+    });
+  });
+
+  /* Phase 5 (BACKLOG #24): recomponer asiento action. */
+  describe('recomponer asiento', () => {
+    it('shows the "Recomponer asiento" button on a BORRADOR asiento', async () => {
+      const fixture = await crearPagina();
+      expect(fixture.nativeElement.querySelector('[data-testid="recomponer-asiento"]')).toBeTruthy();
+    });
+
+    it('hides the "Recomponer asiento" button once the asiento is CONFIRMADO', async () => {
+      const fixture = await crearPagina({}, { estado: 'CONFIRMADO' });
+      expect(fixture.nativeElement.querySelector('[data-testid="recomponer-asiento"]')).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="confirmar-recomponer"]')).toBeNull();
+    });
+
+    it('asks for confirmation, then POSTs /asientos/{id}/recomponer with If-Match', async () => {
+      const fixture = await crearPagina();
+
+      fixture.nativeElement.querySelector('[data-testid="recomponer-asiento"]').click();
+      fixture.detectChanges();
+      expect(fixture.nativeElement.querySelector('[data-testid="confirmar-recomponer"]')).toBeTruthy();
+
+      const promesa = fixture.componentInstance.onRecomponer();
+      const req = httpMock.expectOne('/api/asientos/7/recomponer');
+      expect(req.request.method).toBe('POST');
+      expect(req.request.headers.get('If-Match')).toBe('"a1"');
+      req.flush({ ...asiento, lineas: [] }, { headers: { ETag: '"a2"' } });
+      await promesa;
+
+      expect(fixture.componentInstance.problema()).toBeNull();
+    });
+  });
+
+  /* Phase 5 (BACKLOG #24): generar asiento when none exists (foreign no-TC promotion). */
+  describe('generar asiento', () => {
+    it('shows the "Generar asiento" affordance when there is no asiento', async () => {
+      const fixture = await crearPagina({ moneda: 'USD' }, {}, true);
+      expect(fixture.componentInstance.asiento()).toBeNull();
+      expect(fixture.nativeElement.querySelector('[data-testid="generar-asiento"]')).toBeTruthy();
+    });
+
+    it('does not show the "Generar asiento" affordance when an asiento exists', async () => {
+      const fixture = await crearPagina();
+      expect(fixture.nativeElement.querySelector('[data-testid="generar-asiento"]')).toBeNull();
+    });
+
+    it('POSTs /facturas/{id}/abrir then reloads everything', async () => {
+      const fixture = await crearPagina({ moneda: 'USD' }, {}, true);
+
+      const promesa = fixture.componentInstance.generarAsiento();
+      const abrir = httpMock.expectOne('/api/facturas/42/abrir');
+      expect(abrir.request.method).toBe('POST');
+      abrir.flush(null);
+      await Promise.resolve();
+      await Promise.resolve();
+
+      httpMock.expectOne('/api/facturas/42').flush(factura, { headers: { ETag: '"f2"' } });
+      httpMock
+        .expectOne('/api/facturas/42/asiento')
+        .flush({ asientoContableId: 7, asiento } as FacturaAsientoRespuesta, { headers: { ETag: '"a2"' } });
+      httpMock.expectOne('/api/facturas/42/documentos').flush([]);
+      httpMock.expectOne('/api/facturas/42/historial').flush([]);
+      await promesa;
+
+      expect(fixture.componentInstance.asiento()).toEqual(asiento);
+    });
+  });
+
+  /* Phase 5 (BACKLOG #24): cabecera↔detalle descuadre marker on a BORRADOR asiento. */
+  describe('descuadre marker', () => {
+    it('shows the descuadre warning when the seeded split is unbalanced on BORRADOR', async () => {
+      const fixture = await crearPagina(
+        {},
+        {
+          lineas: [
+            { lineaId: 1, orden: 1, bloque: 'PRINCIPAL', tipo: 'D', debe: 600, haber: 0, cuentaCodigo: '631111', cuentaDescripcion: null, ctaReflejaCodigo: null, ctaPuenteCodigo: null },
+            { lineaId: 2, orden: 2, bloque: 'PRINCIPAL', tipo: 'H', debe: 0, haber: 1000, cuentaCodigo: '421211', cuentaDescripcion: null, ctaReflejaCodigo: null, ctaPuenteCodigo: null },
+          ],
+        }
+      );
+      expect(fixture.componentInstance.descuadreAsiento()).toBe(true);
+      expect(fixture.nativeElement.querySelector('[data-testid="descuadre-asiento"]')).toBeTruthy();
+    });
+
+    it('does not show the descuadre warning when the asiento balances', async () => {
+      const fixture = await crearPagina(
+        {},
+        {
+          lineas: [
+            { lineaId: 1, orden: 1, bloque: 'PRINCIPAL', tipo: 'D', debe: 118, haber: 0, cuentaCodigo: '631111', cuentaDescripcion: null, ctaReflejaCodigo: null, ctaPuenteCodigo: null },
+            { lineaId: 2, orden: 2, bloque: 'PRINCIPAL', tipo: 'H', debe: 0, haber: 118, cuentaCodigo: '421211', cuentaDescripcion: null, ctaReflejaCodigo: null, ctaPuenteCodigo: null },
+          ],
+        }
+      );
+      expect(fixture.componentInstance.descuadreAsiento()).toBe(false);
+      expect(fixture.nativeElement.querySelector('[data-testid="descuadre-asiento"]')).toBeNull();
+    });
+
+    it('does not show the descuadre warning once the asiento is CONFIRMADO', async () => {
+      const fixture = await crearPagina({}, { estado: 'CONFIRMADO' });
+      expect(fixture.componentInstance.descuadreAsiento()).toBe(false);
+    });
+  });
+
+  /* Phase 5 regression (BACKLOG #24): base/IGV in factura-form come from the seeded asiento. */
+  describe('factura-form base/IGV regression', () => {
+    it('passes the seeded asiento basePEN/igvPEN down to factura-form', async () => {
+      const fixture = await crearPagina({ estado: 'VALIDADA' }, { basePEN: 100, igvPEN: 18 });
+      const base = fixture.nativeElement.querySelector('[data-testid="valor-base"]');
+      const igv = fixture.nativeElement.querySelector('[data-testid="valor-igv"]');
+      expect(base.textContent.trim()).toBe('100.00');
+      expect(igv.textContent.trim()).toBe('18.00');
     });
   });
 });

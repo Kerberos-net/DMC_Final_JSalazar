@@ -361,7 +361,13 @@ public sealed class ServicioDeFacturas
             }
         }
 
-        await uow.CrearAsientoBorradorAsync(facturaId, factura.ProveedorCodigo, factura.FechaEmision, ct);
+        // BACKLOG #24 (design A1/A3/B1) -- resuelve los hechos externos, siembra el asiento con
+        // ComposicionDeAsiento.Componer (puro, sin tocar) y lo persiste (encabezado + N lineas) en
+        // esta misma transaccion. El sembrado NO escribe AuditoriaCorreccion (design B3: abrir no
+        // esta en el enum Accion; el asiento ES el registro).
+        var hechos = await uow.ResolverHechosDeComposicionAsync(facturaId, ct);
+        var asiento = SembradoDeAsiento.Sembrar(factura, hechos);
+        await uow.CrearAsientoBorradorAsync(facturaId, asiento, ct);
         await uow.CommitAsync(ct);
         return new ResultadoComando.Aplicado();
     }
