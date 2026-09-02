@@ -29,7 +29,7 @@ public sealed class SesionPurgarTests : AdminOperationsTestBase
         await Sesiones.CreateAsync(usuarioId, tokenHashVieja, ahora.AddHours(8), "ticket-viejo", CancellationToken.None);
         await Sesiones.CreateAsync(usuarioId, tokenHashNueva, ahora.AddHours(8), "ticket-nuevo", CancellationToken.None);
         await Db.ExecuteNonQueryAsync(
-            $"UPDATE fact.Sesion SET CreadaEn = DATEADD(DAY, -100, SYSUTCDATETIME()) WHERE TokenHash = '{tokenHashVieja}';");
+            $"UPDATE fact.Sesion SET CreadaEn = '{ahora.AddDays(-100):yyyy-MM-dd HH:mm:ss}' WHERE TokenHash = '{tokenHashVieja}';");
 
         var sut = new AdminOperations(
             Usuarios, Sesiones, new Argon2idPasswordHasher(), new FakePasswordPrompt("no-se-usa"), timeProvider);
