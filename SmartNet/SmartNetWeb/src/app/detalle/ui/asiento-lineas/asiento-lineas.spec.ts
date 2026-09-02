@@ -99,6 +99,26 @@ describe('AsientoLineas', () => {
     expect((emitido!.linea as { debe: number }).debe).toBe(100);
   });
 
+  it('editing a línea inline can assign its cuentaCodigo (engine seed left it SinCuenta)', () => {
+    const sinCuenta: LineaRespuesta = { ...lineaD, cuentaCodigo: null };
+    const fixture = createComponent([sinCuenta, lineaH]);
+    let emitido: { lineaId: number; linea: unknown } | null = null;
+    fixture.componentInstance.editarLinea.subscribe((e) => (emitido = e));
+
+    (fixture.nativeElement.querySelector('[data-testid="editar-1"]') as HTMLButtonElement).click();
+    fixture.detectChanges();
+
+    const cuentaInput: HTMLInputElement = fixture.nativeElement.querySelector('[data-testid="editar-cuentaCodigo-1"]');
+    expect(cuentaInput).not.toBeNull();
+    cuentaInput.value = '639915';
+    cuentaInput.dispatchEvent(new Event('input'));
+    fixture.detectChanges();
+
+    (fixture.nativeElement.querySelector('[data-testid="confirmar-edicion-1"]') as HTMLButtonElement).click();
+
+    expect((emitido!.linea as { cuentaCodigo: string }).cuentaCodigo).toBe('639915');
+  });
+
   it('adding a línea emits agregarLinea with the composed request', () => {
     const fixture = createComponent([lineaD, lineaH]);
     let emitido: unknown = null;

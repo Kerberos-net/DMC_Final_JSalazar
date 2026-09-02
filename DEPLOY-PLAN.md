@@ -477,6 +477,63 @@ El usuario ejecuta cada script en la VM como Administrador, con guía paso a pas
   (ACL Administradores+SYSTEM), `logs/`, `adjuntos/` (volumen compartido), `caddy/data/` (CA).
 - Keyring de Data Protection en `C:\ProgramData\SmartNet\dataprotection-keys`.
 
+---
+
+## Release v1.1.0 — plan de actualización (2026-09-01)
+
+**Segundo despliegue.** El primero dejó la VM en verde con contenido ≈ commit `480d5bc` (rama
+divergente, nunca tageado). `main` acumuló desde entonces todo el trabajo de producto sin desplegar.
+
+### Alcance (qué cambia respecto a lo que corre en la VM)
+
+| Área | Cambios | ¿Toca infraestructura? |
+|---|---|---|
+| Esquema | **`021_*.sql`** — `fact.Factura.Glosa` + `CamposNoExtraidos` (BACKLOG #19). Aditivo, idempotente. | **Sí** — `SmartNet.Db.Runner` aplica `021` contra `BDSmartNet` compartida |
+| API | BACKLOG #19 (base/IGV/glosa editables + proyección contable), #23 (registro de compra), #24 (ComposicionDeAsiento en el ciclo productivo), #25/#26 (asociación PDF↔XML en promoción) | Reemplazo in situ de `api/` (parada de servicio ~segundos) |
+| SPA | #19/#23/#24 + fix de esta sesión: input de cuenta en la edición inline de `asiento-lineas` (línea sembrada `SinCuenta` no tenía forma de recibir cuenta en la UI) | Copia de `web/` + reload de Caddy, sin tocar backend |
+| Worker | #25/#26 (asociación de PDF sin clave al XML por nombre de archivo) | Actualización del wheel en el venv |
+| Config/secretos | **sin cambios** — ninguna variable nueva | No |
+
+### Método (decisión del usuario, 2026-09-01)
+
+**Build local + copiar**, igual que el primer pase. Sin push a origin, sin CI, sin tag.
+Se asume la brecha de trazabilidad (el `zip` no queda atado a un SHA publicado).
+
+1. Commit del fix SPA pendiente (`asiento-lineas.html` + spec, test verde) → entra en el release.
+2. Verificación local previa (sustituye al gate "CI verde"):
+   - SPA: `npm run build` + `npm test` (Vitest) + `npm run lint` (tsc).
+   - .NET: `dotnet build -c Release SmartNet.sln`. La suite completa necesita SQL Server local;
+     si no está disponible se documenta como no ejecutada (riesgo asumido, mismo que el 1er pase).
+   - Worker: `python -m build` + `pytest` si hay ODBC/SQL local.
+3. Empaquetado `smartnet-v1.1.0.zip` con los comandos del workflow (`dotnet publish` x3, `npm ci &&
+   npm run build`, `python -m build`, copia de `schema/` + `fixtures/` + `deploy/`, `VERSION` con
+   el SHA corto de `main`).
+4. El usuario lleva el `zip` a la VM y corre `deploy/deploy.ps1 -Environment prod` como
+   Administrador, en el orden de ADR 0012 (deshabilitar worker → runner `021` → swap API → swap
+   web → venv worker → re-habilitar worker). `$AplicarFixturesCatalogoDemo` se mantiene en el
+   valor del primer pase.
+5. `deploy/verify.ps1 -Environment prod` — mismas comprobaciones; se añade confirmar `≥ 22` filas
+   en `fact.SchemaVersions` (21 scripts + `021`... revisar el conteo real tras aplicar).
+
+### Autorización que se pedirá en EXECUTE
+
+- Correr `SmartNet.Db.Runner` (aplica `021` sobre la base **compartida**). Aditivo y reversible
+  solo con un script forward nuevo — un rollback de código no revierte la columna.
+- El resto de pasos los ejecuta el usuario a mano en la VM con guía.
+
+### Riesgo abierto no relacionado con el deploy
+
+La invariante REGLAS.md §7 PRINCIPAL (`bloque-principal-invalido`) rechaza asientos editados a
+mano que ya no cuadran con los importes congelados de la factura. Es comportamiento correcto de la
+regla, no un bug; el camino previsto es "Recomponer asiento". Queda pendiente confirmar si
+`BasePEN` se está proyectando con el total en vez de la base en algún caso. **No bloquea v1.1.0.**
+
+### Registro de ejecución v1.1.0
+
+_(pendiente)_
+
+---
+
 ### Pendiente (no bloquea la demo)
 
 1. ~~Crear un usuario para la SPA~~ — **hecho 2026-09-01**: `smartnet-admin.exe usuario crear`

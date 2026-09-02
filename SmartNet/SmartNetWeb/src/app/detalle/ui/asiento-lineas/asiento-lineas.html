@@ -17,7 +17,14 @@
         <tr [attr.data-testid]="'linea-' + linea.lineaId">
           <td>{{ linea.bloque }}</td>
           <td>{{ linea.tipo }}</td>
-          <td>{{ linea.cuentaCodigo }}</td>
+          <td>
+            <input
+              [attr.data-testid]="'editar-cuentaCodigo-' + linea.lineaId"
+              placeholder="Cuenta"
+              [value]="borradorEdicion().cuentaCodigo"
+              (input)="onCampoEdicion('cuentaCodigo', $any($event.target).value)"
+            />
+          </td>
           <td>
             <input
               [attr.data-testid]="'editar-debe-' + linea.lineaId"
