@@ -16,6 +16,7 @@ Listado de archivos y carpetas de la raíz del repositorio con una descripción 
 | ├─ 📄 `DECISIONES REVISION`    | Registro incremental de las decisiones tomadas para cerrar los hallazgos de REVISION-ADVERSARIAL         |
 | ├─ 📄 `DEPLOY PLAN`            |                                                                                                          |
 | ├─ 📄 `DESIGN`                 | Paleta y tokens del tema visua                                                                           |
+| ├─ 📄 `DRIFT`                  |                                                                                                          |
 | ├─ 📄 `DESIGN BRIEF`           | Brief de diseño de las pantallas, basado en el PRD; entrada para generar prototipos.                     |
 | ├─ 📄 `DEUDA TÉCNICA`          |                                                                                                          |
 | ├─ 📄 `HARNESS`                | Índice de *harnesses* activos en el repo (flujos chicos de un solo propósito).                           |
