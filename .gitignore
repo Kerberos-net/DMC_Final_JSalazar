@@ -18,6 +18,8 @@ __pycache__/
 *.egg-info/
 .pytest_cache/
 *.pyc
+SmartNet/SmartNetWorker/build/
+SmartNet/SmartNetWorker/dist_wheel/
 .claude/.lecciones-aprendidas-seen
 
 # Deploy: config y secretos por entorno viven SOLO en el host, nunca en el repo
